@@ -1,0 +1,63 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: somtop_db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: somtop_db
+      MYSQL_USER: devuser
+      MYSQL_PASSWORD: devpassword
+    ports:
+      - "3307:3306"
+    volumes:
+      - ./mysql-data:/var/lib/mysql
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: somtop_phpmyadmin
+    restart: always
+    environment:
+      PMA_HOST: db 
+      MYSQL_ROOT_PASSWORD: rootpassword
+    ports:
+      - "8087:80" 
+    depends_on:
+      - db
+
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile # เพิ่มการชี้ไปที่ Dockerfile
+    container_name: somtop_backend
+    restart: always
+    ports:
+      - "8088:8088"
+    # --- ส่วนที่เพิ่มเข้ามาใหม่สำหรับ Node.js ---
+    environment:
+      PORT: 8088
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: devuser
+      DB_PASSWORD: devpassword
+      DB_NAME: somtop_db
+      JWT_SECRET: your_super_secret_jwt_key
+      CLIENT_URL: http://localhost:5173
+    # ------------------------
+    volumes:
+      - ./backend:/app   
+      - /app/node_modules
+    depends_on:
+      - db
+
+  frontend:
+    image: node:20
+    container_name: somtop_frontend
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+    ports:
+      - "5173:5173"
+    command: sh -c "npm install && npm run dev -- --host"
+    depends_on:
+      - backend
