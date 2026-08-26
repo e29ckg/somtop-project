@@ -10,7 +10,7 @@ const pool = require('../config/db');
 const logActivity = async (req, action, moduleName, details = null) => {
     try {
         // ดึงข้อมูล User จาก Token (รองรับทั้งโครงสร้างปกติ และแบบซ้อนใน data)
-        const user = req.user?.data || req.user || {};
+        const user = req.user?.data || req.user || req.username || {};
         const userId = user.id || null;
         const username = user.username || 'System';
 

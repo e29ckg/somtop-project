@@ -63,7 +63,7 @@ exports.login = async (req, res) => {
             path: '/' // ให้ Cookie ส่งไปทุก Route ในโดเมนนี้
         });
         
-        logActivity(req, 'เข้าสู่ระบบ', 'ระบบสมาชิก', 'เข้าสู่ระบบสำเร็จ');
+        logActivity(payload.data.username, 'เข้าสู่ระบบ', 'ระบบสมาชิก', 'เข้าสู่ระบบสำเร็จ');
         // ส่งข้อมูล User กลับไปให้ Frontend (ไม่ต้องส่ง Token แล้ว)
         res.status(200).json({
             message: 'เข้าสู่ระบบสำเร็จ',
