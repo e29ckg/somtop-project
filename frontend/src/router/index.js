@@ -9,6 +9,9 @@ import ManageUserView from '../views/ManageUserView.vue'
 import ManageCourtView from '../views/ManageCourtView.vue'
 import ActivityLogsView from '../views/ActivityLogsView.vue'
 import ManageTitleView from '../views/ManageTitleView.vue'
+import ManageEventView from '../views/ManageEventView.vue'
+import ManageEventTypeView from '../views/ManageEventTypeView.vue'
+import ManagePositionView from '../views/ManagePositionView.vue'
 
 // 1. สร้าง router ขึ้นมาก่อน
 const router = createRouter({
@@ -57,6 +60,21 @@ const router = createRouter({
           path: 'manage-titles',
           name: 'manage-titles',
           component: ManageTitleView
+        },
+        {
+          path: 'manage-events',
+          name: 'manage-events',
+          component: ManageEventView
+        },
+        {
+          path: 'manage-event-types',
+          name: 'manage-event-types',
+          component: ManageEventTypeView
+        },
+        {
+          path: 'manage-positions',
+          name: 'manage-positions',
+          component: ManagePositionView
         }
       ]
     },

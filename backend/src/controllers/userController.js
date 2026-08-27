@@ -8,8 +8,18 @@ const { logActivity } = require('../utils/logger');
 exports.getAllUsers = async (req, res) => {
     try {
         const [rows] = await pool.query(
-            `SELECT id, username, full_name, role, court_code, last_login, created_at 
-             FROM users ORDER BY created_at DESC`
+            `SELECT 
+                id, 
+                username, 
+                full_name, 
+                role, 
+                court_code, 
+                DATE_FORMAT(last_login, '%Y-%m-%d %H:%i:%s') AS last_login, 
+                DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') AS created_at, 
+                failed_login_attempts, 
+                DATE_FORMAT(lockout_until, '%Y-%m-%d %H:%i:%s') AS lockout_until 
+             FROM users 
+             ORDER BY created_at DESC`
         );
         res.status(200).json({ records: rows });
     } catch (error) {
@@ -114,5 +124,30 @@ exports.deleteUser = async (req, res) => {
     } catch (error) {
         console.error('Error in deleteUser:', error);
         res.status(500).json({ message: 'ไม่สามารถลบข้อมูลได้' });
+    }
+};
+
+// ==========================================
+// 5. ปลดล็อกบัญชีผู้ใช้งาน (Admin Only)
+// ==========================================
+exports.unlockUser = async (req, res) => {
+    try {
+        const { id } = req.body; // หรือรับจาก req.params ขึ้นอยู่กับการออกแบบ Route
+
+        if (!id) return res.status(400).json({ message: 'ไม่ได้ระบุ ID ผู้ใช้งาน' });
+
+        const [result] = await pool.query(
+            'UPDATE users SET failed_login_attempts = 0, lockout_until = NULL WHERE id = ?', 
+            [id]
+        );
+
+        if (result.affectedRows > 0) {
+            res.status(200).json({ message: 'ปลดล็อกบัญชีสำเร็จ' });
+        } else {
+            res.status(404).json({ message: 'ไม่พบผู้ใช้งาน' });
+        }
+    } catch (error) {
+        console.error('Error unlocking user:', error);
+        res.status(500).json({ message: 'ไม่สามารถปลดล็อกบัญชีได้' });
     }
 };

@@ -42,6 +42,7 @@
             <tr>
               <th width="70">รูปถ่าย</th>
               <th>ชื่อ-สกุล</th>
+              <th>ตำแหน่ง</th>
               <th>วัน/เดือน/ปีเกิด</th>
               <th>อายุ (ปี)</th>
               <th>เบอร์โทร</th>
@@ -57,6 +58,7 @@
               </td>
               <!-- Backend ทำ CONCAT รวมชื่อมาให้แล้วในชื่อตัวแปร full_name -->
               <td class="full-name">{{ person.full_name }}</td>
+              <td>{{ person.role_position }}</td>
               <td>{{ formatThaiDateFull(person.dob) }}</td>
               <td>
                 <span class="age-badge" :class="getAgeColorClass(calculateAge(person.dob))">
@@ -172,6 +174,37 @@
             </div>
           </div>
 
+          <!-- ⭐️ เพิ่มกล่องเลือกตำแหน่ง -->
+          <div class="input-group">
+            <label>ตำแหน่ง</label>
+            <select v-model="formData.position_id" required>
+              <option value="" disabled>-- เลือกตำแหน่ง --</option>
+              <option v-for="pos in positions" :key="pos.id" :value="pos.id">
+                {{ pos.name }}
+              </option>
+            </select>
+          </div>
+
+          <!-- ⭐️ เพิ่มกล่องเลือกวันที่เข้ารับตำแหน่ง (ใช้โครงสร้างเดียวกับวันเกิด) -->
+          <div class="input-group">
+            <label>วันที่เข้ารับตำแหน่ง</label>
+            <div class="date-inputs">
+              <select v-model="formData.join_day">
+                <option value="">วัน</option>
+                <option v-for="d in days" :key="d" :value="d">{{ parseInt(d) }}</option>
+              </select>
+              <select v-model="formData.join_month">
+                <option value="">เดือน</option>
+                <option v-for="m in thaiMonths" :key="m.value" :value="m.value">{{ m.label }}</option>
+              </select>
+              <select v-model="formData.join_year">
+                <option value="">ปี พ.ศ.</option>
+                <!-- ใช้ dobYears หรือสร้างตัวแปร year ใหม่สำหรับปีปัจจุบันย้อนหลังสั้นๆ ก็ได้ครับ -->
+                <option v-for="y in dobYears" :key="y.value" :value="y.value">{{ y.label }}</option>
+              </select>
+            </div>
+          </div>
+
           <div class="input-group">
             <label>เบอร์โทร</label>
             <input type="text" v-model="formData.phone" />
@@ -222,6 +255,7 @@ const thaiMonths = [
 ]
 
 const titles = ref([])
+const positions = ref([])
 
 const currentYear = new Date().getFullYear()
 const dobYears = Array.from({length: 81}, (_, i) => {
@@ -241,6 +275,8 @@ const formData = ref({
   title: 'นาย', firstName: '', lastName: '', 
   idCard: '', 
   dob_day: '', dob_month: '', dob_year: '', 
+  position_id: '', 
+  join_day: '', join_month: '', join_year: '', 
   address: '', phone: '', status: 'ใช้งาน', note: '',
   photo: null, existing_photo_path: ''
 })
@@ -255,18 +291,13 @@ const itemsPerPage = ref(10)
 // ฟังก์ชันต่างๆ
 const formatThaiDateFull = (dateStr) => {
   if (!dateStr || dateStr === '0000-00-00') return '-';
-  
-  // ⭐️ นำ dateStr มา split('-') ได้โดยตรงเลยครับ
-  const [year, month, day] = dateStr.split('-');
-  
+  const [year, month, day] = dateStr.split('-');  
   const monthNames = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
   return `${parseInt(day)} ${monthNames[parseInt(month) - 1]} ${parseInt(year) + 543}`;
 }
 
 const calculateAge = (dobStr) => {
   if (!dobStr || dobStr === '0000-00-00') return '-';
-  
-  // ตัด T ออกเผื่อไว้ในกรณีที่มีเวลาติดมา
   const dateOnly = dobStr.split('T')[0];
   const birthDate = new Date(dateOnly);
   const today = new Date();
@@ -319,6 +350,15 @@ const fetchTitles = async () => {
   }
 }
 
+const fetchPositions = async () => {
+  try {
+    const response = await api.get('/positions');
+    positions.value = response.data.records || [];
+  } catch (error) {
+    console.error("ดึงข้อมูลตำแหน่งไม่สำเร็จ:", error);
+  }
+}
+
 // กรองข้อมูล
 const filteredSomtopList = computed(() => {
   if (!searchQuery.value) return somtopList.value;
@@ -363,6 +403,7 @@ const fetchSomtopList = async () => {
 }
 
 const saveData = async () => {
+  // ⭐️ 1. จัดการและเช็ก วัน/เดือน/ปีเกิด (บังคับกรอก)
   let formattedDob = null;
   if (formData.value.dob_year && formData.value.dob_month && formData.value.dob_day) {
     formattedDob = `${formData.value.dob_year}-${formData.value.dob_month}-${formData.value.dob_day}`;
@@ -371,7 +412,13 @@ const saveData = async () => {
     return;
   }
 
-  // ⭐️ เช็คว่ากรอกชื่อครบถ้วนหรือไม่
+  // ⭐️ 2. จัดการ วันที่เข้ารับตำแหน่ง (ถ้าไม่ได้กรอก จะเป็น null)
+  let formattedJoinDate = null;
+  if (formData.value.join_year && formData.value.join_month && formData.value.join_day) {
+    formattedJoinDate = `${formData.value.join_year}-${formData.value.join_month}-${formData.value.join_day}`;
+  }
+
+  // เช็กว่ากรอกชื่อครบถ้วนหรือไม่
   if (!formData.value.title || !formData.value.firstName || !formData.value.lastName) {
     swalError('ข้อมูลไม่ครบถ้วน', 'กรุณาระบุคำนำหน้า ชื่อ และสกุล ให้ครบถ้วน');
     return;
@@ -381,17 +428,22 @@ const saveData = async () => {
     const payload = new FormData()
     if (formData.value.id) payload.append('id', formData.value.id)
     
-    // ⭐️ อัปเดตการส่งแยก 3 ฟิลด์ ไปยัง Backend
     payload.append('title', formData.value.title)
     payload.append('first_name', formData.value.firstName)
     payload.append('last_name', formData.value.lastName)
-    
-    payload.append('id_card', formData.value.idCard)
+    payload.append('id_card', formData.value.idCard || '') // ⭐️ แก้ไขตรงนี้
     payload.append('dob', formattedDob)
-    payload.append('address', formData.value.address)
-    payload.append('phone', formData.value.phone)
+    payload.append('address', formData.value.address || '') // ⭐️ แก้ไขตรงนี้
+    payload.append('phone', formData.value.phone || '')     // ⭐️ แก้ไขตรงนี้
     payload.append('status', formData.value.status)
-    payload.append('note', formData.value.note)
+    payload.append('note', formData.value.note || '')       // ⭐️ แก้ไขตรงนี้
+    payload.append('position_id', formData.value.position_id)
+    
+// ...
+    
+    if (formattedJoinDate) {
+      payload.append('join_date', formattedJoinDate)
+    }
 
     if (formData.value.photo) {
       payload.append('photo', formData.value.photo)
@@ -400,7 +452,6 @@ const saveData = async () => {
     const config = { headers: { 'Content-Type': 'multipart/form-data' } }
 
     if (isEditing.value) {
-      // ใช้ PUT ตรงๆ กับ API Node.js
       await api.put('/somtop', payload, config)
       swalSuccess('บันทึกสำเร็จ', 'อัปเดตข้อมูลผู้พิพากษาสมทบสำเร็จ')
     } else {
@@ -432,42 +483,53 @@ const openAddModal = () => {
   isEditing.value = false
   previewPhotoUrl.value = ''
   formData.value = { 
-    id: null, 
-    title: 'นาย', firstName: '', lastName: '', 
-    idCard: '', 
+    id: null, title: 'นาย', firstName: '', lastName: '', idCard: '', 
     dob_day: '', dob_month: '', dob_year: '', 
-    address: '', phone: '', status: 'ใช้งาน', note: '',
-    photo: null, existing_photo_path: ''
+    position_id: '', join_day: '', join_month: '', join_year: '',
+    address: '', phone: '', status: 'ใช้งาน', note: '', photo: null, existing_photo_path: ''
   }
   isModalOpen.value = true
 }
 
 const openEditModal = (person) => {
   isEditing.value = true
-  
+    
+  // 1. แยก วัน/เดือน/ปีเกิด
   let dDay = '', dMonth = '', dYear = '';
   if (person.dob && person.dob !== '0000-00-00') {
-    const dateOnly = person.dob.split('T')[0];
-    const [y, m, d] = dateOnly.split('-');
+    const dobOnly = person.dob.split('T')[0];
+    const [y, m, d] = dobOnly.split('-');
     dYear = y; dMonth = m; dDay = d;
   }
 
+  // 2. แยก วันที่เข้ารับตำแหน่ง
+  let jDay = '', jMonth = '', jYear = '';
+  if (person.join_date && person.join_date !== '0000-00-00') {
+    const joinDateOnly = person.join_date.split('T')[0];
+    const [y, m, d] = joinDateOnly.split('-');
+    jYear = y; jMonth = m; jDay = d;
+  }
+  
   previewPhotoUrl.value = person.photo_path || ''
 
-  // ⭐️ ดึง title, first_name, last_name จาก DB มาใส่ฟอร์ม
   formData.value = {
     id: person.id,
     title: person.title || 'นาย',
     firstName: person.first_name || '',
     lastName: person.last_name || '',
-    idCard: person.id_card,
+    idCard: person.id_card || '',       // ⭐️ แก้ไข: เติม || '' ป้องกันค่าหลุดเป็น null
     dob_day: dDay,
     dob_month: dMonth,
     dob_year: dYear,
-    address: person.address,
-    phone: person.phone,
+    position_id: person.position_id || '', 
+    join_day: jDay, 
+    join_month: jMonth, 
+    join_year: jYear, 
+    address: person.address || '',      // ⭐️ แก้ไข
+    phone: person.phone || '',          // ⭐️ แก้ไข
     status: person.status,
-    note: person.note,
+    note: person.note || '',            // ⭐️ แก้ไข
+    // ⭐️ ลบ position_id และ join_date ที่ประกาศซ้ำซ้อนด้านล่างออก
     photo: null,
     existing_photo_path: person.photo_path || ''
   }
@@ -479,6 +541,7 @@ const closeModal = () => isModalOpen.value = false
 onMounted(() => {
   fetchSomtopList()
   fetchTitles()
+  fetchPositions()
 })
 </script>
 

@@ -15,34 +15,46 @@ const deletePhysicalFile = (relativePath) => {
 };
 
 // ==========================================
-// 1. ดึงข้อมูล พ.สมทบ ทั้งหมด
+// 1. ดึงข้อมูล พ.สมทบ ทั้งหมด (จัดเรียงตามอาวุโสแบบไดนามิก)
 // ==========================================
 exports.getAllSomtop = async (req, res) => {
     try {
         const courtCode = req.user.court_code; 
         
-        // ⭐️ ระบุชื่อคอลัมน์ทั้งหมด และใช้ DATE_FORMAT จัดการฟิลด์ dob
+        // ⭐️ ใช้ LEFT JOIN เพื่อดึงชื่อตำแหน่งและ Level จากตาราง somtop_positions
         let query = `
             SELECT 
-                id, title, first_name, last_name, id_card, court_code, 
-                DATE_FORMAT(dob, '%Y-%m-%d') AS dob, 
-                address, phone, status, note, photo_path, 
-                CONCAT(title, first_name, ' ', last_name) AS full_name 
-            FROM somtop
+                s.id, s.title, s.first_name, s.last_name, s.id_card, s.court_code, 
+                DATE_FORMAT(s.dob, '%Y-%m-%d') AS dob,
+                DATE_FORMAT(s.join_date, '%Y-%m-%d') AS join_date,
+                s.position_id, 
+                sp.name AS role_position, -- ส่งกลับไปในชื่อเดิมเพื่อให้ Frontend ไม่พัง
+                sp.level AS position_level,
+                s.address, s.phone, s.status, s.note, s.photo_path, 
+                CONCAT(s.title, s.first_name, ' ', s.last_name) AS full_name 
+            FROM somtop s
+            LEFT JOIN somtop_positions sp ON s.position_id = sp.id
         `;
         let params = [];
         
         if (courtCode) {
-            query += ' WHERE court_code = ?';
+            query += ' WHERE s.court_code = ?';
             params.push(courtCode);
         }
         
-        query += ' ORDER BY created_at DESC';
+        // ⭐️ เปลี่ยนมาจัดเรียงตาม sp.level ที่ตั้งไว้ในตารางแทน
+        query += ` 
+            ORDER BY 
+                sp.level ASC,       -- 1. เรียงตามระดับอาวุโสของตำแหน่ง (เลขน้อยขึ้นก่อน)
+                s.join_date ASC,    -- 2. เรียงตามวันที่เข้ารับตำแหน่ง
+                s.first_name ASC,   -- 3. เรียงตามตัวอักษรชื่อ
+                s.last_name ASC     -- 4. เรียงตามตัวอักษรนามสกุล
+        `;
         
         const [rows] = await pool.query(query, params);
 
         const records = rows.map(row => {
-            if (row.photo_path) row.photo_path = `${BASE_URL}/${row.photo_path}`;
+            if (row.photo_path) row.photo_path = `${process.env.APP_URL || 'http://localhost:8088'}/${row.photo_path}`;
             return row;
         });
 
@@ -54,38 +66,37 @@ exports.getAllSomtop = async (req, res) => {
 };
 
 // ==========================================
-// 2. เพิ่มข้อมูลใหม่ (พร้อมรูปภาพ และบันทึกศาล)
+// 2. เพิ่มข้อมูลใหม่
 // ==========================================
 exports.createSomtop = async (req, res) => {
     let photoPath = null;
     try {
-        const { title, first_name, last_name, id_card, dob, address, phone, status, note } = req.body;
-        const courtCode = req.user.data?.court_code || req.user.court_code;
-
+        // ⭐️ เปลี่ยน role_position เป็น position_id และเพิ่ม join_date
+        const { title, first_name, last_name, id_card, dob, join_date, position_id, address, phone, status, note } = req.body;
+        const courtCode = req.user.court_code; 
+        
         if (!title || !first_name || !last_name) {
-            // ⭐️ แก้ไข: ลบ ../ ออก
             if (req.file) deletePhysicalFile(`uploads/somtop/${req.file.filename}`);
             return res.status(400).json({ message: 'กรุณาระบุคำนำหน้า ชื่อ และสกุล ให้ครบถ้วน' });
         }
 
         if (req.file) {
-            // ⭐️ แก้ไข: ลบ ../ ออก เพื่อให้เก็บใน DB เป็น uploads/somtop/filename.jpg
             photoPath = `uploads/somtop/${req.file.filename}`;
         }
 
         const query = `
             INSERT INTO somtop 
-            (title, first_name, last_name, id_card, court_code, dob, address, phone, status, note, photo_path) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (title, first_name, last_name, id_card, court_code, dob, join_date, position_id, address, phone, status, note, photo_path) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         
         await pool.query(query, [
             title, first_name, last_name, id_card || null, courtCode, 
-            dob || null, address || null, phone || null, status || 'ใช้งาน', 
+            dob || null, join_date || null, position_id || null, 
+            address || null, phone || null, status || 'ใช้งาน', 
             note || null, photoPath
         ]);
 
-        logActivity(req, 'เพิ่มข้อมูล', 'จัดการ พ.สมทบ', `เพิ่มรายชื่อ: ${title}${first_name} ${last_name}`);
         res.status(201).json({ message: 'เพิ่มข้อมูลผู้พิพากษาสมทบสำเร็จ' });
     } catch (error) {
         console.error('Error creating somtop:', error);
@@ -95,17 +106,18 @@ exports.createSomtop = async (req, res) => {
         if (error.code === 'ER_DUP_ENTRY') {
             return res.status(400).json({ message: 'เลขบัตรประชาชนนี้ถูกใช้งานแล้ว กรุณาตรวจสอบอีกครั้ง' });
         }
-        
+
         res.status(500).json({ message: 'ไม่สามารถบันทึกข้อมูลได้' });
     }
 };
 
 // ==========================================
-// 3. แก้ไขข้อมูล (และจัดการไฟล์รูปใหม่ทับรูปเก่า)
+// 3. แก้ไขข้อมูล
 // ==========================================
 exports.updateSomtop = async (req, res) => {
     try {
-        const { id, title, first_name, last_name, id_card, dob, address, phone, status, note } = req.body;
+        // ⭐️ เปลี่ยน role_position เป็น position_id และเพิ่ม join_date
+        const { id, title, first_name, last_name, id_card, dob, join_date, position_id, address, phone, status, note } = req.body;
 
         if (!id || !title || !first_name || !last_name) {
             return res.status(400).json({ message: 'ข้อมูลไม่ครบถ้วน (ต้องการคำนำหน้า ชื่อ และสกุล)' });
@@ -119,33 +131,31 @@ exports.updateSomtop = async (req, res) => {
         let photoPath = existing[0].photo_path;
 
         if (req.file) {
-            // ⭐️ แก้ไข: ลบ ../ ออก
             photoPath = `uploads/somtop/${req.file.filename}`;
         }
 
         const query = `
             UPDATE somtop SET 
-                title = ?, first_name = ?, last_name = ?, id_card = ?, dob = ?, 
-                address = ?, phone = ?, status = ?, note = ?, photo_path = ? 
+                title = ?, first_name = ?, last_name = ?, id_card = ?, dob = ?, join_date = ?, 
+                position_id = ?, address = ?, phone = ?, status = ?, note = ?, photo_path = ? 
             WHERE id = ?
         `;
         
         await pool.query(query, [
-            title, first_name, last_name, id_card || null, dob || null, 
-            address || null, phone || null, status || 'ใช้งาน', 
+            title, first_name, last_name, id_card || null, dob || null, join_date || null,
+            position_id || null, address || null, phone || null, status || 'ใช้งาน', 
             note || null, photoPath, id
         ]);
 
         if (req.file && existing[0].photo_path) {
             deletePhysicalFile(existing[0].photo_path);
         }
-        logActivity(req, 'อัปเดตข้อมูล', 'จัดการ พ.สมทบ', `อัปเดตข้อมูล ID: ${id}`);
+
         res.status(200).json({ message: 'อัปเดตข้อมูลสำเร็จ' });
     } catch (error) {
         console.error('Error updating somtop:', error);
         
         if (req.file) {
-            // ⭐️ แก้ไข: ลบ ../ ออก
             deletePhysicalFile(`uploads/somtop/${req.file.filename}`);
         }
 

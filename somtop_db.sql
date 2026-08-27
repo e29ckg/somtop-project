@@ -14,6 +14,8 @@ CREATE TABLE users (
     last_login DATETIME NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP 
+    failed_login_attempts INT DEFAULT 0 COMMENT 'จำนวนครั้งที่ล็อกอินผิด',
+    lockout_until DATETIME NULL COMMENT 'เวลาที่จะปลดล็อกอัตโนมัติ';
 );
 
 CREATE TABLE courts (
@@ -29,23 +31,39 @@ CREATE TABLE courts (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS `somtop` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `title` varchar(50) NOT NULL COMMENT 'คำนำหน้าชื่อ',
-  `first_name` varchar(100) NOT NULL COMMENT 'ชื่อ',
-  `last_name` varchar(100) NOT NULL COMMENT 'สกุล',
-  `id_card` varchar(20) DEFAULT NULL UNIQUE COMMENT 'เลขบัตรประชาชน',
-  `court_code` VARCHAR(50) DEFAULT NULL COMMENT 'รหัสหน่วยงาน เช่น pkk',
-  `dob` date DEFAULT NULL COMMENT 'วัน/เดือน/ปีเกิด',
-  `address` text DEFAULT NULL COMMENT 'ที่อยู่',
-  `phone` varchar(50) DEFAULT NULL COMMENT 'เบอร์โทร',
-  `status` varchar(50) DEFAULT 'ใช้งาน' COMMENT 'สถานะ',
-  `note` text DEFAULT NULL COMMENT 'หมายเหตุ',
-  `photo_path` varchar(255) DEFAULT NULL COMMENT 'ฟิลด์เก็บ Path ของรูปภาพ',
-  `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  INDEX `idx_court_code` (`court_code`)
+-- ==========================================
+-- 2. ตารางรายชื่อผู้พิพากษาสมทบ (อัปเดตโครงสร้างใหม่)
+-- ==========================================
+CREATE TABLE IF NOT EXISTS somtop (
+  id int(11) NOT NULL AUTO_INCREMENT,
+  
+  -- ⭐️ แยกฟิลด์ชื่อตามโครงสร้างใหม่
+  title varchar(50) NOT NULL COMMENT 'คำนำหน้าชื่อ',
+  first_name varchar(100) NOT NULL COMMENT 'ชื่อ',
+  last_name varchar(100) NOT NULL COMMENT 'สกุล',
+  
+  id_card varchar(20) DEFAULT NULL UNIQUE COMMENT 'เลขบัตรประชาชน',
+  court_code VARCHAR(50) DEFAULT NULL COMMENT 'รหัสศาลที่สังกัด',
+  dob date DEFAULT NULL COMMENT 'วัน/เดือน/ปีเกิด',
+  
+  -- ⭐️ เพิ่มวันที่เข้ารับตำแหน่ง และเปลี่ยนไปใช้ position_id
+  join_date date DEFAULT NULL COMMENT 'วันที่เข้ารับตำแหน่ง',
+  position_id int(11) DEFAULT NULL COMMENT 'อ้างอิงตาราง somtop_positions',
+  
+  address text DEFAULT NULL COMMENT 'ที่อยู่',
+  phone varchar(50) DEFAULT NULL COMMENT 'เบอร์โทร',
+  status varchar(50) DEFAULT 'ใช้งาน' COMMENT 'สถานะ',
+  note text DEFAULT NULL COMMENT 'หมายเหตุ',
+  photo_path varchar(255) DEFAULT NULL COMMENT 'ฟิลด์เก็บ Path ของรูปภาพ',
+  
+  created_at timestamp DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  
+  PRIMARY KEY (id),
+  INDEX idx_court_code (court_code),
+  
+  -- ⭐️ สร้าง Foreign Key เชื่อมกับตารางตำแหน่ง
+  CONSTRAINT fk_somtop_position FOREIGN KEY (position_id) REFERENCES somtop_positions(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
@@ -127,3 +145,74 @@ INSERT INTO name_titles (name) VALUES
 ('ร้อยโท'),
 ('ร้อยตรี'),
 ('ว่าที่ร้อยตรี');
+
+CREATE TABLE events (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255) NOT NULL COMMENT 'หัวข้อกิจกรรม/ชื่องาน',
+    description TEXT COMMENT 'รายละเอียดกิจกรรม',
+    start_date DATETIME NOT NULL COMMENT 'วัน-เวลา เริ่มต้น',
+    end_date DATETIME NOT NULL COMMENT 'วัน-เวลา สิ้นสุด',
+    location VARCHAR(255) COMMENT 'สถานที่จัดกิจกรรม',
+    court_code VARCHAR(50) NOT NULL COMMENT 'รหัสศาล (จำกัดการมองเห็นตามศาล)',
+    created_by INT NULL COMMENT 'ID ผู้สร้างกิจกรรม (อ้างอิงตาราง users)',
+    status ENUM('รอดำเนินการ', 'กำลังดำเนินการ', 'เสร็จสิ้น', 'ยกเลิก') DEFAULT 'รอดำเนินการ' COMMENT 'สถานะกิจกรรม',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    -- ตั้งค่า Foreign Key ไปยังตาราง users เพื่อให้รู้ว่าใครเป็นคนสร้าง
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
+    -- เพิ่ม Index สำหรับการดึงข้อมูลตามศาลให้ไวขึ้น
+    INDEX idx_event_court_code (court_code)
+);
+
+CREATE TABLE event_participants (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    event_id INT NOT NULL COMMENT 'อ้างอิง ID ของกิจกรรม',
+    somtop_id INT NOT NULL COMMENT 'อ้างอิง ID ของ พ.สมทบ ที่เข้าร่วม',
+    status ENUM('รอตอบรับ', 'ยืนยันเข้าร่วม', 'ไม่เข้าร่วม') DEFAULT 'รอตอบรับ' COMMENT 'สถานะการเข้าร่วมของแต่ละบุคคล',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    -- ลบข้อมูลการเข้าร่วมอัตโนมัติ หากกิจกรรมถูกลบ หรือ พ.สมทบ ถูกลบ
+    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
+    FOREIGN KEY (somtop_id) REFERENCES somtop(id) ON DELETE CASCADE,
+    
+    -- ป้องกันการเพิ่มรายชื่อคนเดิมซ้ำในกิจกรรมเดียวกัน
+    UNIQUE KEY unique_participant (event_id, somtop_id) 
+);
+
+-- สร้างตารางเก็บประเภทกิจกรรม
+CREATE TABLE event_types (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL COMMENT 'ชื่อประเภทกิจกรรม',
+    status ENUM('ใช้งาน', 'ระงับ') DEFAULT 'ใช้งาน' COMMENT 'สถานะการให้เลือกใช้งาน',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- เพิ่มข้อมูลประเภทกิจกรรมเริ่มต้นตามที่คุณต้องการ
+INSERT INTO event_types (name) VALUES 
+('การประชุม'), 
+('งานพิธี'), 
+('กิจกรรมของหน่วยงาน'), 
+('อื่นๆ');
+
+ALTER TABLE events
+ADD COLUMN event_type_id INT NULL COMMENT 'อ้างอิงตาราง event_types' AFTER id,
+ADD CONSTRAINT fk_event_type 
+    FOREIGN KEY (event_type_id) REFERENCES event_types(id) ON DELETE SET NULL;
+
+CREATE TABLE somtop_positions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE COMMENT 'ชื่อตำแหน่ง',
+    level INT NOT NULL DEFAULT 99 COMMENT 'ระดับความสำคัญ (เลขน้อย = อาวุโสมาก)',
+    status ENUM('ใช้งาน', 'ระงับ') DEFAULT 'ใช้งาน',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- เพิ่มข้อมูลเริ่มต้น (Level 1 คือสูงสุด)
+INSERT INTO somtop_positions (name, level) VALUES
+('ประธานผู้พิพากษาสมทบ', 1),
+('รองประธาน', 2),
+('เลขา', 3),
+('สมทบ', 4);

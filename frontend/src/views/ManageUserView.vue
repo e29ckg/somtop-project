@@ -33,7 +33,6 @@
             <tr>
               <th>ชื่อผู้ใช้ (Username)</th>
               <th>ชื่อ-สกุล</th>
-              <!-- ⭐️ เพิ่มคอลัมน์รหัสศาล -->
               <th>รหัสศาล</th> 
               <th>สิทธิ์การใช้งาน (Role)</th>
               <th>เข้าสู่ระบบล่าสุด</th>
@@ -43,8 +42,11 @@
           <tbody>
             <tr v-for="user in paginatedList" :key="user.id" class="data-row">
               <td class="font-mono">{{ user.username }}</td>
-              <td class="full-name">{{ user.full_name }}</td>
-              <!-- ⭐️ แสดงรหัสศาล -->
+              <td class="full-name">{{ user.full_name }} 
+                <span v-if="isUserLocked(user.lockout_until)" class="locked-badge">
+                  🔒 ระงับการใช้งาน
+                </span>
+              </td>
               <td class="font-mono font-bold">{{ user.court_code ? user.court_code.toUpperCase() : '-' }}</td>
               <td>
                 <span class="status-badge" :class="user.role === 'admin' ? 'active' : 'warning'">
@@ -54,6 +56,14 @@
               <td class="text-muted">{{ user.last_login || '-' }}</td>
               <td class="no-print">
                 <div class="action-buttons">
+                  <button 
+                    v-if="isUserLocked(user.lockout_until)" 
+                    class="btn-icon unlock-active" 
+                    @click="unlockAccount(user.id)" 
+                    title="ปลดล็อกบัญชี"
+                  >
+                    🔓
+                  </button>
                   <button class="btn-icon edit" @click="openEditModal(user)" title="แก้ไข">✏️</button>
                   <button class="btn-icon delete" @click="deleteData(user.id)" title="ลบ">🗑️</button>
                 </div>
@@ -113,7 +123,6 @@
             </select>
           </div>
 
-          <!-- ⭐️ กล่องค้นหารหัสศาล -->
           <div class="input-group searchable-select">
             <label>รหัสศาล (Court Code) <span style="color: #DC2626;">*</span></label>
             <input 
@@ -205,14 +214,12 @@ const closeCourtDropdown = () => {
     if (!formData.value.court_code) {
       courtSearchQuery.value = '';
     } else {
-      // คืนค่า text กลับเป็นชื่อศาลที่เลือกไว้
       const selected = courtList.value.find(c => c.court_code === formData.value.court_code);
       if (selected) courtSearchQuery.value = `${selected.court_code.toUpperCase()} - ${selected.court_name}`;
     }
   }, 200); 
 }
 
-// ⭐️ เพิ่ม court_code ใน State
 const formData = ref({
   id: null, username: '', password: '', full_name: '', role: 'viewer', court_code: ''
 })
@@ -241,7 +248,7 @@ watch(searchQuery, () => currentPage.value = 1);
 // === ฟังก์ชัน API ===
 const fetchData = async () => {
   try {
-    const response = await api.get('/users') // ⭐️ ลบ .php ออกแล้ว
+    const response = await api.get('/users') 
     dataList.value = response.data.records || []
   } catch (error) {
     console.error("ดึงข้อมูลไม่สำเร็จ:", error)
@@ -275,19 +282,33 @@ const deleteData = async (id) => {
   const result = await swalConfirm('ยืนยันการลบ', 'คุณแน่ใจหรือไม่ว่าต้องการลบผู้ใช้งานรายนี้?')
   if(result.isConfirmed) {
     try {
-      // ⭐️ หาก Backend Node.js ใช้ URL params (/users/:id) ให้เปลี่ยนเป็น `/users/${id}` แทน
-      await api.delete(`/users`, { data: { id: id } })
+      // ⭐️ ปรับให้ส่งผ่าน URL Params ตรงตามมาตรฐาน REST API
+      await api.delete(`/users/${id}`)
       swalSuccess('ลบสำเร็จ', 'ข้อมูลผู้ใช้งานถูกลบทิ้งแล้ว')
       fetchData()
     } catch (error) {
-      swalError('ลบข้อมูลไม่สำเร็จ', 'ไม่สามารถลบข้อมูลได้')
+      swalError('ลบข้อมูลไม่สำเร็จ', error.response?.data?.message || 'ไม่สามารถลบข้อมูลได้')
+    }
+  }
+}
+
+// ⭐️ เพิ่มฟังก์ชันยิง API ปลดล็อกผู้ใช้งาน
+const unlockAccount = async (id) => {
+  const result = await swalConfirm('ยืนยันการปลดล็อก', 'คุณต้องการปลดล็อกการระงับเข้าสู่ระบบ สำหรับผู้ใช้งานรายนี้หรือไม่?')
+  if(result.isConfirmed) {
+    try {
+      await api.put('/users/unlock', { id: id })
+      swalSuccess('สำเร็จ', 'ปลดล็อกบัญชีผู้ใช้งานเรียบร้อยแล้ว')
+      fetchData()
+    } catch (error) {
+      swalError('ผิดพลาด', error.response?.data?.message || 'ไม่สามารถปลดล็อกบัญชีได้')
     }
   }
 }
 
 const openAddModal = () => {
   isEditing.value = false;
-  courtSearchQuery.value = ''; // ⭐️ ล้างกล่องค้นหา
+  courtSearchQuery.value = ''; 
   formData.value = { id: null, username: '', password: '', full_name: '', role: 'viewer', court_code: '' };
   isModalOpen.value = true;
 }
@@ -295,7 +316,6 @@ const openAddModal = () => {
 const openEditModal = (item) => {
   isEditing.value = true;
   
-  // ⭐️ นำรหัสศาลเดิมมาเทียบเพื่อดึงชื่อมาแสดงในกล่องค้นหา
   if (item.court_code) {
     const selected = courtList.value.find(c => c.court_code.toLowerCase() === item.court_code.toLowerCase());
     courtSearchQuery.value = selected ? `${selected.court_code.toUpperCase()} - ${selected.court_name}` : item.court_code;
@@ -309,12 +329,17 @@ const openEditModal = (item) => {
   isModalOpen.value = true;
 }
 
-
 const closeModal = () => isModalOpen.value = false
+
+const isUserLocked = (lockoutUntil) => {
+  if (!lockoutUntil) return false;
+  // เทียบเวลา lockout_until กับเวลาปัจจุบัน
+  return new Date(lockoutUntil) > new Date();
+};
 
 onMounted(() => {
   fetchData()
-  fetchCourts(); // ⭐️ ดึงข้อมูลศาลทันทีที่เปิดหน้า
+  fetchCourts()
 })
 </script>
 
@@ -361,5 +386,33 @@ onMounted(() => {
 }
 .no-results:hover {
   background-color: transparent !important;
+}
+
+/* === สถานะการล็อกบัญชี === */
+.locked-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background-color: #FEE2E2;
+  color: #DC2626;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.row-locked td {
+  background-color: #FEF2F2 !important; /* เปลี่ยนสีพื้นหลังแถวให้เป็นสีแดงอ่อนมาก */
+}
+
+/* เน้นปุ่มปลดล็อกให้เป็นสีส้ม/เหลือง สังเกตง่าย */
+.btn-icon.unlock-active {
+  background-color: #FEF3C7;
+  border-color: #FDE68A;
+}
+.btn-icon.unlock-active:hover {
+  background-color: #FDE68A;
 }
 </style>

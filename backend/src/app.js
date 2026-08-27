@@ -12,6 +12,9 @@ const somtopRoutes = require('./routes/somtopRoutes');
 const leaveRoutes = require('./routes/leaveRoutes');
 const logRoutes = require('./routes/logRoutes');
 const titleRoutes = require('./routes/titleRoutes');
+const eventRoutes = require('./routes/eventRoutes');
+const eventTypeRoutes = require('./routes/eventTypeRoutes');
+const positionRoutes = require('./routes/positionRoutes');
 
 const app = express();
 app.use('/uploads', express.static(path.join(__dirname, './uploads')));
@@ -32,7 +35,9 @@ app.use('/api/somtop', somtopRoutes);
 app.use('/api/leaves', leaveRoutes);
 app.use('/api/logs', logRoutes);
 app.use('/api/titles', titleRoutes);
-
+app.use('/api/events', eventRoutes);
+app.use('/api/event-types', eventTypeRoutes);
+app.use('/api/positions', positionRoutes);
 
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 

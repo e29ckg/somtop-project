@@ -12,5 +12,6 @@ router.get('/', userController.getAllUsers);
 router.post('/', userController.createUser);
 router.put('/', userController.updateUser);
 router.delete('/', userController.deleteUser);
+router.put('/unlock', userController.unlockUser)
 
 module.exports = router;

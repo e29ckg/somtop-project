@@ -25,6 +25,11 @@
            <span class="sidebar-text">ประวัติการลา</span>
         </router-link>
         
+        <router-link to="/manage-events" class="nav-item">
+           <span class="nav-icon">📅</span>
+           <span class="sidebar-text">จัดการกิจกรรม</span>
+        </router-link>
+
         <!-- ⭐️ ซ่อน/แสดงเมนูตั้งค่า เฉพาะผู้ที่มี Role = admin เท่านั้น -->
         <div v-if="userRole === 'admin'">
           <div class="menu-category">ตั้งค่าระบบ</div>
@@ -39,6 +44,14 @@
           <router-link to="/manage-titles" class="nav-item">
              <span class="nav-icon">🏷️</span>
              <span class="sidebar-text">คำนำหน้าชื่อ</span>
+          </router-link>
+          <router-link to="/manage-positions" class="nav-item">
+             <span class="nav-icon">🏅</span>
+             <span class="sidebar-text">จัดการตำแหน่ง</span>
+          </router-link>
+          <router-link to="/manage-event-types" class="nav-item">
+            <span class="nav-icon">🏷️</span>
+            <span class="sidebar-text">ประเภทกิจกรรม</span>
           </router-link>
           <router-link to="/activity-logs" class="nav-item">
              <span class="nav-icon">📋</span>
@@ -112,6 +125,7 @@ const currentRouteName = computed(() => {
   if (route.path === '/dashboard') return 'ภาพรวมระบบ'
   if (route.path === '/manage-somtop') return 'จัดการข้อมูล พ.สมทบ'
   if (route.path === '/leave-history') return 'ประวัติการลา'
+  if (route.path === '/manage-events') return 'จัดการกิจกรรม'
   if (route.path === '/manage-users') return 'จัดการผู้ใช้งานระบบ'
   if (route.path === '/manage-courts') return 'จัดการข้อมูลศาล'
   if (route.path === '/manage-titles') return 'จัดการคำนำหน้า'
@@ -122,12 +136,7 @@ const currentRouteName = computed(() => {
 // ⭐️ ฟังก์ชันออกจากระบบแบบมียืนยัน
 const handleLogout = async () => {
   const result = await swalConfirm('ยืนยันการออกจากระบบ', 'คุณแน่ใจหรือไม่ว่าต้องการออกจากระบบ?');
-  
-  // if (result.isConfirmed) {
-  //   // localStorage.removeItem('token')
-  //   localStorage.removeItem('user') 
-  //   router.push('/')
-  // }
+    
   if (result.isConfirmed) {
     try {
       // ⭐️ ยิง API ไปบอก Backend ให้ลบ HttpOnly Cookie
