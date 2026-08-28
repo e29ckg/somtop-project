@@ -52,6 +52,9 @@ exports.getAllLeaves = async (req, res) => {
             if (row.file_path) {
                 row.file_path = `${BASE_URL}/${row.file_path}`;
             }
+            if (row.total_days !== null) {
+                row.total_days = Number(row.total_days);
+            }
             return row;
         });
 

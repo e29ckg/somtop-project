@@ -108,7 +108,7 @@
                 <td>
                   <div class="full-name">{{ leave.full_name }}</div>
                 </td>
-                <td>{{ leave.leave_type }}</td>
+                <td>{{ leave.leave_type_name || leave.leave_type }}</td>
                 <td>{{ formatThaiDateShort(leave.start_date) }} - {{ formatThaiDateShort(leave.end_date) }}</td>
                 <td class="font-mono text-center">
                   {{ leave.total_days % 1 === 0 ? parseInt(leave.total_days) : leave.total_days }}
@@ -179,7 +179,6 @@
               placeholder="พิมพ์เพื่อค้นหารายชื่อ..." 
               required
             />
-            <!-- รายการรายชื่อที่จะโชว์ขึ้นมาเมื่อคลิกช่องกรอก -->
             <ul v-if="isSomtopDropdownOpen" class="search-dropdown">
               <li 
                 v-for="person in filteredSomtopList" 
@@ -197,6 +196,7 @@
           <div class="input-group full-width">
             <label>ประเภทการลา</label>
             <select v-model="formData.leave_type_id" required>
+              <option value="" disabled>-- เลือกประเภทการลา --</option>
               <option v-for="type in leaveTypes" :key="type.id" :value="type.id">
                 {{ type.name }}
               </option>
@@ -240,9 +240,16 @@
           </div>
           
           <div class="input-group">
-            <label>จำนวนวันลา</label>
-            <input type="number" v-model="formData.total_days" step="0.5" min="0" required />
-          </div>
+  <label>จำนวนวันลา</label>
+  <input 
+    type="number" 
+    v-model="formData.total_days" 
+    step="0.5" 
+    min="0" 
+    required 
+    @blur="formData.total_days = formData.total_days % 1 === 0 ? parseInt(formData.total_days) : parseFloat(formData.total_days)"
+  />
+</div>
 
           <div class="input-group">
             <label>สถานะการอนุมัติ</label>
@@ -258,7 +265,6 @@
             <textarea v-model="formData.note" rows="2" placeholder="ระบุเหตุผลการลา..."></textarea>
           </div>
 
-          <!-- ช่องอัปโหลดไฟล์ PDF -->
           <div class="input-group full-width upload-section">
             <label>แนบไฟล์ใบลา (PDF เท่านั้น)</label>
             <input type="file" accept=".pdf,application/pdf" @change="handleFileUpload" class="file-input" />
@@ -298,7 +304,6 @@ import { swalSuccess, swalError, swalConfirm } from '../utils/swal'
 
 const isLoading = ref(false)
 
-// === ข้อมูลพื้นฐานสำหรับกล่องเลือกวันที่ ===
 const days = Array.from({length: 31}, (_, i) => String(i + 1).padStart(2, '0'))
 
 const thaiMonths = [
@@ -316,7 +321,6 @@ const thaiYears = Array.from({length: 15}, (_, i) => {
   return { value: String(y), label: String(y + 543) }
 })
 
-// === State การค้นหา ===
 const filters = ref({
   name: '',
   start_day: '', start_month: '', start_year: '',
@@ -325,17 +329,12 @@ const filters = ref({
 
 const leaveList = ref([])
 const somtopList = ref([]) 
-const leaveTypes = ref([
-  { id: 1, name: 'ลาป่วย' },
-  { id: 2, name: 'ลากิจส่วนตัว' },
-  { id: 3, name: 'ลาพักผ่อน' },
-  { id: 4, name: 'อื่นๆ' }
-])
+const leaveTypes = ref([]) // ⭐️ เปลี่ยนมารอรับค่าจาก Backend
 
 const isModalOpen = ref(false)
 const isEditing = ref(false)
 const formData = ref({
-  id: null, somtop_id: '', leave_type_id: 1, 
+  id: null, somtop_id: '', leave_type_id: '', 
   start_day: '', start_month: '', start_year: '',
   end_day: '', end_month: '', end_year: '',
   total_days: 0, note: '', status: 'รอตรวจสอบ', file: null, existing_file_path: ''
@@ -344,15 +343,12 @@ const formData = ref({
 const isPreviewOpen = ref(false)
 const previewUrl = ref('')
 
-// === ระบบแบ่งหน้า (Pagination) ===
 const currentPage = ref(1)
 const itemsPerPage = ref(10)
 
-// === State สำหรับกล่องค้นหารายชื่อแบบพิมพ์ได้ ===
 const somtopSearchQuery = ref('')
 const isSomtopDropdownOpen = ref(false)
 
-// กรองรายชื่ออัตโนมัติเมื่อพิมพ์ค้นหาในฟอร์มยื่นเรื่องขอลา
 const filteredSomtopList = computed(() => {
   if (!somtopSearchQuery.value) return somtopList.value;
   return somtopList.value.filter(person => 
@@ -360,14 +356,12 @@ const filteredSomtopList = computed(() => {
   );
 })
 
-// เมื่อคลิกเลือกชื่อจาก Dropdown
 const selectSomtop = (person) => {
   formData.value.somtop_id = person.id;
   somtopSearchQuery.value = person.full_name; 
   isSomtopDropdownOpen.value = false;
 }
 
-// ปิด Dropdown เมื่อคลิกที่อื่น
 const closeSomtopDropdown = () => {
   setTimeout(() => {
     isSomtopDropdownOpen.value = false;
@@ -377,11 +371,10 @@ const closeSomtopDropdown = () => {
   }, 200); 
 }
 
-// === ฟังก์ชันตัวช่วยแปลงวันที่แสดงผลในตาราง ===
 const formatThaiDate = (dateStr) => {
   if (!dateStr || dateStr === '0000-00-00') return '';
-  const [year, month, day] = dateStr.split('-');
-  // แปลง ค.ศ. เป็น พ.ศ.
+  const datePart = dateStr.split('T')[0].split(' ')[0];
+  const [year, month, day] = datePart.split('-');
   const thaiYear = parseInt(year) + 543;
   return `${day}/${month}/${thaiYear}`;
 }
@@ -391,27 +384,25 @@ const getFilterDateStr = (year, month, day) => {
   return null;
 }
 
-// === ฟังก์ชันแปลงวันที่แบบย่อ (เช่น 1 ม.ค. 69) ===
 const formatThaiDateShort = (dateStr) => {
   if (!dateStr || dateStr === '0000-00-00') return '-';
-  
-  const [year, month, day] = dateStr.split('-');
-  
+  const datePart = dateStr.split('T')[0].split(' ')[0];
+  const [year, month, day] = datePart.split('-');
   const shortMonthNames = [
     'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 
     'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
   ];
-  
-  const thaiDay = parseInt(day); // ตัดเลข 0 นำหน้า
+  const thaiDay = parseInt(day);
   const thaiMonth = shortMonthNames[parseInt(month) - 1];
-  const thaiYear = (parseInt(year) + 543).toString().slice(-2); // ตัดเอาเฉพาะ 2 ตัวท้าย
+  const thaiYear = (parseInt(year) + 543).toString().slice(-2);
   
   return `${thaiDay} ${thaiMonth} ${thaiYear}`;
 }
 
 const formatThaiDateFull = (dateStr) => {
   if (!dateStr || dateStr === '0000-00-00') return '';
-  const [year, month, day] = dateStr.split('-');
+  const datePart = dateStr.split('T')[0].split(' ')[0]; // ⭐️ ป้องกัน Timestamp
+  const [year, month, day] = datePart.split('-');
   const thaiYear = parseInt(year) + 543;
   const monthNames = [
     'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
@@ -421,7 +412,6 @@ const formatThaiDateFull = (dateStr) => {
   return `${parseInt(day)} ${thaiMonth} ${thaiYear}`;
 }
 
-// === การค้นหา & กรองข้อมูล ===
 const filteredLeaveList = computed(() => {
   return leaveList.value.filter(leave => {
     let matchName = true
@@ -446,7 +436,6 @@ const filteredLeaveList = computed(() => {
   })
 })
 
-// === Pagination Logic ===
 const totalPages = computed(() => {
   return Math.ceil(filteredLeaveList.value.length / itemsPerPage.value) || 1;
 })
@@ -462,7 +451,6 @@ const changePage = (page) => {
   }
 }
 
-// รีเซ็ตหน้ากลับไปที่ 1 เสมอเมื่อมีการเปลี่ยนแปลงตัวกรองค้นหา
 watch(filters, () => {
   currentPage.value = 1;
 }, { deep: true });
@@ -475,7 +463,6 @@ const clearFilters = () => {
   }
 }
 
-// === สั่งพิมพ์รายงาน ===
 const printReport = () => {
   const printContents = document.querySelector('.print-area').innerHTML;
   const printWindow = window.open('', '_blank', 'height=600,width=800');
@@ -548,6 +535,17 @@ const fetchSomtopList = async () => {
   }
 }
 
+// ⭐️ ฟังก์ชันใหม่สำหรับดึงข้อมูล "ประเภทการลา" 
+const fetchLeaveTypes = async () => {
+  try {
+    const response = await api.get('/leave-types/admin') 
+    // กรองมาเฉพาะรายการที่ Admin เปิดสถานะ "ใช้งาน"
+    leaveTypes.value = response.data.records.filter(t => t.status === 'ใช้งาน') || []
+  } catch (error) {
+    console.error('ดึงประเภทการลาไม่สำเร็จ:', error)
+  }
+}
+
 const handleFileUpload = (event) => {
   const file = event.target.files[0]
   if (file) {
@@ -592,7 +590,7 @@ const saveData = async () => {
     const config = { headers: { 'Content-Type': 'multipart/form-data' } }
 
     if (isEditing.value) {
-      payload.append('_method', 'PUT')
+      // ⭐️ เอา _method: PUT ออกตามคำแนะนำของ Node.js สามารถใช้ api.put ตรงๆ ได้เลย
       await api.put('/leaves', payload, config)
       swalSuccess('บันทึกสำเร็จ', 'อัปเดตข้อมูลและจัดการไฟล์สำเร็จแล้ว')
     } else {
@@ -624,7 +622,6 @@ const deleteData = async (id) => {
   }
 }
 
-// === ฟังก์ชัน UI และคำนวณ ===
 const openPdfPreview = (url) => {
   previewUrl.value = url
   isPreviewOpen.value = true
@@ -663,7 +660,7 @@ const openAddModal = () => {
   isEditing.value = false
   somtopSearchQuery.value = ''
   formData.value = { 
-    id: null, somtop_id: '', leave_type_id: 1, 
+    id: null, somtop_id: '', leave_type_id: '', 
     start_day: '', start_month: '', start_year: '',
     end_day: '', end_month: '', end_year: '',
     total_days: 0, note: '', status: 'รอตรวจสอบ', file: null, existing_file_path: '' 
@@ -677,12 +674,14 @@ const openEditModal = (leave) => {
   
   let sYear = '', sMonth = '', sDay = '';
   if (leave.start_date) {
-    [sYear, sMonth, sDay] = leave.start_date.split('-');
+    const datePart = leave.start_date.split('T')[0].split(' ')[0];
+    [sYear, sMonth, sDay] = datePart.split('-');
   }
 
   let eYear = '', eMonth = '', eDay = '';
   if (leave.end_date) {
-    [eYear, eMonth, eDay] = leave.end_date.split('-');
+    const datePart = leave.end_date.split('T')[0].split(' ')[0];
+    [eYear, eMonth, eDay] = datePart.split('-');
   }
 
   formData.value = {
@@ -709,6 +708,7 @@ const closeModal = () => isModalOpen.value = false
 onMounted(() => {
   fetchLeaves()
   fetchSomtopList()
+  fetchLeaveTypes() // ⭐️ สั่งให้ดึงประเภทการลาตอนโหลดหน้าเว็บ
 })
 </script>
 

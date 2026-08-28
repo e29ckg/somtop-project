@@ -12,6 +12,7 @@ import ManageTitleView from '../views/ManageTitleView.vue'
 import ManageEventView from '../views/ManageEventView.vue'
 import ManageEventTypeView from '../views/ManageEventTypeView.vue'
 import ManagePositionView from '../views/ManagePositionView.vue'
+import ManageLeaveTypeView from '../views/ManageLeaveTypeView.vue'
 
 // 1. สร้าง router ขึ้นมาก่อน
 const router = createRouter({
@@ -75,6 +76,11 @@ const router = createRouter({
           path: 'manage-positions',
           name: 'manage-positions',
           component: ManagePositionView
+        },
+        {
+          path: 'manage-leave-types',
+          name: 'manage-leave-types',
+          component: ManageLeaveTypeView
         }
       ]
     },

@@ -178,3 +178,4 @@ CREATE TABLE activity_logs (
     details TEXT NULL COMMENT 'รายละเอียดเพิ่มเติม (บันทึกเป็น JSON หรือข้อความ)',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+

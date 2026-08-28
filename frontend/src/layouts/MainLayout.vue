@@ -49,6 +49,10 @@
              <span class="nav-icon">🏅</span>
              <span class="sidebar-text">จัดการตำแหน่ง</span>
           </router-link>
+          <router-link to="/manage-leave-types" class="nav-item">
+            <span class="nav-icon">🏷️</span>
+            <span class="sidebar-text">ประเภทการลา</span>
+          </router-link>
           <router-link to="/manage-event-types" class="nav-item">
             <span class="nav-icon">🏷️</span>
             <span class="sidebar-text">ประเภทกิจกรรม</span>
