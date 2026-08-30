@@ -240,16 +240,16 @@
           </div>
           
           <div class="input-group">
-  <label>จำนวนวันลา</label>
-  <input 
-    type="number" 
-    v-model="formData.total_days" 
-    step="0.5" 
-    min="0" 
-    required 
-    @blur="formData.total_days = formData.total_days % 1 === 0 ? parseInt(formData.total_days) : parseFloat(formData.total_days)"
-  />
-</div>
+          <label>จำนวนวันลา</label>
+          <input 
+            type="number" 
+            v-model="formData.total_days" 
+            step="0.5" 
+            min="0" 
+            required 
+            @blur="formData.total_days = formData.total_days % 1 === 0 ? parseInt(formData.total_days) : parseFloat(formData.total_days)"
+          />
+        </div>
 
           <div class="input-group">
             <label>สถานะการอนุมัติ</label>

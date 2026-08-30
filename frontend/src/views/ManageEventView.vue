@@ -126,13 +126,39 @@
           </div>
 
           <div class="input-group">
-            <label>วัน-เวลา เริ่มต้น <span class="text-danger">*</span></label>
-            <input type="datetime-local" v-model="formData.start_date" required />
+            <label>วันที่เริ่มต้น <span class="text-danger">*</span></label>
+            <div class="date-inputs">
+              <select v-model="formData.start_day" required>
+                <option value="">วัน</option>
+                <option v-for="d in days" :key="d" :value="d">{{ parseInt(d) }}</option>
+              </select>
+              <select v-model="formData.start_month" required>
+                <option value="">เดือน</option>
+                <option v-for="m in thaiMonths" :key="m.value" :value="m.value">{{ m.label }}</option>
+              </select>
+              <select v-model="formData.start_year" required>
+                <option value="">ปี</option>
+                <option v-for="y in eventYears" :key="y.value" :value="y.value">{{ y.label }}</option>
+              </select>
+            </div>
           </div>
 
           <div class="input-group">
-            <label>วัน-เวลา สิ้นสุด <span class="text-danger">*</span></label>
-            <input type="datetime-local" v-model="formData.end_date" required />
+            <label>วันที่สิ้นสุด <span class="text-muted">(ไม่ระบุได้)</span></label>
+            <div class="date-inputs">
+              <select v-model="formData.end_day">
+                <option value="">วัน</option>
+                <option v-for="d in days" :key="d" :value="d">{{ parseInt(d) }}</option>
+              </select>
+              <select v-model="formData.end_month">
+                <option value="">เดือน</option>
+                <option v-for="m in thaiMonths" :key="m.value" :value="m.value">{{ m.label }}</option>
+              </select>
+              <select v-model="formData.end_year">
+                <option value="">ปี</option>
+                <option v-for="y in eventYears" :key="y.value" :value="y.value">{{ y.label }}</option>
+              </select>
+            </div>
           </div>
 
           <div class="input-group full-width">
@@ -217,17 +243,29 @@ const selectedEvent = ref(null)
 // ⭐️ 1. เพิ่มตัวแปรสำหรับเก็บรายชื่อ "ประเภทกิจกรรม"
 const eventTypes = ref([])
 
-// ⭐️ 2. เพิ่ม event_type_id เข้าไปใน formData 
-const formData = ref({
-  id: null, 
-  event_type_id: '', // ฟิลด์ใหม่
-  title: '', 
-  description: '', 
-  start_date: '', 
-  end_date: '', 
-  location: '', 
-  status: 'รอดำเนินการ'
+// === ข้อมูลพื้นฐานสำหรับกล่องเลือกวันที่ ===
+const days = Array.from({length: 31}, (_, i) => String(i + 1).padStart(2, '0'))
+const thaiMonths = [
+  { value: '01', label: 'มกราคม' }, { value: '02', label: 'กุมภาพันธ์' },
+  { value: '03', label: 'มีนาคม' }, { value: '04', label: 'เมษายน' },
+  { value: '05', label: 'พฤษภาคม' }, { value: '06', label: 'มิถุนายน' },
+  { value: '07', label: 'กรกฎาคม' }, { value: '08', label: 'สิงหาคม' },
+  { value: '09', label: 'กันยายน' }, { value: '10', label: 'ตุลาคม' },
+  { value: '11', label: 'พฤศจิกายน' }, { value: '12', label: 'ธันวาคม' }
+]
+const currentYear = new Date().getFullYear()
+const eventYears = Array.from({length: 15}, (_, i) => {
+  const y = currentYear - 5 + i // ให้เลือดย้อนหลัง 5 ปี และล่วงหน้า 10 ปี
+  return { value: String(y), label: String(y + 543) }
 })
+
+// ปรับปรุง formData ใหม่
+const formData = ref({
+  id: null, event_type_id: '', title: '', description: '', location: '', status: 'รอดำเนินการ',
+  start_day: '', start_month: '', start_year: '',
+  end_day: '', end_month: '', end_year: ''
+})
+
 
 // === State ระบบค้นหาและแบ่งหน้า ===
 const searchQuery = ref('')
@@ -285,6 +323,8 @@ const getStatusClass = (status) => {
   return ''; // รอดำเนินการ สีเทา
 }
 
+
+
 // === ฟังก์ชัน API (กิจกรรม) ===
 const fetchEventTypes = async () => {
   try {
@@ -316,9 +356,38 @@ const fetchSomtopList = async () => {
   }
 }
 
+// ฟังก์ชันช่วยแยกวันที่ YYYY-MM-DD หรือ DATETIME ออกเป็นส่วนๆ
+const parseDateToParts = (dateStr) => {
+  if (!dateStr) return { day: '', month: '', year: '' };
+  const dateOnly = dateStr.split('T')[0].split(' ')[0]; 
+  const [year, month, day] = dateOnly.split('-');
+  return { year, month, day };
+}
+
 const saveData = async () => {
   try {
-    const payload = { ...formData.value }
+    // รวมวันที่และตั้งเวลาเริ่มต้นเป็นเที่ยงคืน
+    const start_date = `${formData.value.start_year}-${formData.value.start_month}-${formData.value.start_day} 00:00:00`;
+    let end_date = null;
+    
+    // ถ้ามีการเลือกวันที่สิ้นสุดครบ ให้ตั้งเวลาเป็นก่อนเที่ยงคืน
+    if (formData.value.end_year && formData.value.end_month && formData.value.end_day) {
+      end_date = `${formData.value.end_year}-${formData.value.end_month}-${formData.value.end_day} 23:59:59`;
+    } else {
+      // ถ้าไม่ได้ระบุวันที่สิ้นสุด ให้ใช้วันที่เริ่มต้นแทน (เพื่อไม่ให้ขัดกับกฎ NOT NULL ของ Database)
+      end_date = `${formData.value.start_year}-${formData.value.start_month}-${formData.value.start_day} 23:59:59`;
+    }
+
+    const payload = {
+      id: formData.value.id,
+      event_type_id: formData.value.event_type_id,
+      title: formData.value.title,
+      description: formData.value.description,
+      location: formData.value.location,
+      status: formData.value.status,
+      start_date: start_date,
+      end_date: end_date
+    }
 
     if (isEditing.value) {
       await api.put(`/events/${payload.id}`, payload)
@@ -333,6 +402,34 @@ const saveData = async () => {
   } catch (error) {
     swalError('เกิดข้อผิดพลาด', error.response?.data?.message || 'ไม่สามารถบันทึกข้อมูลได้')
   }
+}
+
+const openAddModal = () => {
+  isEditing.value = false
+  formData.value = { 
+    id: null, event_type_id: '', title: '', description: '', location: '', status: 'รอดำเนินการ',
+    start_day: '', start_month: '', start_year: '',
+    end_day: '', end_month: '', end_year: ''
+  }
+  isModalOpen.value = true
+}
+
+const openEditModal = (item) => {
+  isEditing.value = true
+  
+  const startParts = parseDateToParts(item.start_date);
+  const endParts = parseDateToParts(item.end_date);
+
+  formData.value = { 
+    ...item,
+    start_day: startParts.day,
+    start_month: startParts.month,
+    start_year: startParts.year,
+    end_day: endParts.day,
+    end_month: endParts.month,
+    end_year: endParts.year
+  }
+  isModalOpen.value = true
 }
 
 const deleteData = async (id) => {
@@ -395,24 +492,7 @@ const toggleParticipant = async (somtopId, isChecked) => {
 }
 
 // === ฟังก์ชันควบคุม Modal ===
-const openAddModal = () => {
-  isEditing.value = false
-  formData.value = { 
-    id: null, event_type_id: '', title: '', description: '', start_date: '', end_date: '', location: '', status: 'รอดำเนินการ'
-  }
-  isModalOpen.value = true
-}
 
-const openEditModal = (item) => {
-  isEditing.value = true
-  formData.value = { 
-    ...item,
-    event_type_id: item.event_type_id || '', 
-    start_date: formatForInput(item.start_date),
-    end_date: formatForInput(item.end_date)
-  }
-  isModalOpen.value = true
-}
 
 const closeModal = () => isModalOpen.value = false
 
@@ -438,4 +518,13 @@ onMounted(() => {
 .participant-item:hover { background-color: #F9FAFB; }
 .participant-item input[type="checkbox"] { width: 18px; height: 18px; accent-color: #10B981; cursor: pointer; }
 .person-name { font-size: 14px; font-weight: 500; color: #111827; }
+
+.date-inputs {
+  display: flex;
+  gap: 8px;
+}
+.date-inputs select {
+  flex: 1;
+  min-width: 0; 
+}
 </style>
