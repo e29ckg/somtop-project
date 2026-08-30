@@ -1,4 +1,20 @@
 const pool = require('../config/db');
+const fs = require('fs');
+const path = require('path');
+
+const deletePhysicalFiles = (filePathsJson) => {
+    if (!filePathsJson) return;
+    try {
+        const paths = JSON.parse(filePathsJson);
+        paths.forEach(fileUrl => {
+            const filename = path.basename(fileUrl);
+            const filepath = path.join(__dirname, '../../uploads/events/', filename);
+            if (fs.existsSync(filepath)) fs.unlinkSync(filepath);
+        });
+    } catch (error) {
+        console.error('Error deleting files:', error);
+    }
+};
 
 // ==========================================
 // 1. ดึงข้อมูลปฏิทินกิจกรรมทั้งหมด (ตามศาลของผู้ใช้)
@@ -7,12 +23,14 @@ exports.getAllEvents = async (req, res) => {
     try {
         const courtCode = req.user.court_code; 
 
-        // ⭐️ เพิ่มการ JOIN ตาราง event_types เพื่อดึงชื่อประเภทกิจกรรม (event_type_name) มาแสดงผล
         let query = `
             SELECT 
                 e.id, e.event_type_id, et.name AS event_type_name,
-                e.title, e.description, e.start_date, e.end_date, 
+                e.title, e.description, 
+                DATE_FORMAT(e.start_date, '%Y-%m-%d %H:%i:%s') AS start_date,
+                DATE_FORMAT(e.end_date, '%Y-%m-%d %H:%i:%s') AS end_date,
                 e.location, e.status, e.created_by, u.full_name AS creator_name,
+                e.file_paths,
                 (SELECT COUNT(*) FROM event_participants ep WHERE ep.event_id = e.id) AS participant_count
             FROM events e
             LEFT JOIN users u ON e.created_by = u.id
@@ -28,7 +46,25 @@ exports.getAllEvents = async (req, res) => {
         query += ` ORDER BY e.start_date ASC`;
 
         const [events] = await pool.query(query, params);
-        res.status(200).json({ records: events });
+
+        // ⭐️ แปลงข้อความ JSON ของไฟล์แนบ ให้เป็น Array ก่อนส่งไป Frontend
+        const records = events.map(row => {
+            if (row.file_paths) {
+                try {
+                    let parsedPaths = JSON.parse(row.file_paths);
+                    // ป้องกันกรณีแปลงค่าได้แต่ไม่ใช่ Array
+                    row.file_paths = Array.isArray(parsedPaths) ? parsedPaths : [row.file_paths];
+                } catch (e) {
+                    // ถ้าระบบเก่าเซฟเป็น String ไฟล์เดียว ก็จับใส่ Array ให้
+                    row.file_paths = [row.file_paths];
+                }
+            } else {
+                row.file_paths = []; // ถ้าไม่มีไฟล์เลย ส่ง Array ว่างไปแทน
+            }
+            return row;
+        });
+
+        res.status(200).json({ records });
     } catch (error) {
         console.error('Error fetching events:', error);
         res.status(500).json({ message: 'เกิดข้อผิดพลาดในการดึงข้อมูลกิจกรรม' });
@@ -75,14 +111,23 @@ exports.createEvent = async (req, res) => {
             return res.status(400).json({ message: 'กรุณาระบุข้อมูลจำเป็นให้ครบถ้วน (รวมถึงประเภทกิจกรรม)' });
         }
 
+        // จัดการไฟล์แนบหลายไฟล์
+        let filePathsArray = [];
+        if (req.files && req.files.length > 0) {
+            const protocol = req.secure ? 'https' : 'http';
+            const host = req.headers.host;
+            filePathsArray = req.files.map(file => `${protocol}://${host}/uploads/events/${file.filename}`);
+        }
+        const filePathsDb = filePathsArray.length > 0 ? JSON.stringify(filePathsArray) : null;
+
         // ⭐️ เพิ่ม event_type_id ลงในคำสั่ง INSERT
         const eventQuery = `
-            INSERT INTO events (event_type_id, title, description, start_date, end_date, location, court_code, created_by, status) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO events (event_type_id, title, description, start_date, end_date, location, court_code, created_by, status, file_paths) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         const [eventResult] = await connection.query(eventQuery, [
             event_type_id, title, description || null, start_date, end_date, location || null, 
-            courtCode, createdBy, status || 'รอดำเนินการ'
+            courtCode, createdBy, status || 'รอดำเนินการ', filePathsDb
         ]);
         
         const eventId = eventResult.insertId;
@@ -112,22 +157,44 @@ exports.createEvent = async (req, res) => {
 exports.updateEvent = async (req, res) => {
     try {
         const { id } = req.params;
-        // ⭐️ รับค่า event_type_id เพิ่มเข้ามา
         const { event_type_id, title, description, start_date, end_date, location, status } = req.body;
 
         if (!title || !start_date || !end_date || !event_type_id) {
             return res.status(400).json({ message: 'กรุณาระบุข้อมูลให้ครบถ้วน' });
         }
 
-        // ⭐️ เพิ่ม event_type_id ลงในคำสั่ง UPDATE
+        // 1. ดึงข้อมูลเดิมมาตรวจสอบหาไฟล์เก่า
+        const [existing] = await pool.query('SELECT file_paths FROM events WHERE id = ?', [id]);
+        if (existing.length === 0) {
+            return res.status(404).json({ message: 'ไม่พบข้อมูลกิจกรรม' });
+        }
+
+        let filePathsDb = existing[0].file_paths;
+
+        // 2. ถ้ามีการอัปโหลดไฟล์ใหม่ ให้บันทึกไฟล์ใหม่และลบไฟล์เก่าทิ้ง
+        if (req.files && req.files.length > 0) {
+            // ลบไฟล์เดิมออกจากเซิร์ฟเวอร์
+            deletePhysicalFiles(existing[0].file_paths);
+
+            // สร้าง Array ไฟล์ใหม่
+            const protocol = req.secure ? 'https' : 'http';
+            const host = req.headers.host;
+            const newPaths = req.files.map(file => `${protocol}://${host}/uploads/events/${file.filename}`);
+            
+            filePathsDb = JSON.stringify(newPaths);
+        }
+
+        // 3. อัปเดตข้อมูลลงฐานข้อมูล (เพิ่ม file_paths)
         const query = `
             UPDATE events SET 
-                event_type_id = ?, title = ?, description = ?, start_date = ?, end_date = ?, location = ?, status = ?
+                event_type_id = ?, title = ?, description = ?, start_date = ?, 
+                end_date = ?, location = ?, status = ?, file_paths = ?
             WHERE id = ?
         `;
         
         await pool.query(query, [
-            event_type_id, title, description || null, start_date, end_date, location || null, status || 'รอดำเนินการ', id
+            event_type_id, title, description || null, start_date, end_date, 
+            location || null, status || 'รอดำเนินการ', filePathsDb, id
         ]);
 
         res.status(200).json({ message: 'อัปเดตข้อมูลกิจกรรมสำเร็จ' });
@@ -143,14 +210,24 @@ exports.updateEvent = async (req, res) => {
 exports.deleteEvent = async (req, res) => {
     try {
         const { id } = req.params;
+
+        // 1. ดึงข้อมูลเพื่อตรวจสอบหาไฟล์แนบที่ต้องลบ
+        const [existing] = await pool.query('SELECT file_paths FROM events WHERE id = ?', [id]);
+        
+        // 2. ถ้ามีไฟล์แนบ ให้เรียกใช้ฟังก์ชันลบไฟล์ออกจากเซิร์ฟเวอร์
+        if (existing.length > 0 && existing[0].file_paths) {
+            deletePhysicalFiles(existing[0].file_paths);
+        }
+
+        // 3. ลบข้อมูลกิจกรรมออกจากฐานข้อมูล
         await pool.query('DELETE FROM events WHERE id = ?', [id]);
+        
         res.status(200).json({ message: 'ลบกิจกรรมสำเร็จ' });
     } catch (error) {
         console.error('Error deleting event:', error);
         res.status(500).json({ message: 'ไม่สามารถลบกิจกรรมได้' });
     }
 };
-
 // ==========================================
 // 6. เพิ่ม/ลด ผู้เข้าร่วม
 // ==========================================

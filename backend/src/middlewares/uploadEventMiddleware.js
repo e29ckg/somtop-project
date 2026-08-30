@@ -2,7 +2,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-const uploadDir = path.join(__dirname, '../../uploads/leaves/');
+const uploadDir = path.join(__dirname, '../../uploads/events/');
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true, mode: 0o775 });
 }
@@ -14,19 +14,18 @@ const storage = multer.diskStorage({
     filename: function (req, file, cb) {
         const uniqueSuffix = Date.now() + '_' + Math.round(Math.random() * 1E9);
         const ext = path.extname(file.originalname).toLowerCase();
-        cb(null, 'leave_' + uniqueSuffix + ext); 
+        cb(null, 'event_' + uniqueSuffix + ext); 
     }
 });
 
-// อนุญาตให้รับ PDF, รูปภาพ, Word, และ Excel
 const fileFilter = (req, file, cb) => {
     const allowedMimeTypes = [
         'application/pdf', 
         'image/jpeg', 'image/png', 
-        'application/msword', // .doc
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
-        'application/vnd.ms-excel', // .xls
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' // .xlsx
+        'application/msword', 
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 
+        'application/vnd.ms-excel', 
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
     ];
 
     if (allowedMimeTypes.includes(file.mimetype)) {

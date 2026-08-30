@@ -66,6 +66,8 @@ CREATE TABLE event_types (
 INSERT INTO event_types (name) VALUES 
 ('การประชุม'), ('งานพิธี'), ('กิจกรรมของหน่วยงาน'), ('อื่นๆ');
 
+ALTER TABLE leave_requests MODIFY file_path TEXT COMMENT 'เก็บ path ไฟล์แนบแบบ Array JSON เช่น ["file1.pdf", "file2.jpg"]';
+ALTER TABLE events ADD file_paths TEXT NULL COMMENT 'เก็บ path ไฟล์แนบแบบ Array JSON เช่น ["file1.pdf", "file2.jpg"]';
 
 -- ==========================================
 -- หมวดที่ 2: ข้อมูลผู้ใช้งานและพนักงาน (Core Entities)

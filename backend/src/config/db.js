@@ -9,7 +9,9 @@ const pool = mysql.createPool({
     database: process.env.DB_NAME || 'somtop_db',
     waitForConnections: true,
     connectionLimit: 10, // รองรับการเชื่อมต่อพร้อมกัน 10 connections
-    queueLimit: 0
+    queueLimit: 0,
+    timezone: '+07:00',
+    dateStrings: true
 });
 
 // ทดสอบการเชื่อมต่อเมื่อเริ่มต้นเซิร์ฟเวอร์

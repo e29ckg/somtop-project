@@ -119,12 +119,20 @@
                   </span>
                 </td>
                 <td class="no-print">
-                  <div class="action-buttons">
-                    <button v-if="leave.file_path" @click="openPdfPreview(leave.file_path)" class="btn-icon" title="ดูไฟล์แนบ">📎</button>
-                    <button class="btn-icon edit" @click="openEditModal(leave)" title="แก้ไข">✏️</button>
-                    <button class="btn-icon delete" @click="deleteData(leave.id)" title="ลบ">🗑️</button>
-                  </div>
-                </td>
+                      <div class="action-buttons">
+                        <!-- วนลูปแสดงปุ่มไฟล์ทั้งหมด -->
+                        <template v-if="leave.file_path && leave.file_path.length > 0">
+                          <a v-for="(file, fIndex) in leave.file_path" :key="fIndex" 
+                            :href="file" target="_blank" 
+                            class="btn-icon" :title="'ดูไฟล์ที่ ' + (fIndex + 1)">
+                            📎
+                          </a>
+                        </template>
+                        
+                        <button class="btn-icon edit" @click="openEditModal(leave)" title="แก้ไข">✏️</button>
+                        <button class="btn-icon delete" @click="deleteData(leave.id)" title="ลบ">🗑️</button>
+                      </div>
+                    </td>
               </tr>
               <tr v-if="filteredLeaveList.length === 0">
                 <td colspan="7" class="text-center text-muted">ไม่พบข้อมูลการลาที่ค้นหา</td>
@@ -266,12 +274,26 @@
           </div>
 
           <div class="input-group full-width upload-section">
-            <label>แนบไฟล์ใบลา (PDF เท่านั้น)</label>
-            <input type="file" accept=".pdf,application/pdf" @change="handleFileUpload" class="file-input" />
-            <small v-if="isEditing && formData.existing_file_path" class="file-hint">
-              มีไฟล์แนบเดิมอยู่แล้ว: <a href="#" @click.prevent="openPdfPreview(formData.existing_file_path)">ดูไฟล์ปัจจุบัน</a> 
-              (หากอัปโหลดใหม่ ระบบจะลบไฟล์เก่าทิ้งอัตโนมัติ)
-            </small>
+            <label>แนบไฟล์ใบลา (PDF, ภาพ, Word, Excel) *เลือกได้หลายไฟล์</label>
+            <input type="file" multiple accept=".pdf,image/*,.doc,.docx,.xls,.xlsx" @change="handleFileUpload" class="file-input" />
+            
+            <!-- ป้องกัน Error ด้วยการเช็ค formData.files ก่อน -->
+            <ul v-if="formData.files && formData.files.length > 0" class="file-list">
+              <li v-for="(file, index) in formData.files" :key="index">
+                📄 {{ file.name }}
+              </li>
+            </ul>
+
+            <!-- แสดงไฟล์เดิมที่มีอยู่แล้ว -->
+            <div v-if="isEditing && formData.existing_file_paths && formData.existing_file_paths.length > 0" class="file-hint">
+              <p class="mb-1 text-gray-700">ไฟล์แนบเดิม:</p>
+              <ul class="existing-files">
+                <li v-for="(file, index) in formData.existing_file_paths" :key="index">
+                  <a :href="file" target="_blank">ดูไฟล์ที่ {{ index + 1 }}</a>
+                </li>
+              </ul>
+              <small class="text-muted">(หากเลือกอัปโหลดไฟล์ใหม่ ระบบจะลบไฟล์เก่าทิ้งทั้งหมด)</small>
+            </div>
           </div>
 
           <div class="modal-actions full-width">
@@ -334,10 +356,9 @@ const leaveTypes = ref([]) // ⭐️ เปลี่ยนมารอรับ�
 const isModalOpen = ref(false)
 const isEditing = ref(false)
 const formData = ref({
-  id: null, somtop_id: '', leave_type_id: '', 
-  start_day: '', start_month: '', start_year: '',
-  end_day: '', end_month: '', end_year: '',
-  total_days: 0, note: '', status: 'รอตรวจสอบ', file: null, existing_file_path: ''
+  id: null, somtop_id: '', leave_type_id: 1, start_date: '', end_date: '', 
+  total_days: 0, note: '', status: 'รอตรวจสอบ', 
+  files: [], existing_file_paths: []
 })
 
 const isPreviewOpen = ref(false)
@@ -512,14 +533,23 @@ const printReport = () => {
 
 // === ฟังก์ชัน API ===
 const fetchLeaves = async () => {
-  isLoading.value = true;
   try {
     const response = await api.get('/leaves')
-    leaveList.value = response.data.records || []
+    const records = response.data.records || []
+    
+    leaveList.value = records.map(item => {
+      let parsedPaths = [];
+      if (item.file_paths) {
+        try {
+          parsedPaths = typeof item.file_paths === 'string' ? JSON.parse(item.file_paths) : item.file_paths;
+        } catch(e) { 
+          parsedPaths = [item.file_paths]; // สำรองกรณี Backend ส่งมาเป็น string ธรรมดา 1 ไฟล์
+        }
+      }
+      return { ...item, file_paths: parsedPaths };
+    });
   } catch (error) {
     console.error('ดึงข้อมูลประวัติการลาไม่สำเร็จ:', error)
-  } finally {
-    isLoading.value = false;
   }
 }
 
@@ -547,15 +577,10 @@ const fetchLeaveTypes = async () => {
 }
 
 const handleFileUpload = (event) => {
-  const file = event.target.files[0]
-  if (file) {
-    if (file.type === 'application/pdf') {
-      formData.value.file = file
-    } else {
-      swalError('ไฟล์ไม่ถูกต้อง', 'กรุณาอัปโหลดไฟล์นามสกุล .pdf เท่านั้น')
-      event.target.value = '' 
-      formData.value.file = null
-    }
+  if (event.target.files && event.target.files.length > 0) {
+    formData.value.files = Array.from(event.target.files);
+  } else {
+    formData.value.files = [];
   }
 }
 
@@ -583,8 +608,10 @@ const saveData = async () => {
     payload.append('note', formData.value.note)
     payload.append('status', formData.value.status)
     
-    if (formData.value.file) {
-      payload.append('leave_file', formData.value.file)
+    if (formData.value.files && formData.value.files.length > 0) {
+      formData.value.files.forEach(file => {
+        payload.append('leave_files', file);
+      });
     }
 
     const config = { headers: { 'Content-Type': 'multipart/form-data' } }
@@ -658,12 +685,10 @@ const calculateDays = () => {
 
 const openAddModal = () => {
   isEditing.value = false
-  somtopSearchQuery.value = ''
   formData.value = { 
-    id: null, somtop_id: '', leave_type_id: '', 
-    start_day: '', start_month: '', start_year: '',
-    end_day: '', end_month: '', end_year: '',
-    total_days: 0, note: '', status: 'รอตรวจสอบ', file: null, existing_file_path: '' 
+    id: null, somtop_id: '', leave_type_id: 1, start_date: '', end_date: '', 
+    total_days: 0, note: '', status: 'รอตรวจสอบ', 
+    files: [], existing_file_paths: [] 
   }
   isModalOpen.value = true
 }
@@ -697,8 +722,8 @@ const openEditModal = (leave) => {
     total_days: leave.total_days, 
     note: leave.note, 
     status: leave.status, 
-    file: null, 
-    existing_file_path: leave.file_path || '' 
+    files: [], 
+    existing_file_paths: leave.file_paths || [] 
   }
   isModalOpen.value = true
 }
@@ -783,5 +808,29 @@ onMounted(() => {
 }
 .no-results:hover {
   background-color: transparent !important;
+}
+
+.existing-files {
+  list-style-type: none;
+  padding-left: 0;
+  margin: 4px 0 12px 0;
+}
+.existing-files li {
+  margin-bottom: 4px;
+}
+.existing-files li a {
+  color: #3B82F6;
+  text-decoration: underline;
+  font-size: 13px;
+}
+.existing-files li a:hover {
+  color: #2563EB;
+}
+.file-list {
+  list-style: none;
+  padding-left: 0;
+  margin-top: 8px;
+  font-size: 13px;
+  color: #059669;
 }
 </style>

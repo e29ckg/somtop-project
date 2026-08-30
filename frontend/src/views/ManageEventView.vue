@@ -73,6 +73,13 @@
                   <div class="action-buttons">
                     <!-- ปุ่มจัดการผู้เข้าร่วม -->
                     <button class="btn-icon manage-users" @click="openParticipantModal(event)" title="จัดการผู้เข้าร่วม">👥</button>
+                    <template v-if="event.file_paths && event.file_paths.length > 0">
+                    <button v-for="(file, fIndex) in event.file_paths" :key="fIndex" 
+                       @click="openFilePreview(file)" 
+                       class="btn-icon" :title="'ดูไฟล์ที่ ' + (fIndex + 1)">
+                      📎
+                    </button>
+                  </template>
                     <button class="btn-icon edit" @click="openEditModal(event)" title="แก้ไขกิจกรรม">✏️</button>
                     <button class="btn-icon delete" @click="deleteData(event.id)" title="ลบกิจกรรม">🗑️</button>
                   </div>
@@ -125,9 +132,11 @@
             <input type="text" v-model="formData.title" required placeholder="เช่น ประชุมใหญ่สามัญประจำปี" />
           </div>
 
-          <div class="input-group">
-            <label>วันที่เริ่มต้น <span class="text-danger">*</span></label>
+          <!-- ⭐️ เติมคำว่า full-width เข้าไปที่คลาสของกล่องเริ่มต้น -->
+          <div class="input-group full-width">
+            <label>วัน-เวลา เริ่มต้น <span class="text-danger">*</span></label>
             <div class="date-inputs">
+              <!-- เลือกวันที่ -->
               <select v-model="formData.start_day" required>
                 <option value="">วัน</option>
                 <option v-for="d in days" :key="d" :value="d">{{ parseInt(d) }}</option>
@@ -140,12 +149,25 @@
                 <option value="">ปี</option>
                 <option v-for="y in eventYears" :key="y.value" :value="y.value">{{ y.label }}</option>
               </select>
+              <span class="time-separator">เวลา</span>
+              <!-- เลือกเวลา -->
+              <select v-model="formData.start_hour" required>
+                <option value="">ชม.</option>
+                <option v-for="h in hours" :key="h" :value="h">{{ h }}</option>
+              </select>
+              <span>:</span>
+              <select v-model="formData.start_minute" required>
+                <option value="">นาที</option>
+                <option v-for="m in minutes" :key="m" :value="m">{{ m }}</option>
+              </select>
             </div>
           </div>
 
-          <div class="input-group">
-            <label>วันที่สิ้นสุด <span class="text-muted">(ไม่ระบุได้)</span></label>
+          <!-- ⭐️ เติมคำว่า full-width เข้าไปที่คลาสของกล่องสิ้นสุดด้วยเช่นกัน -->
+          <div class="input-group full-width">
+            <label>วัน-เวลา สิ้นสุด <span class="text-muted">(ไม่ระบุได้)</span></label>
             <div class="date-inputs">
+              <!-- เลือกวันที่ -->
               <select v-model="formData.end_day">
                 <option value="">วัน</option>
                 <option v-for="d in days" :key="d" :value="d">{{ parseInt(d) }}</option>
@@ -157,6 +179,17 @@
               <select v-model="formData.end_year">
                 <option value="">ปี</option>
                 <option v-for="y in eventYears" :key="y.value" :value="y.value">{{ y.label }}</option>
+              </select>
+              <span class="time-separator">เวลา</span>
+              <!-- เลือกเวลา -->
+              <select v-model="formData.end_hour">
+                <option value="">ชม.</option>
+                <option v-for="h in hours" :key="h" :value="h">{{ h }}</option>
+              </select>
+              <span>:</span>
+              <select v-model="formData.end_minute">
+                <option value="">นาที</option>
+                <option v-for="m in minutes" :key="m" :value="m">{{ m }}</option>
               </select>
             </div>
           </div>
@@ -179,6 +212,35 @@
               <option value="เสร็จสิ้น">เสร็จสิ้น</option>
               <option value="ยกเลิก">ยกเลิก</option>
             </select>
+          </div>
+
+          <div class="input-group full-width upload-section">
+            <label>แนบไฟล์เอกสาร (PDF, ภาพ, Word, Excel)</label>
+            <input 
+              type="file" 
+              multiple 
+              accept=".pdf,image/*,.doc,.docx,.xls,.xlsx" 
+              @change="handleFileUpload" 
+              class="file-input" 
+            />
+            
+            <!-- แสดงรายชื่อไฟล์ใหม่ที่เพิ่งเลือก -->
+            <ul v-if="formData.files && formData.files.length > 0" class="file-list">
+              <li v-for="(file, index) in formData.files" :key="index">
+                📄 {{ file.name }}
+              </li>
+            </ul>
+
+            <!-- แสดงไฟล์เดิมที่มีอยู่แล้วตอนกดแก้ไข -->
+            <div v-if="isEditing && formData.existing_file_paths && formData.existing_file_paths.length > 0" class="file-hint mt-3">
+              <p class="mb-1 text-gray-700 font-bold">ไฟล์แนบเดิม:</p>
+              <ul class="existing-files list-none pl-0">
+                <li v-for="(file, index) in formData.existing_file_paths" :key="index" class="mb-1">
+                  <a href="#" @click.prevent="openFilePreview(file)" class="text-blue-500 underline text-sm">ดูไฟล์ที่ {{ index + 1 }}</a>
+                </li>
+              </ul>
+              <small class="text-muted">(หากเลือกอัปโหลดไฟล์ใหม่ ระบบจะลบไฟล์เก่าทิ้งทั้งหมด)</small>
+            </div>
           </div>
 
           <div class="modal-actions full-width">
@@ -220,6 +282,19 @@
         </div>
       </div>
     </div>
+    <!-- ⭐️ Modal 3: ดูไฟล์แนบ (Preview) -->
+    <div v-if="isPreviewOpen" class="modal-overlay no-print">
+      <div class="modal-card pdf-modal">
+        <div class="modal-header">
+          <h2>ดูไฟล์แนบ</h2>
+          <button class="close-btn" @click="closeFilePreview">✕</button>
+        </div>
+        <div class="pdf-container">
+          <!-- iframe จะแสดงผล PDF และรูปภาพ ส่วน Word/Excel จะดาวน์โหลดอัตโนมัติ -->
+          <iframe :src="previewUrl" width="100%" height="100%" style="border:none;"></iframe>
+        </div>
+      </div>
+    </div>
 
   </div>
 </template>
@@ -240,11 +315,29 @@ const isEditing = ref(false)
 const isParticipantModalOpen = ref(false)
 const selectedEvent = ref(null)
 
+// === ตัวแปรสำหรับจัดการ Modal ดูไฟล์ ===
+const isPreviewOpen = ref(false)
+const previewUrl = ref('')
+
+// === ฟังก์ชันเปิด/ปิด Modal ดูไฟล์ ===
+const openFilePreview = (url) => {
+  previewUrl.value = url
+  isPreviewOpen.value = true
+}
+
+const closeFilePreview = () => {
+  isPreviewOpen.value = false
+  previewUrl.value = ''
+}
+
 // ⭐️ 1. เพิ่มตัวแปรสำหรับเก็บรายชื่อ "ประเภทกิจกรรม"
 const eventTypes = ref([])
 
 // === ข้อมูลพื้นฐานสำหรับกล่องเลือกวันที่ ===
 const days = Array.from({length: 31}, (_, i) => String(i + 1).padStart(2, '0'))
+const hours = Array.from({length: 24}, (_, i) => String(i).padStart(2, '0'))   // 00-23
+const minutes = Array.from({length: 60}, (_, i) => String(i).padStart(2, '0')) // 00-59
+
 const thaiMonths = [
   { value: '01', label: 'มกราคม' }, { value: '02', label: 'กุมภาพันธ์' },
   { value: '03', label: 'มีนาคม' }, { value: '04', label: 'เมษายน' },
@@ -259,11 +352,13 @@ const eventYears = Array.from({length: 15}, (_, i) => {
   return { value: String(y), label: String(y + 543) }
 })
 
-// ปรับปรุง formData ใหม่
+
+// ปรับปรุง formData ใหม่ เพิ่มตัวแปรเวลา
 const formData = ref({
   id: null, event_type_id: '', title: '', description: '', location: '', status: 'รอดำเนินการ',
-  start_day: '', start_month: '', start_year: '',
-  end_day: '', end_month: '', end_year: ''
+  start_day: '', start_month: '', start_year: '', start_hour: '08', start_minute: '30',
+  end_day: '', end_month: '', end_year: '', end_hour: '16', end_minute: '30',
+  files: [] // สำหรับเก็บไฟล์
 })
 
 
@@ -356,51 +451,73 @@ const fetchSomtopList = async () => {
   }
 }
 
-// ฟังก์ชันช่วยแยกวันที่ YYYY-MM-DD หรือ DATETIME ออกเป็นส่วนๆ
+// ฟังก์ชันช่วยแยกวันที่และเวลา (รองรับกรณีมีตัว T และช่องว่าง)
 const parseDateToParts = (dateStr) => {
-  if (!dateStr) return { day: '', month: '', year: '' };
-  const dateOnly = dateStr.split('T')[0].split(' ')[0]; 
+  if (!dateStr) return { year: '', month: '', day: '', hour: '08', minute: '30' };
+  
+  // แปลงตัว T เป็นช่องว่าง แล้วแยก วันที่ กับ เวลา ออกจากกัน
+  const parts = dateStr.replace('T', ' ').split(' ');
+  const dateOnly = parts[0]; 
+  const timeOnly = parts[1] || '08:30:00'; 
+  
   const [year, month, day] = dateOnly.split('-');
-  return { year, month, day };
+  const [hour, minute] = timeOnly.split(':');
+  
+  return { year, month, day, hour, minute };
+}
+
+const handleFileUpload = (event) => {
+  const selectedFiles = Array.from(event.target.files);
+  formData.value.files = selectedFiles;
 }
 
 const saveData = async () => {
   try {
-    // รวมวันที่และตั้งเวลาเริ่มต้นเป็นเที่ยงคืน
-    const start_date = `${formData.value.start_year}-${formData.value.start_month}-${formData.value.start_day} 00:00:00`;
-    let end_date = null;
+    const sHour = formData.value.start_hour || '00';
+    const sMin = formData.value.start_minute || '00';
+    const start_date = `${formData.value.start_year}-${formData.value.start_month}-${formData.value.start_day} ${sHour}:${sMin}:00`;
     
-    // ถ้ามีการเลือกวันที่สิ้นสุดครบ ให้ตั้งเวลาเป็นก่อนเที่ยงคืน
+    let end_date = null;
     if (formData.value.end_year && formData.value.end_month && formData.value.end_day) {
-      end_date = `${formData.value.end_year}-${formData.value.end_month}-${formData.value.end_day} 23:59:59`;
+      const eHour = formData.value.end_hour || '23';
+      const eMin = formData.value.end_minute || '59';
+      end_date = `${formData.value.end_year}-${formData.value.end_month}-${formData.value.end_day} ${eHour}:${eMin}:59`;
     } else {
-      // ถ้าไม่ได้ระบุวันที่สิ้นสุด ให้ใช้วันที่เริ่มต้นแทน (เพื่อไม่ให้ขัดกับกฎ NOT NULL ของ Database)
       end_date = `${formData.value.start_year}-${formData.value.start_month}-${formData.value.start_day} 23:59:59`;
     }
 
-    const payload = {
-      id: formData.value.id,
-      event_type_id: formData.value.event_type_id,
-      title: formData.value.title,
-      description: formData.value.description,
-      location: formData.value.location,
-      status: formData.value.status,
-      start_date: start_date,
-      end_date: end_date
+    // สร้าง FormData แทน Object ธรรมดา
+    const payload = new FormData();
+    if (formData.value.id) payload.append('id', formData.value.id);
+    payload.append('event_type_id', formData.value.event_type_id);
+    payload.append('title', formData.value.title);
+    payload.append('description', formData.value.description);
+    payload.append('location', formData.value.location);
+    payload.append('status', formData.value.status);
+    payload.append('start_date', start_date);
+    payload.append('end_date', end_date);
+    
+    // วนลูปแนบไฟล์ทั้งหมด
+    if (formData.value.files && formData.value.files.length > 0) {
+      formData.value.files.forEach(file => {
+        payload.append('event_files', file); // ชื่อต้องตรงกับ .array('event_files') ใน Backend
+      });
     }
 
+    const config = { headers: { 'Content-Type': 'multipart/form-data' } };
+
     if (isEditing.value) {
-      await api.put(`/events/${payload.id}`, payload)
-      swalSuccess('บันทึกสำเร็จ', 'อัปเดตข้อมูลกิจกรรมเรียบร้อย')
+      await api.put(`/events/${formData.value.id}`, payload, config);
+      swalSuccess('บันทึกสำเร็จ', 'อัปเดตข้อมูลกิจกรรมเรียบร้อย');
     } else {
-      await api.post('/events', payload)
-      swalSuccess('บันทึกสำเร็จ', 'สร้างกิจกรรมใหม่เรียบร้อย')
+      await api.post('/events', payload, config);
+      swalSuccess('บันทึกสำเร็จ', 'สร้างกิจกรรมใหม่เรียบร้อย');
     }
     
-    closeModal()
-    fetchEvents()
+    closeModal();
+    fetchEvents();
   } catch (error) {
-    swalError('เกิดข้อผิดพลาด', error.response?.data?.message || 'ไม่สามารถบันทึกข้อมูลได้')
+    swalError('เกิดข้อผิดพลาด', error.response?.data?.message || 'ไม่สามารถบันทึกข้อมูลได้');
   }
 }
 
@@ -408,8 +525,10 @@ const openAddModal = () => {
   isEditing.value = false
   formData.value = { 
     id: null, event_type_id: '', title: '', description: '', location: '', status: 'รอดำเนินการ',
-    start_day: '', start_month: '', start_year: '',
-    end_day: '', end_month: '', end_year: ''
+    start_day: '', start_month: '', start_year: '', start_hour: '08', start_minute: '30',
+    end_day: '', end_month: '', end_year: '', end_hour: '16', end_minute: '30',
+    files: [], // เคลียร์ไฟล์ใหม่
+    existing_file_paths: [] // เคลียร์ไฟล์เก่า
   }
   isModalOpen.value = true
 }
@@ -425,9 +544,16 @@ const openEditModal = (item) => {
     start_day: startParts.day,
     start_month: startParts.month,
     start_year: startParts.year,
+    start_hour: startParts.hour,
+    start_minute: startParts.minute,
+    
     end_day: endParts.day,
     end_month: endParts.month,
-    end_year: endParts.year
+    end_year: endParts.year,
+    end_hour: endParts.hour,
+    end_minute: endParts.minute,
+    files: [], // เตรียมรับไฟล์อัปโหลดใหม่
+    existing_file_paths: item.file_paths || [] // ⭐️ ดึงไฟล์เก่ามาแสดง
   }
   isModalOpen.value = true
 }
@@ -526,5 +652,51 @@ onMounted(() => {
 .date-inputs select {
   flex: 1;
   min-width: 0; 
+}
+.date-inputs {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap; /* เผื่อหน้าจอแคบ */
+}
+.date-inputs select {
+  flex: 1;
+  min-width: 60px; 
+}
+.time-separator {
+  color: #6B7280;
+  font-size: 13px;
+  margin: 0 4px;
+}
+
+.upload-section {
+  background-color: #F9FAFB;
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px dashed #D1D5DB;
+}
+.file-list {
+  margin-top: 10px;
+  padding-left: 0;
+  list-style: none;
+  font-size: 13px;
+  color: #4B5563;
+}
+.file-list li {
+  margin-bottom: 4px;
+}
+
+/* === CSS สำหรับ Modal ดูไฟล์ === */
+.pdf-modal {
+  max-width: 900px;
+  height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+.pdf-container {
+  flex: 1;
+  background-color: #F3F4F6;
+  border-radius: 8px;
+  overflow: hidden;
 }
 </style>

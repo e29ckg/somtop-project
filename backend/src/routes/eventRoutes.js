@@ -15,8 +15,14 @@ router.get('/:id/participants', eventController.getEventParticipants); // ดึ
 // (ออปชัน) ถ้าอยากให้แค่ Admin สร้างกิจกรรมได้ ให้เปิดบรรทัดนี้:
 // router.use(verifyAdmin); 
 
-router.post('/', eventController.createEvent);                         // สร้างกิจกรรม
-router.put('/:id', eventController.updateEvent);                       // แก้ไขกิจกรรม
+const uploadEvent = require('../middlewares/uploadEventMiddleware');
+
+// เปลี่ยนการรับข้อมูลให้รองรับ form-data
+router.post('/', uploadEvent.array('event_files', 10), eventController.createEvent);
+router.put('/:id', uploadEvent.array('event_files', 10), eventController.updateEvent);
+
+// router.post('/', eventController.createEvent);                         // สร้างกิจกรรม
+// router.put('/:id', eventController.updateEvent);                       // แก้ไขกิจกรรม
 router.delete('/:id', eventController.deleteEvent);                    // ลบกิจกรรม
 
 // ==========================================

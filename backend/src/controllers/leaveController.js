@@ -5,17 +5,33 @@ const { logActivity } = require('../utils/logger');
 
 const BASE_URL = process.env.APP_URL || 'http://localhost:8088';
 
-// ฟังก์ชันลบไฟล์จริงออกจากเซิร์ฟเวอร์
-const deletePhysicalFile = (relativePath) => {
-    if (relativePath) {
-        const fullPath = path.join(__dirname, '../../', relativePath);
-        if (fs.existsSync(fullPath)) {
-            fs.unlinkSync(fullPath);
+const deletePhysicalFiles = (filePathsData) => {
+    if (!filePathsData) return;
+    try {
+        let paths = [];
+        try {
+            // ลองแปลงเป็น Array ก่อน
+            paths = JSON.parse(filePathsData);
+            if (!Array.isArray(paths)) paths = [paths];
+        } catch (e) {
+            // ถ้า Parse ไม่ได้ แปลว่าเป็น String ไฟล์เดียวของระบบเก่า
+            paths = [filePathsData];
         }
+
+        paths.forEach(fileUrl => {
+            if (fileUrl) {
+                // ดึงเฉพาะชื่อไฟล์ออกมาจาก URL
+                const filename = path.basename(fileUrl);
+                const filepath = path.join(__dirname, '../../uploads/leaves/', filename);
+                if (fs.existsSync(filepath)) fs.unlinkSync(filepath);
+            }
+        });
+    } catch (error) {
+        console.error('Error deleting files:', error);
     }
 };
 
-/// ==========================================
+// ==========================================
 // 1. ดึงประวัติการลา (ตามศาลของผู้ใช้งาน)
 // ==========================================
 exports.getAllLeaves = async (req, res) => {
@@ -48,12 +64,20 @@ exports.getAllLeaves = async (req, res) => {
 
         const [rows] = await pool.query(query, params);
 
+        // ⭐️ แปลงข้อความ JSON ให้เป็น Array ก่อนส่งไป Frontend
         const records = rows.map(row => {
             if (row.file_path) {
-                row.file_path = `${BASE_URL}/${row.file_path}`;
-            }
-            if (row.total_days !== null) {
-                row.total_days = Number(row.total_days);
+                try {
+                    // ลองแปลง JSON String เป็น Array
+                    let parsedPaths = JSON.parse(row.file_path);
+                    // ป้องกันกรณี Parse ได้แต่ไม่ใช่ Array
+                    row.file_path = Array.isArray(parsedPaths) ? parsedPaths : [row.file_path];
+                } catch (e) {
+                    // ถ้า Parse ไม่ได้ แปลว่าเป็นข้อมูลระบบเก่าที่มีไฟล์เดียว ก็จับใส่ Array ให้
+                    row.file_path = [row.file_path];
+                }
+            } else {
+                row.file_path = []; // ถ้าไม่มีไฟล์เลย ส่ง Array ว่างไปแทน
             }
             return row;
         });
@@ -77,10 +101,13 @@ exports.createLeave = async (req, res) => {
             return res.status(400).json({ message: 'ข้อมูลไม่ครบถ้วน' });
         }
 
-        let filePath = null;
-        if (req.file) {
-            filePath = `uploads/leaves/${req.file.filename}`;
+        let filePaths = [];
+        if (req.files && req.files.length > 0) {
+            const protocol = req.secure ? 'https' : 'http';
+            const host = req.headers.host;
+            filePaths = req.files.map(file => `${protocol}://${host}/uploads/leaves/${file.filename}`);
         }
+        const filePathDb = filePaths.length > 0 ? JSON.stringify(filePaths) : null;
 
         const query = `
             INSERT INTO leave_requests 
@@ -90,7 +117,7 @@ exports.createLeave = async (req, res) => {
 
         await pool.query(query, [
             somtop_id, leave_type_id, courtCode, start_date, end_date, total_days, 
-            note || null, status || 'รอตรวจสอบ', filePath
+            note || null, status || 'รอตรวจสอบ', filePathDb
         ]);
 
         logActivity(req, 'เพิ่มข้อมูล', 'จัดการการลา', `สร้างใบลาใหม่: ${somtop_id}`);
@@ -114,12 +141,18 @@ exports.updateLeave = async (req, res) => {
         const [existing] = await pool.query('SELECT file_path FROM leave_requests WHERE id = ?', [id]);
         if (existing.length === 0) return res.status(404).json({ message: 'ไม่พบข้อมูลใบลา' });
         
-        let filePath = existing[0].file_path;
+        let filePathDb = existing[0].file_path;
 
-        // ถ้ามีไฟล์ใหม่แนบมา ให้ลบไฟล์เก่าทิ้ง
-        if (req.file) {
-            deletePhysicalFile(filePath);
-            filePath = `uploads/leaves/${req.file.filename}`;
+        // ถ้ามีไฟล์ใหม่แนบมา ให้ลบไฟล์เก่าทิ้งทั้งหมด
+        if (req.files && req.files.length > 0) {
+            deletePhysicalFiles(existing[0].file_path);
+            
+            // สร้าง Array ของไฟล์ใหม่
+            const protocol = req.secure ? 'https' : 'http';
+            const host = req.headers.host;
+            const newPaths = req.files.map(file => `${protocol}://${host}/uploads/leaves/${file.filename}`);
+            
+            filePathDb = JSON.stringify(newPaths);
         }
 
         const query = `
@@ -131,10 +164,12 @@ exports.updateLeave = async (req, res) => {
 
         await pool.query(query, [
             somtop_id, leave_type_id, start_date, end_date, total_days, 
-            note || null, status || 'รอตรวจสอบ', filePath, id
+            note || null, status || 'รอตรวจสอบ', filePathDb, id
         ]);
 
-        logActivity(req, 'อัปเดตข้อมูล', 'จัดการการลา', `อัปเดตใบลา ID: ${id}`);
+        if (typeof logActivity === 'function') {
+            logActivity(req, 'อัปเดตข้อมูล', 'จัดการการลา', `อัปเดตใบลา ID: ${id}`);
+        }
         res.status(200).json({ message: 'อัปเดตข้อมูลและไฟล์แนบสำเร็จ' });
     } catch (error) {
         console.error('Error in updateLeave:', error);
@@ -147,19 +182,22 @@ exports.updateLeave = async (req, res) => {
 // ==========================================
 exports.deleteLeave = async (req, res) => {
     try {
-        const { id } = req.params; 
+        const { id } = req.params; // ใช้ req.params ตามมาตรฐาน REST API
 
         if (!id) return res.status(400).json({ message: 'ไม่ได้ระบุ ID ที่ต้องการลบ' });
 
         const [existing] = await pool.query('SELECT file_path FROM leave_requests WHERE id = ?', [id]);
         
-        // ลบไฟล์ PDF ก่อนลบข้อมูล
-        if (existing.length > 0) {
-            deletePhysicalFile(existing[0].file_path);
+        // ลบไฟล์แนบทั้งหมดก่อนลบข้อมูลในฐานข้อมูล
+        if (existing.length > 0 && existing[0].file_path) {
+            deletePhysicalFiles(existing[0].file_path);
         }
 
         await pool.query('DELETE FROM leave_requests WHERE id = ?', [id]);
-        logActivity(req, 'ลบข้อมูล', 'จัดการการลา', `ลบใบลา ID: ${id}`);
+        
+        if (typeof logActivity === 'function') {
+            logActivity(req, 'ลบข้อมูล', 'จัดการการลา', `ลบใบลา ID: ${id}`);
+        }
         res.status(200).json({ message: 'ลบข้อมูลและไฟล์แนบสำเร็จ' });
     } catch (error) {
         console.error('Error in deleteLeave:', error);
