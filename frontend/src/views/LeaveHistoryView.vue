@@ -538,7 +538,7 @@ const fetchSomtopList = async () => {
 // ⭐️ ฟังก์ชันใหม่สำหรับดึงข้อมูล "ประเภทการลา" 
 const fetchLeaveTypes = async () => {
   try {
-    const response = await api.get('/leave-types/admin') 
+    const response = await api.get('/leave-types') 
     // กรองมาเฉพาะรายการที่ Admin เปิดสถานะ "ใช้งาน"
     leaveTypes.value = response.data.records.filter(t => t.status === 'ใช้งาน') || []
   } catch (error) {
