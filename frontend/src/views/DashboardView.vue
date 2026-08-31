@@ -118,7 +118,7 @@
         </div>
       </div>
 
-      <!-- Right Panel: Distribution (Spanning 4 columns) -->
+      <!-- Right Panel: Distribution (Spanning 4 columns) 
       <div class="card assets-section">
         <h2 class="card-title">สัดส่วนแยกตามตำแหน่ง</h2>
         
@@ -136,7 +136,8 @@
             </div>
           </div>
         </div>
-      </div>
+      </div> 
+      -->
 
       <!-- Bottom Panel: Recent Events (Spanning 12 columns) -->
       <div class="card events-section">
@@ -541,7 +542,7 @@ onMounted(() => {
 .unit { font-size: 14px; color: #6B7280; font-weight: 400; }
 
 /* Sections */
-.calendar-section { grid-column: span 8; min-height: 500px; display: flex; flex-direction: column; padding: 20px; }
+.calendar-section { grid-column: span 12; min-height: 500px; display: flex; flex-direction: column; padding: 20px; }
 .assets-section { grid-column: span 4; }
 .events-section { grid-column: span 12; }
 
