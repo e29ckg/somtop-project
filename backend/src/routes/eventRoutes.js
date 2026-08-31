@@ -24,6 +24,7 @@ router.put('/:id', uploadEvent.array('event_files', 10), eventController.updateE
 // router.post('/', eventController.createEvent);                         // สร้างกิจกรรม
 // router.put('/:id', eventController.updateEvent);                       // แก้ไขกิจกรรม
 router.delete('/:id', eventController.deleteEvent);                    // ลบกิจกรรม
+router.post('/delete-file', eventController.deleteSingleFile);         // ลบไฟล์แนบทีละไฟล์
 
 // ==========================================
 // Endpoints สำหรับจัดการคนเข้าร่วมหลังสร้างกิจกรรมไปแล้ว

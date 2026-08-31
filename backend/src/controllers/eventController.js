@@ -228,6 +228,48 @@ exports.deleteEvent = async (req, res) => {
         res.status(500).json({ message: 'ไม่สามารถลบกิจกรรมได้' });
     }
 };
+
+// ==========================================
+// 6. ลบไฟล์แนบ (ทีละไฟล์)
+// ==========================================
+exports.deleteSingleFile = async (req, res) => {
+    try {
+        const { id, file_url } = req.body;
+
+        if (!id || !file_url) {
+            return res.status(400).json({ message: 'ข้อมูลไม่ครบถ้วน' });
+        }
+
+        const [existing] = await pool.query('SELECT file_paths FROM events WHERE id = ?', [id]);
+        if (existing.length === 0 || !existing[0].file_paths) {
+            return res.status(404).json({ message: 'ไม่พบข้อมูลไฟล์' });
+        }
+
+        let pathsArray = JSON.parse(existing[0].file_paths);
+
+        // ⭐️ 1. ดึงเฉพาะชื่อไฟล์เป้าหมายออกมา (เช่น event_1234.pdf)
+        const targetFilename = file_url.split('/').pop();
+
+        // ⭐️ 2. กรองข้อมูลโดยเทียบเฉพาะชื่อไฟล์ส่วนท้าย
+        const updatedPaths = pathsArray.filter(url => {
+            const currentFilename = url.split('/').pop();
+            return currentFilename !== targetFilename;
+        });
+
+        await pool.query('UPDATE events SET file_paths = ? WHERE id = ?', [
+            JSON.stringify(updatedPaths), id
+        ]);
+
+        // ส่งเฉพาะชื่อไฟล์หรือ URL ไปให้ Helper ลบไฟล์ตามที่คุณออกแบบไว้
+        deletePhysicalFiles(JSON.stringify([file_url]));
+
+        res.status(200).json({ message: 'ลบไฟล์สำเร็จ' });
+    } catch (error) {
+        console.error('Error deleting single file:', error);
+        res.status(500).json({ message: 'ไม่สามารถลบไฟล์ได้' });
+    }
+};
+
 // ==========================================
 // 6. เพิ่ม/ลด ผู้เข้าร่วม
 // ==========================================
