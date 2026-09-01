@@ -118,7 +118,7 @@ exports.createEvent = async (req, res) => {
             const host = req.headers.host;
             filePathsArray = req.files.map(file => `${protocol}://${host}/uploads/events/${file.filename}`);
         }
-        const filePathsDb = filePathsArray.length > 0 ? JSON.stringify(filePathsArray) : null;
+        const filePathsDb = filePathsArray.length > 0 ? JSON.stringify(filePathsArray) : '';
 
         // ⭐️ เพิ่ม event_type_id ลงในคำสั่ง INSERT
         const eventQuery = `
@@ -126,7 +126,7 @@ exports.createEvent = async (req, res) => {
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         const [eventResult] = await connection.query(eventQuery, [
-            event_type_id, title, description || null, start_date, end_date, location || null, 
+            event_type_id, title, description || '', start_date, end_date, location || '', 
             courtCode, createdBy, status || 'รอดำเนินการ', filePathsDb
         ]);
         

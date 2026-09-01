@@ -585,9 +585,9 @@ onMounted(() => {
 .calendar-wrapper { border: 1px solid #E5E7EB; border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; flex: 1; }
 .calendar-days-header { display: grid; grid-template-columns: repeat(7, 1fr); background-color: #F9FAFB; border-bottom: 1px solid #E5E7EB; }
 .day-name { padding: 10px; text-align: center; font-size: 13px; font-weight: 600; color: #4B5563; }
-.calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); flex: 1; background-color: #E5E7EB; gap: 1px; }
+.calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); flex: 1; background-color: #E5E7EB; gap: 1px; }
 
-.calendar-cell { background-color: #FFFFFF; min-height: 80px; padding: 4px; display: flex; flex-direction: column; transition: background-color 0.2s; }
+.calendar-cell { background-color: #FFFFFF; min-height: 80px; padding: 4px; display: flex; flex-direction: column; transition: background-color 0.2s; min-width: 0;}
 .calendar-cell:hover { background-color: #F9FAFB; }
 .calendar-cell.not-current-month { background-color: #F3F4F6; color: #9CA3AF; }
 .calendar-cell.is-today .date-number { background-color: #10B981; color: white; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: 600; margin: 2px 2px 4px auto; }
@@ -598,7 +598,7 @@ onMounted(() => {
 .events-container::-webkit-scrollbar { width: 4px; }
 .events-container::-webkit-scrollbar-thumb { background-color: #D1D5DB; border-radius: 4px; }
 
-.event-pill { font-size: 10px; padding: 3px 6px; border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: default; border-left: 3px solid transparent; }
+.event-pill { font-size: 10px; padding: 3px 6px; border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: default; border-left: 3px solid transparent; display: block; width: 100%; box-sizing: border-box;}
 .pill-event { background-color: #EDE9FE; color: #5B21B6; border-left-color: #8B5CF6; }
 .pill-leave-approved { background-color: #D1FAE5; color: #065F46; border-left-color: #10B981; }
 .pill-leave-pending { background-color: #FEF3C7; color: #92400E; border-left-color: #F59E0B; }
