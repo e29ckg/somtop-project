@@ -16,3 +16,4 @@ frontend/dist/
 # ไฟล์รูปภาพและใบลาอัปโหลด (ป้องกันการละเมิดข้อมูลส่วนบุคคล)
 backend/uploads/
 somtop-backend/uploads/
+frontend/vite.config.js
