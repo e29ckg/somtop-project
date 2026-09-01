@@ -16,6 +16,7 @@ const eventRoutes = require('./routes/eventRoutes');
 const eventTypeRoutes = require('./routes/eventTypeRoutes');
 const positionRoutes = require('./routes/positionRoutes');
 const leaveTypeRoutes = require('./routes/leaveTypeRoutes');
+const templateRoutes = require('./routes/templateRoutes');
 
 
 const app = express();
@@ -41,6 +42,7 @@ app.use('/api/events', eventRoutes);
 app.use('/api/event-types', eventTypeRoutes);
 app.use('/api/positions', positionRoutes);
 app.use('/api/leave-types', leaveTypeRoutes);
+app.use('/api/templates', templateRoutes);
 
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 

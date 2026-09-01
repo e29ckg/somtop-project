@@ -1,6 +1,9 @@
 const pool = require('../config/db');
 const fs = require('fs');
 const path = require('path');
+const PizZip = require('pizzip');
+const Docxtemplater = require('docxtemplater');
+
 const { logActivity } = require('../utils/logger');
 
 const BASE_URL = process.env.APP_URL || 'http://localhost:8088';
@@ -202,5 +205,76 @@ exports.deleteLeave = async (req, res) => {
     } catch (error) {
         console.error('Error in deleteLeave:', error);
         res.status(500).json({ message: 'ไม่สามารถลบข้อมูลได้' });
+    }
+};
+
+// ==========================================
+// พิมพ์แบบฟอร์มใบลา (Word)
+// ==========================================
+exports.exportToWord = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // ดึงข้อมูลและใช้ CONCAT รวมคำนำหน้า ชื่อ สกุล ให้เป็น full_name
+        const query = `
+            SELECT 
+                lr.*, 
+                CONCAT(s.title, s.first_name, ' ', s.last_name) AS full_name, 
+                lt.name AS leave_type_name
+            FROM leave_requests lr
+            LEFT JOIN somtop s ON lr.somtop_id = s.id
+            LEFT JOIN leave_types lt ON lr.leave_type_id = lt.id
+            WHERE lr.id = ?
+        `;
+        const [rows] = await pool.query(query, [id]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ message: 'ไม่พบข้อมูลใบลา' });
+        }
+
+        const leaveData = rows[0];
+
+        // โหลด Template
+        const templatePath = path.resolve(__dirname, '../../templates/leave_template.docx');
+        const content = fs.readFileSync(templatePath, 'binary');
+
+        const zip = new PizZip(content);
+        const doc = new Docxtemplater(zip, {
+            paragraphLoop: true,
+            linebreaks: true,
+        });
+
+        // ฟังก์ชันแปลงวันที่เป็นภาษาไทย
+        const formatThaiDate = (dateString) => {
+            if (!dateString) return '-';
+            const date = new Date(dateString);
+            const months = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+            return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear() + 543}`;
+        };
+
+        // แมปข้อมูลลงในตัวแปรของเอกสาร Word
+        doc.render({
+            full_name: leaveData.full_name || '-',
+            leave_type_name: leaveData.leave_type_name || '-',
+            start_date: formatThaiDate(leaveData.start_date),
+            end_date: formatThaiDate(leaveData.end_date),
+            total_days: leaveData.total_days ? (leaveData.total_days % 1 === 0 ? parseInt(leaveData.total_days) : parseFloat(leaveData.total_days)) : '0',
+            note: leaveData.note || '-'
+        });
+
+        const buf = doc.getZip().generate({
+            type: 'nodebuffer',
+            compression: 'DEFLATE',
+        });
+
+        const outputFilename = `ใบลา_${leaveData.full_name.replace(/\s+/g, '_')}_${Date.now()}.docx`;
+        
+        res.setHeader('Content-Disposition', `attachment; filename=${encodeURIComponent(outputFilename)}`);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        res.send(buf);
+
+    } catch (error) {
+        console.error('Error generating Word file:', error);
+        res.status(500).json({ message: 'เกิดข้อผิดพลาดในการสร้างไฟล์ Word' });
     }
 };

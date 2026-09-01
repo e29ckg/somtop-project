@@ -218,16 +218,23 @@
               </li>
             </ul>
 
+            <!-- แสดงไฟล์เดิมที่มีอยู่แล้วตอนกดแก้ไข -->
             <div v-if="isEditing && formData.existing_file_paths && formData.existing_file_paths.length > 0" class="file-hint mt-3">
               <p class="mb-2 text-gray-700 font-bold">ไฟล์แนบเดิม:</p>
               <ul class="existing-files list-none pl-0">
-                <li v-for="(file, index) in formData.existing_file_paths" :key="index" class="existing-file-item">
-                  <a href="#" @click.prevent="openFilePreview(file, formData.id)" class="text-blue-500 underline text-sm">ดูไฟล์ที่ {{ index + 1 }}</a>
-                  <!-- ปุ่มลบไฟล์แบบ Inline -->
-                  <button type="button" class="btn-icon delete-inline" @click.prevent="deleteFileInline(file)" title="ลบไฟล์นี้">🗑️</button>
+                <li v-for="(file, index) in formData.existing_file_paths" :key="index" style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                  <!-- ไอคอนและชื่อไฟล์ -->
+                  <span style="font-size: 16px;">{{ getFileIcon(file) }}</span>
+                  <a href="#" @click.prevent="openFilePreview(file, formData.id)" class="text-blue-700 underline text-sm" style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                    {{ getFileName(file) }}
+                  </a>
+                  <!-- ปุ่มลบไฟล์ (สีแดงอ่อน) -->
+                  <button type="button" @click.prevent="deleteFileInline(file)" title="ลบไฟล์นี้" style="background-color: #FCE8E8; color: #EF4444; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                    🗑️
+                  </button>
                 </li>
               </ul>
-              <small class="text-muted mt-2 block">(หากเลือกอัปโหลดไฟล์ใหม่ ระบบจะลบไฟล์เก่าทิ้งทั้งหมด)</small>
+              <small class="text-muted">(หากเลือกอัปโหลดไฟล์ใหม่ ระบบจะเพิ่มไฟล์ต่อท้ายรายการเดิม)</small>
             </div>
           </div>
 
@@ -286,6 +293,7 @@
               {{ selectedEventToView.status }}
             </span>
           </div>
+
           
           <div class="detail-grid">
             <div class="detail-item">
@@ -324,21 +332,37 @@
             </div>
           </div>
 
+          <!-- แสดงรายชื่อผู้เข้าร่วม -->
+          <div class="detail-section" v-if="viewParticipantsList && viewParticipantsList.length > 0">
+            <label class="section-label">ผู้เข้าร่วมกิจกรรม ({{ viewParticipantsList.length }} ท่าน)</label>
+            <div class="participant-tags">
+              <span v-for="person in viewParticipantsList" :key="person.somtop_id" class="participant-tag">
+                👤 {{ person.full_name }}
+              </span>
+            </div>
+          </div>
+          <div class="detail-section" v-else-if="viewParticipantsList && viewParticipantsList.length === 0">
+            <label class="section-label">ผู้เข้าร่วมกิจกรรม</label>
+            <p class="text-muted text-sm">ยังไม่มีผู้เข้าร่วม</p>
+          </div>
+
+          <!-- ส่วนแสดงไฟล์แนบใน View Modal -->
           <div class="detail-section" v-if="selectedEventToView.file_paths && selectedEventToView.file_paths.length > 0">
-            <label class="section-label">ไฟล์แนบเอกสาร ({{ selectedEventToView.file_paths.length }} ไฟล์)</label>
-            <div class="file-grid">
+            <label class="section-label">ไฟล์แนบเอกสาร:</label>
+            <div class="file-grid mt-2">
               <button 
                 v-for="(file, index) in selectedEventToView.file_paths" 
                 :key="index"
                 @click="openFilePreview(file, selectedEventToView.id)" 
                 class="file-attachment-btn"
               >
-                <span class="file-icon">📎</span>
-                <span class="file-name">เอกสารแนบที่ {{ index + 1 }}</span>
+                <span class="file-icon">{{ getFileIcon(file) }}</span>
+                <span class="file-name">{{ getFileName(file) }}</span>
                 <span class="file-action">เปิดดูไฟล์ ↗</span>
               </button>
             </div>
           </div>
+
         </div>
 
         <div class="modal-actions">
@@ -353,7 +377,6 @@
         <div class="modal-header">
           <h2>ดูไฟล์แนบ</h2>
           <div class="preview-actions">
-            <button v-if="isEditing && previewUrl" class="btn-icon delete" @click="deleteCurrentFile" title="ลบไฟล์นี้">🗑️</button>
             <button class="close-btn" @click="closeFilePreview">✕</button>
           </div>
         </div>
@@ -418,6 +441,41 @@ const searchQuery = ref('')
 const participantSearchQuery = ref('')
 const currentPage = ref(1)
 const itemsPerPage = ref(10)
+
+const viewParticipantsList = ref([])
+
+// ดึงชื่อไฟล์จาก URL
+// ดึงชื่อไฟล์จาก URL และตัดตัวเลข Timestamp ออก
+const getFileName = (url) => {
+  if (!url) return 'เอกสารแนบ';
+  try {
+    // 1. ดึงส่วนท้ายสุดของ URL มาแปลงกลับเป็นภาษาไทย
+    let filename = decodeURIComponent(url.split('/').pop());
+    
+    // 2. หาตำแหน่งของเครื่องหมาย _ ตัวแรก (ที่เราตั้งไว้คั่นระหว่าง Timestamp กับ ชื่อไฟล์)
+    const firstUnderscoreIndex = filename.indexOf('_');
+    
+    // 3. ถ้าเจอ _ และอยู่ด้านหน้า (ช่วง Timestamp) ให้ตัดส่วนนั้นทิ้ง
+    if (firstUnderscoreIndex > 0 && firstUnderscoreIndex <= 15) {
+       filename = filename.substring(firstUnderscoreIndex + 1);
+    }
+    
+    return filename;
+  } catch (e) {
+    return url.split('/').pop();
+  }
+};
+
+// เช็คนามสกุลไฟล์เพื่อแสดงไอคอน
+const getFileIcon = (url) => {
+  if (!url) return '📎';
+  const ext = url.split('.').pop().toLowerCase();
+  if (ext === 'pdf') return '📄'; 
+  if (['doc', 'docx'].includes(ext)) return '📘'; 
+  if (['xls', 'xlsx'].includes(ext)) return '📗'; 
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) return '🖼️'; 
+  return '📎';
+};
 
 // ==========================================
 // 2. Computed Properties & Formatting
@@ -664,9 +722,18 @@ const openEditModal = (item) => {
   isModalOpen.value = true;
 }
 
-const openViewModal = (eventItem) => {
+// ปรับฟังก์ชันเปิดหน้า View ให้ดึงข้อมูลผู้เข้าร่วมด้วย
+const openViewModal = async (eventItem) => {
   selectedEventToView.value = eventItem;
   isViewModalOpen.value = true;
+  viewParticipantsList.value = []; // เคลียร์ค่าเก่าก่อน
+  
+  try {
+    const response = await api.get(`/events/${eventItem.id}/participants`);
+    viewParticipantsList.value = response.data.records || [];
+  } catch (error) {
+    console.error("ดึงรายชื่อผู้เข้าร่วมไม่สำเร็จ:", error);
+  }
 }
 
 const openFilePreview = (url, eventId) => {
@@ -869,5 +936,91 @@ onMounted(() => {
   background-color: #F3F4F6;
   border-radius: 8px;
   overflow: hidden;
+}
+/* Participant Tags in View Modal */
+.participant-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.participant-tag {
+  background-color: #F0FDF4;
+  color: #166534;
+  border: 1px solid #BBF7D0;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+/* =========================================
+   สไตล์สำหรับปุ่มไฟล์แนบ (File Attachments)
+========================================= */
+.section-label {
+  font-size: 14px;
+  color: #374151;
+  font-weight: 600;
+  display: block;
+}
+
+.file-grid { 
+  display: grid; 
+  grid-template-columns: 1fr; 
+  gap: 10px; 
+  margin-top: 8px;
+}
+
+.file-attachment-btn { 
+  display: flex; 
+  align-items: center; 
+  gap: 12px; 
+  padding: 12px 16px; 
+  background-color: #FFFFFF; 
+  border: 1px solid #E5E7EB; 
+  border-radius: 8px; 
+  cursor: pointer; 
+  transition: all 0.2s ease; 
+  text-align: left; 
+  width: 100%; 
+  box-shadow: 0 1px 2px rgba(0,0,0,0.02); 
+}
+
+/* เอฟเฟกต์เมื่อเมาส์ชี้ (Hover) จะเปลี่ยนเป็นสีฟ้าและยกตัวขึ้นเล็กน้อย */
+.file-attachment-btn:hover { 
+  border-color: #BFDBFE; 
+  background-color: #EFF6FF; 
+  box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.1); 
+  transform: translateY(-1px);
+}
+
+.file-icon { 
+  font-size: 20px; 
+  flex-shrink: 0;
+}
+
+/* ตั้งค่าให้ชื่อไฟล์ตัดจบด้วย ... หากชื่อยาวเกินไป */
+.file-name { 
+  color: #3B82F6; 
+  font-size: 14px; 
+  font-weight: 500; 
+  flex: 1; 
+  overflow: hidden; 
+  text-overflow: ellipsis; 
+  white-space: nowrap; 
+}
+
+.file-action { 
+  color: #3B82F6; 
+  font-size: 13px; 
+  font-weight: 600; 
+  opacity: 0; 
+  transition: opacity 0.2s; 
+}
+
+.file-attachment-btn:hover .file-action { 
+  opacity: 1; 
 }
 </style>

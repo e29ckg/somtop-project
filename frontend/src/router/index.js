@@ -13,6 +13,7 @@ import ManageEventView from '../views/ManageEventView.vue'
 import ManageEventTypeView from '../views/ManageEventTypeView.vue'
 import ManagePositionView from '../views/ManagePositionView.vue'
 import ManageLeaveTypeView from '../views/ManageLeaveTypeView.vue'
+import ManageTemplateView from '../views/ManageTemplateView.vue'
 
 // 1. สร้าง router ขึ้นมาก่อน
 const router = createRouter({
@@ -81,6 +82,11 @@ const router = createRouter({
           path: 'manage-leave-types',
           name: 'manage-leave-types',
           component: ManageLeaveTypeView
+        },
+        {
+          path: 'manage-templates',
+          name: 'manage-templates',
+          component: ManageTemplateView
         }
       ]
     },

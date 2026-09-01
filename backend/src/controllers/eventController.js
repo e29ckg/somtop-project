@@ -152,7 +152,7 @@ exports.createEvent = async (req, res) => {
 };
 
 // ==========================================
-// 4. แก้ไขข้อมูลกิจกรรม
+// 4. แก้ไขข้อมูลกิจกรรม (เพิ่มไฟล์แนบ)
 // ==========================================
 exports.updateEvent = async (req, res) => {
     try {
@@ -169,22 +169,32 @@ exports.updateEvent = async (req, res) => {
             return res.status(404).json({ message: 'ไม่พบข้อมูลกิจกรรม' });
         }
 
-        let filePathsDb = existing[0].file_paths;
-
-        // 2. ถ้ามีการอัปโหลดไฟล์ใหม่ ให้บันทึกไฟล์ใหม่และลบไฟล์เก่าทิ้ง
-        if (req.files && req.files.length > 0) {
-            // ลบไฟล์เดิมออกจากเซิร์ฟเวอร์
-            deletePhysicalFiles(existing[0].file_paths);
-
-            // สร้าง Array ไฟล์ใหม่
-            const protocol = req.secure ? 'https' : 'http';
-            const host = req.headers.host;
-            const newPaths = req.files.map(file => `${protocol}://${host}/uploads/events/${file.filename}`);
-            
-            filePathsDb = JSON.stringify(newPaths);
+        // 2. แปลงไฟล์เก่าให้เป็น Array
+        let currentPaths = [];
+        if (existing[0].file_paths) {
+            try {
+                currentPaths = JSON.parse(existing[0].file_paths);
+                if (!Array.isArray(currentPaths)) currentPaths = [existing[0].file_paths];
+            } catch (e) {
+                currentPaths = [existing[0].file_paths];
+            }
         }
 
-        // 3. อัปเดตข้อมูลลงฐานข้อมูล (เพิ่ม file_paths)
+        // 3. ถ้ามีการอัปโหลดไฟล์ใหม่ ให้นำมารวมกับไฟล์เก่า (Append)
+        if (req.files && req.files.length > 0) {
+            const protocol = req.secure ? 'https' : 'http';
+            const host = req.headers.host;
+            
+            // สร้าง Array ไฟล์ใหม่
+            const newPaths = req.files.map(file => `${protocol}://${host}/uploads/events/${file.filename}`);
+            
+            // นำไฟล์เก่าและไฟล์ใหม่มารวมกัน
+            currentPaths = currentPaths.concat(newPaths);
+        }
+
+        const filePathsDb = currentPaths.length > 0 ? JSON.stringify(currentPaths) : null;
+
+        // 4. อัปเดตข้อมูลลงฐานข้อมูล
         const query = `
             UPDATE events SET 
                 event_type_id = ?, title = ?, description = ?, start_date = ?, 
@@ -197,7 +207,7 @@ exports.updateEvent = async (req, res) => {
             location || null, status || 'รอดำเนินการ', filePathsDb, id
         ]);
 
-        res.status(200).json({ message: 'อัปเดตข้อมูลกิจกรรมสำเร็จ' });
+        res.status(200).json({ message: 'อัปเดตข้อมูลกิจกรรมและเพิ่มไฟล์สำเร็จ' });
     } catch (error) {
         console.error('Error updating event:', error);
         res.status(500).json({ message: 'ไม่สามารถอัปเดตกิจกรรมได้' });

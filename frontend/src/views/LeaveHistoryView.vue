@@ -104,7 +104,7 @@
             </tr>
             <template v-else>
               <tr v-for="(leave, index) in paginatedLeaveList" :key="index" class="data-row">
-                <td class="font-mono">{{ formatThaiDateFull(leave.submit_date) }}</td>
+                <td class="font-mono">{{ formatThaiDateShort(leave.submit_date) }}</td>
                 <td>
                   <div class="full-name">{{ leave.full_name }}</div>
                 </td>
@@ -120,6 +120,7 @@
                 </td>
                 <td class="no-print">
                       <div class="action-buttons">
+                        <button class="btn-icon" @click="exportToWord(leave.id)" title="พิมพ์แบบฟอร์มใบลา (Word)">🖨️</button>
                         <!-- วนลูปแสดงปุ่มไฟล์ทั้งหมด -->
                         <template v-if="leave.file_path && leave.file_path.length > 0">
                           <a v-for="(file, fIndex) in leave.file_path" :key="fIndex" 
@@ -472,6 +473,38 @@ const changePage = (page) => {
   }
 }
 
+// ดึงชื่อไฟล์จาก URL และตัดตัวเลข Timestamp ออก
+const getFileName = (url) => {
+  if (!url) return 'เอกสารแนบ';
+  try {
+    // 1. ดึงส่วนท้ายสุดของ URL มาแปลงกลับเป็นภาษาไทย
+    let filename = decodeURIComponent(url.split('/').pop());
+    
+    // 2. หาตำแหน่งของเครื่องหมาย _ ตัวแรก (ที่เราตั้งไว้คั่นระหว่าง Timestamp กับ ชื่อไฟล์)
+    const firstUnderscoreIndex = filename.indexOf('_');
+    
+    // 3. ถ้าเจอ _ และอยู่ด้านหน้า (ช่วง Timestamp) ให้ตัดส่วนนั้นทิ้ง
+    if (firstUnderscoreIndex > 0 && firstUnderscoreIndex <= 15) {
+       filename = filename.substring(firstUnderscoreIndex + 1);
+    }
+    
+    return filename;
+  } catch (e) {
+    return url.split('/').pop();
+  }
+};
+
+// เช็คนามสกุลไฟล์เพื่อแสดงไอคอน
+const getFileIcon = (url) => {
+  if (!url) return '📎';
+  const ext = url.split('.').pop().toLowerCase();
+  if (ext === 'pdf') return '📄'; 
+  if (['doc', 'docx'].includes(ext)) return '📘'; 
+  if (['xls', 'xlsx'].includes(ext)) return '📗'; 
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) return '🖼️'; 
+  return '📎';
+};
+
 watch(filters, () => {
   currentPage.value = 1;
 }, { deep: true });
@@ -508,7 +541,7 @@ const printReport = () => {
           table { width: 100%; border-collapse: collapse; margin-top: 20px; }
           th, td { border: 1px solid #000; padding: 10px; text-align: left; font-size: 14px; }
           th { background-color: #f0f0f0; font-weight: bold; }
-          .status-badge { font-weight: bold; }
+          .status-badge { font-weight: bold;  white-space: nowrap; }
           .no-print { display: none !important; }
         </style>
       </head>
@@ -649,6 +682,7 @@ const deleteData = async (id) => {
   }
 }
 
+
 const openPdfPreview = (url) => {
   previewUrl.value = url
   isPreviewOpen.value = true
@@ -729,6 +763,45 @@ const openEditModal = (leave) => {
 }
 
 const closeModal = () => isModalOpen.value = false
+
+// ==========================================
+// ฟังก์ชันส่งออกเป็นไฟล์ Word (ดาวน์โหลดไฟล์)
+// ==========================================
+const exportToWord = async (id) => {
+  try {
+    // 1. จำเป็นต้องระบุ responseType: 'blob' เพื่อให้ Axios เข้าใจว่าเรากำลังรับไฟล์ไบนารี
+    const response = await api.get(`/leaves/${id}/export-word`, {
+      responseType: 'blob' 
+    });
+
+    // 2. สร้าง URL เสมือนจากข้อมูลไบนารี (Blob)
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    
+    // 3. สร้างแท็ก <a> จำลองขึ้นมาเพื่อบังคับคลิกดาวน์โหลด
+    const link = document.createElement('a');
+    link.href = url;
+    
+    // พยายามดึงชื่อไฟล์จาก header Content-Disposition (ถ้ามี) หรือใช้ค่าเริ่มต้น
+    let filename = `แบบฟอร์มใบลา_${id}.docx`;
+    const contentDisposition = response.headers['content-disposition'];
+    if (contentDisposition && contentDisposition.indexOf('filename=') !== -1) {
+      filename = decodeURIComponent(contentDisposition.split('filename=')[1]);
+    }
+
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+
+    // 4. เคลียร์ค่าทิ้งหลังโหลดเสร็จ
+    link.remove();
+    window.URL.revokeObjectURL(url);
+    
+    swalSuccess('ดาวน์โหลดสำเร็จ', 'สร้างไฟล์ใบลาเรียบร้อยแล้ว');
+  } catch (error) {
+    console.error('Export Error:', error);
+    swalError('เกิดข้อผิดพลาด', 'ไม่สามารถดาวน์โหลดไฟล์แบบฟอร์มใบลาได้');
+  }
+}
 
 onMounted(() => {
   fetchLeaves()

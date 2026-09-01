@@ -12,9 +12,17 @@ const storage = multer.diskStorage({
         cb(null, uploadDir);
     },
     filename: function (req, file, cb) {
-        const uniqueSuffix = Date.now() + '_' + Math.round(Math.random() * 1E9);
-        const ext = path.extname(file.originalname).toLowerCase();
-        cb(null, 'event_' + uniqueSuffix + ext); 
+        // 1. แปลง Encoding เพื่อป้องกันปัญหาชื่อไฟล์ภาษาไทยกลายเป็นภาษาต่างดาว
+        const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+        
+        // 2. แทนที่ช่องว่างด้วยเครื่องหมาย _ เพื่อป้องกันปัญหา URL พัง
+        const safeName = originalName.replace(/\s+/g, '_');
+        
+        // 3. นำ Timestamp (เวลาปัจจุบัน) มาต่อหน้าชื่อไฟล์เดิม ป้องกันผู้ใช้อัปโหลดชื่อไฟล์ซ้ำกัน
+        // ผลลัพธ์จะได้ชื่อไฟล์เช่น: 1718822920633_ใบรับรองแพทย์.pdf
+        const uniqueName = Date.now() + '_' + safeName;
+        
+        cb(null, uniqueName);
     }
 });
 
