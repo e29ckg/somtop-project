@@ -56,7 +56,7 @@
             </tr>
             
             <template v-else>
-              <tr v-for="event in paginatedList" :key="event.id" class="data-row">
+              <tr v-for="event in paginatedList" :key="event.id" class="data-row" :class="{ 'upcoming-row': isUpcomingEvent(event.start_date) }">
                 <td class="font-bold">{{ event.title }}</td>
                 <td>{{ formatDateTime(event.start_date) }}</td>
                 <td>{{ formatDateTime(event.end_date) }}</td>
@@ -480,12 +480,29 @@ const getFileIcon = (url) => {
 // ==========================================
 // 2. Computed Properties & Formatting
 // ==========================================
+// === ฟังก์ชันตรวจสอบกิจกรรมที่ยังไม่ถึง (อนาคต หรือ วันนี้) ===
+const isUpcomingEvent = (startDateStr) => {
+  if (!startDateStr) return false;
+  const eventDate = new Date(startDateStr);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // รีเซ็ตเวลาของวันนี้เป็น 00:00:00 เพื่อเทียบเฉพาะวันที่
+  return eventDate >= today;
+}
+
+// === กรองและเรียงลำดับกิจกรรม ===
 const filteredList = computed(() => {
-  if (!searchQuery.value) return eventList.value;
-  const q = searchQuery.value.toLowerCase()
-  return eventList.value.filter(item => 
-    item.title.toLowerCase().includes(q) || (item.location && item.location.toLowerCase().includes(q))
-  );
+  let result = [...eventList.value]; // คัดลอก Array เพื่อไม่ให้กระทบข้อมูลต้นทาง
+
+  // 1. ค้นหา (Search)
+  if (searchQuery.value) {
+    const q = searchQuery.value.toLowerCase()
+    result = result.filter(item => 
+      item.title.toLowerCase().includes(q) || (item.location && item.location.toLowerCase().includes(q))
+    );
+  }
+
+  // 2. เรียงลำดับวันที่จากมากไปน้อย (ใหม่สุดอยู่บน)
+  return result.sort((a, b) => new Date(b.start_date) - new Date(a.start_date));
 })
 
 const filteredSomtopList = computed(() => {
@@ -574,7 +591,27 @@ const saveData = async () => {
       const eMin = formData.value.end_minute || '59';
       end_date = `${formData.value.end_year}-${formData.value.end_month}-${formData.value.end_day} ${eHour}:${eMin}:59`;
     } else {
-      end_date = `${formData.value.start_year}-${formData.value.start_month}-${formData.value.start_day} 23:59:59`;
+      // 1. นำข้อมูลวันเวลาเริ่มต้นมาสร้าง Date Object (เดือนต้อง -1 เพราะ JavaScript นับเดือนเริ่มจาก 0)
+      const autoEndDate = new Date(
+        formData.value.start_year, 
+        parseInt(formData.value.start_month) - 1, 
+        formData.value.start_day, 
+        parseInt(sHour), 
+        parseInt(sMin), 
+        0
+      );
+      
+      // 2. บวกเวลาเพิ่มไป 2 ชั่วโมง
+      autoEndDate.setHours(autoEndDate.getHours() + 2);
+      
+      // 3. แปลงกลับและเติมเลข 0 นำหน้าให้เป็นรูปแบบ YYYY-MM-DD HH:mm:ss
+      const eYear = autoEndDate.getFullYear();
+      const eMonth = String(autoEndDate.getMonth() + 1).padStart(2, '0');
+      const eDay = String(autoEndDate.getDate()).padStart(2, '0');
+      const eHourStr = String(autoEndDate.getHours()).padStart(2, '0');
+      const eMinStr = String(autoEndDate.getMinutes()).padStart(2, '0');
+      
+      end_date = `${eYear}-${eMonth}-${eDay} ${eHourStr}:${eMinStr}:00`;
     }
 
     const payload = new FormData();
@@ -1022,5 +1059,21 @@ onMounted(() => {
 
 .file-attachment-btn:hover .file-action { 
   opacity: 1; 
+}
+/* =========================================
+   สไตล์ไฮไลต์กิจกรรมที่ยังไม่ถึง (Upcoming)
+========================================= */
+.data-row.upcoming-row td {
+  background-color: #F0FDF4; /* พื้นหลังสีเขียวพาสเทลอ่อนมาก */
+}
+
+/* สร้างแถบสีเขียวที่ขอบซ้ายของคอลัมน์แรก */
+.data-row.upcoming-row td:first-child {
+  border-left: 4px solid #10B981; 
+}
+
+/* เอฟเฟกต์ตอนนำเมาส์ไปชี้ */
+.data-row.upcoming-row:hover td {
+  background-color: #DCFCE7; 
 }
 </style>

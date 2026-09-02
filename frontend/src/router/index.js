@@ -14,6 +14,7 @@ import ManageEventTypeView from '../views/ManageEventTypeView.vue'
 import ManagePositionView from '../views/ManagePositionView.vue'
 import ManageLeaveTypeView from '../views/ManageLeaveTypeView.vue'
 import ManageTemplateView from '../views/ManageTemplateView.vue'
+import ManageGoogleCalendarView from '../views/ManageGoogleCalendarView.vue'
 
 // 1. สร้าง router ขึ้นมาก่อน
 const router = createRouter({
@@ -87,6 +88,11 @@ const router = createRouter({
           path: 'manage-templates',
           name: 'manage-templates',
           component: ManageTemplateView
+        },
+        {
+          path: 'manage-calendar-sync',
+          name: 'manage-calendar-sync',
+          component: ManageGoogleCalendarView
         }
       ]
     },

@@ -33,6 +33,11 @@
         <!-- ⭐️ ซ่อน/แสดงเมนูตั้งค่า เฉพาะผู้ที่มี Role = admin เท่านั้น -->
         <div v-if="userRole === 'admin'">
           <div class="menu-category">ตั้งค่าระบบ</div>
+          <!-- เมนูจัดการ Google Calendar -->
+          <router-link to="/manage-calendar-sync" class="nav-item">
+             <span class="nav-icon">📅</span>
+             <span class="sidebar-text">ตั้งค่า Google Calendar</span>
+          </router-link>
           <router-link to="/manage-courts" class="nav-item">
              <span class="nav-icon">🏢</span>
              <span class="sidebar-text">จัดการข้อมูลศาล</span>

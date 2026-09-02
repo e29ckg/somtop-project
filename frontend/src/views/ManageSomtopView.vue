@@ -286,7 +286,7 @@ const previewPhotoUrl = ref('')
 // === State ระบบค้นหาและแบ่งหน้า ===
 const searchQuery = ref('')
 const currentPage = ref(1)
-const itemsPerPage = ref(10)
+const itemsPerPage = ref(50)
 
 // ฟังก์ชันต่างๆ
 const formatThaiDateFull = (dateStr) => {

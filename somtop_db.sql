@@ -181,3 +181,7 @@ CREATE TABLE activity_logs (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- เพิ่มคอลัมน์ google_event_id ในตาราง events เพื่อเก็บ ID ของกิจกรรมจาก Google Calendar
+ALTER TABLE events
+ADD COLUMN google_event_id VARCHAR(255) NULL COMMENT 'เก็บ ID ของกิจกรรมจาก Google Calendar' AFTER status;
+
