@@ -185,3 +185,14 @@ CREATE TABLE activity_logs (
 ALTER TABLE events
 ADD COLUMN google_event_id VARCHAR(255) NULL COMMENT 'เก็บ ID ของกิจกรรมจาก Google Calendar' AFTER status;
 
+CREATE TABLE IF NOT EXISTS calendar_settings (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    calendar_id VARCHAR(255) NULL COMMENT 'อีเมล หรือ ID ของปฏิทิน',
+    is_sync_enabled BOOLEAN DEFAULT TRUE COMMENT 'สถานะเปิด/ปิดการส่งข้อมูล 1=เปิด, 0=ปิด',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- เพิ่มข้อมูลแถวแรกไว้เป็นค่าเริ่มต้น (Default)
+INSERT INTO calendar_settings (id, calendar_id, is_sync_enabled) 
+VALUES (1, '', 1) 
+ON DUPLICATE KEY UPDATE id=1;
