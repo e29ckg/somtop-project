@@ -17,3 +17,6 @@ frontend/dist/
 backend/uploads/
 somtop-backend/uploads/
 frontend/vite.config.js
+
+backend/src/config/google-service-account.json
+backup/*
