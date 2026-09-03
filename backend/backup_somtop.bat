@@ -15,7 +15,7 @@ set DB_PASS=
 set DB_NAME=somtop_db
 
 :: สร้างชื่อโฟลเดอร์ตามวันที่และเวลา (เช่น 2026-09-03_06-14)
-set DATETIME=%date:~10,4%-%date:~4,2%-%date:~7,2%_%time:~0,2%-%time:~3,2%
+set DATETIME=%date:~-4,4%-%date:~4,2%-%date:~7,2%_%time:~0,2%-%time:~3,2%
 set DATETIME=%DATETIME: =0%
 set BACKUP_FOLDER=%BACKUP_ROOT%\backup\backup_%DATETIME%
 
