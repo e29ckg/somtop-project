@@ -27,7 +27,7 @@ exports.getAllSomtop = async (req, res) => {
                 s.id, s.title, s.first_name, s.last_name, s.id_card, s.court_code, 
                 DATE_FORMAT(s.dob, '%Y-%m-%d') AS dob,
                 DATE_FORMAT(s.join_date, '%Y-%m-%d') AS join_date,
-                s.position_id, 
+                s.position_id, s.occupation,
                 sp.name AS role_position, -- ส่งกลับไปในชื่อเดิมเพื่อให้ Frontend ไม่พัง
                 sp.level AS position_level,
                 s.address, s.phone, s.status, s.note, s.photo_path, 
@@ -72,12 +72,12 @@ exports.createSomtop = async (req, res) => {
     let photoPath = null;
     try {
         // ⭐️ เปลี่ยน role_position เป็น position_id และเพิ่ม join_date
-        const { title, first_name, last_name, id_card, dob, join_date, position_id, address, phone, status, note } = req.body;
+        const { title, first_name, last_name, id_card, dob, occupation, join_date, position_id, address, phone, status, note } = req.body;
         const courtCode = req.user.court_code; 
         
-        if (!title || !first_name || !last_name) {
+        if (!title || !first_name || !last_name || !occupation) {
             if (req.file) deletePhysicalFile(`uploads/somtop/${req.file.filename}`);
-            return res.status(400).json({ message: 'กรุณาระบุคำนำหน้า ชื่อ และสกุล ให้ครบถ้วน' });
+            return res.status(400).json({ message: 'กรุณาระบุคำนำหน้า ชื่อ สกุล และอาชีพ ให้ครบถ้วน' });
         }
 
         if (req.file) {
@@ -86,13 +86,13 @@ exports.createSomtop = async (req, res) => {
 
         const query = `
             INSERT INTO somtop 
-            (title, first_name, last_name, id_card, court_code, dob, join_date, position_id, address, phone, status, note, photo_path) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (title, first_name, last_name, id_card, court_code, dob, occupation, join_date, position_id, address, phone, status, note, photo_path) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         
         await pool.query(query, [
             title, first_name, last_name, id_card || null, courtCode, 
-            dob || null, join_date || null, position_id || null, 
+            dob || null, occupation || null, join_date || null, position_id || null, 
             address || null, phone || null, status || 'ใช้งาน', 
             note || null, photoPath
         ]);
@@ -117,10 +117,10 @@ exports.createSomtop = async (req, res) => {
 exports.updateSomtop = async (req, res) => {
     try {
         // ⭐️ เปลี่ยน role_position เป็น position_id และเพิ่ม join_date
-        const { id, title, first_name, last_name, id_card, dob, join_date, position_id, address, phone, status, note } = req.body;
+        const { id, title, first_name, last_name, id_card, dob, occupation, join_date, position_id, address, phone, status, note } = req.body;
 
-        if (!id || !title || !first_name || !last_name) {
-            return res.status(400).json({ message: 'ข้อมูลไม่ครบถ้วน (ต้องการคำนำหน้า ชื่อ และสกุล)' });
+        if (!id || !title || !first_name || !last_name || !occupation) {
+            return res.status(400).json({ message: 'ข้อมูลไม่ครบถ้วน (ต้องการคำนำหน้า ชื่อ สกุล และอาชีพ)' });
         }
 
         const [existing] = await pool.query('SELECT photo_path FROM somtop WHERE id = ?', [id]);
@@ -136,13 +136,13 @@ exports.updateSomtop = async (req, res) => {
 
         const query = `
             UPDATE somtop SET 
-                title = ?, first_name = ?, last_name = ?, id_card = ?, dob = ?, join_date = ?, 
+                title = ?, first_name = ?, last_name = ?, id_card = ?, dob = ?, occupation = ?, join_date = ?, 
                 position_id = ?, address = ?, phone = ?, status = ?, note = ?, photo_path = ? 
             WHERE id = ?
         `;
         
         await pool.query(query, [
-            title, first_name, last_name, id_card || null, dob || null, join_date || null,
+            title, first_name, last_name, id_card || null, dob || null, occupation || null, join_date || null,
             position_id || null, address || null, phone || null, status || 'ใช้งาน', 
             note || null, photoPath, id
         ]);
@@ -188,5 +188,39 @@ exports.deleteSomtop = async (req, res) => {
     } catch (error) {
         console.error('Error deleting somtop:', error);
         res.status(500).json({ message: 'ไม่สามารถลบข้อมูลได้' });
+    }
+};
+
+// ==========================================
+// 4. ดึงประวัติการลาและกิจกรรมของ พ.สมทบ (รายบุคคล)
+// ==========================================
+exports.getSomtopHistory = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // 1. ดึงประวัติการลา (JOIN กับ leave_types)
+        const queryLeaves = `
+            SELECT lr.start_date, lr.end_date, lr.total_days, lr.status, lt.name as leave_type_name 
+            FROM leave_requests lr 
+            LEFT JOIN leave_types lt ON lr.leave_type_id = lt.id 
+            WHERE lr.somtop_id = ? 
+            ORDER BY lr.created_at DESC
+        `;
+        const [leaves] = await pool.query(queryLeaves, [id]);
+
+        // 2. ดึงประวัติกิจกรรม (JOIN กับ events)
+        const queryEvents = `
+            SELECT e.title, e.start_date, e.end_date, ep.status 
+            FROM event_participants ep 
+            JOIN events e ON ep.event_id = e.id 
+            WHERE ep.somtop_id = ? 
+            ORDER BY e.start_date DESC
+        `;
+        const [events] = await pool.query(queryEvents, [id]);
+
+        res.status(200).json({ leaves, events });
+    } catch (error) {
+        console.error('Error fetching somtop history:', error);
+        res.status(500).json({ message: 'เกิดข้อผิดพลาดในการดึงประวัติ' });
     }
 };

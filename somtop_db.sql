@@ -196,3 +196,6 @@ CREATE TABLE IF NOT EXISTS calendar_settings (
 INSERT INTO calendar_settings (id, calendar_id, is_sync_enabled) 
 VALUES (1, '', 1) 
 ON DUPLICATE KEY UPDATE id=1;
+
+ALTER TABLE `somtop`
+ADD COLUMN `occupation` varchar(150) DEFAULT NULL COMMENT 'อาชีพ' AFTER `dob`;

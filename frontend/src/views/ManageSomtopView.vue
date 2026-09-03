@@ -73,6 +73,7 @@
               </td>
               <td class="no-print">
                 <div class="action-buttons">
+                  <button class="btn-icon view" @click="openViewModal(person)" title="ดูรายละเอียด">👁️</button>
                   <button class="btn-icon edit" @click="openEditModal(person)" title="แก้ไข">✏️</button>
                   <button class="btn-icon delete" @click="deleteData(person.id)" title="ลบ">🗑️</button>
                 </div>
@@ -155,6 +156,10 @@
             <label>เลขบัตรประชาชน</label>
             <input type="text" v-model="formData.idCard" maxlength="13" />
           </div>
+          <div class="input-group">
+            <label>อาชีพ</label>
+            <input type="text" v-model="formData.occupation" placeholder="เช่น รับราชการ, ธุรกิจส่วนตัว" />
+          </div>
 
           <div class="input-group">
             <label>วัน/เดือน/ปีเกิด</label>
@@ -235,6 +240,158 @@
         </form>
       </div>
     </div>
+
+    <!-- ⭐️ Modal: ดูรายละเอียด พ.สมทบ (View Only) -->
+    <div v-if="isViewModalOpen" class="modal-overlay no-print">
+      <div class="modal-card detail-modal">
+        <div class="modal-header">
+          <h2>รายละเอียดข้อมูล พ.สมทบ</h2>
+          <button class="close-btn" @click="closeViewModal">✕</button>
+        </div>
+        
+        <div class="modal-body" v-if="selectedSomtopToView">
+          <!-- ส่วนรูปโปรไฟล์และชื่อ -->
+          <div class="profile-header text-center mb-4" style="display: flex; flex-direction: column; align-items: center; border-bottom: 1px dashed #E5E7EB; padding-bottom: 20px; margin-bottom: 20px;">
+            <img v-if="selectedSomtopToView.photo_path" :src="selectedSomtopToView.photo_path" style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 3px solid #10B981; margin-bottom: 12px;" />
+            <div v-else style="width: 120px; height: 120px; border-radius: 50%; background: #F3F4F6; display: flex; align-items: center; justify-content: center; font-size: 48px; border: 2px dashed #D1D5DB; margin-bottom: 12px;">👤</div>
+            
+            <h3 style="font-size: 22px; font-weight: 600; color: #111827; margin: 0 0 8px 0;">{{ selectedSomtopToView.full_name }}</h3>
+            <span class="status-badge" :class="selectedSomtopToView.status === 'ใช้งาน' ? 'active' : 'inactive'">
+              สถานะ: {{ selectedSomtopToView.status }}
+            </span>
+          </div>
+          
+          <!-- ข้อมูลทั่วไป Grid -->
+          <div class="detail-grid">
+            <div class="detail-item">
+              <span class="detail-icon">🪪</span>
+              <div class="detail-content">
+                <label>เลขบัตรประชาชน</label>
+                <p>{{ selectedSomtopToView.id_card || '-' }}</p>
+              </div>
+            </div>
+
+            <div class="detail-item">
+              <span class="detail-icon">🎂</span>
+              <div class="detail-content">
+                <label>วัน/เดือน/ปีเกิด</label>
+                <p>{{ formatThaiDateFull(selectedSomtopToView.dob) }}</p>
+              </div>
+            </div>
+
+            <div class="detail-item">
+              <span class="detail-icon">💼</span>
+              <div class="detail-content">
+                <label>อาชีพ</label>
+                <!-- นำฟิลด์อาชีพที่เพิ่งเพิ่มมาแสดงผล -->
+                <p>{{ selectedSomtopToView.occupation || '-' }}</p>
+              </div>
+            </div>
+
+            <div class="detail-item">
+              <span class="detail-icon">📞</span>
+              <div class="detail-content">
+                <label>เบอร์โทรศัพท์</label>
+                <p>{{ selectedSomtopToView.phone || '-' }}</p>
+              </div>
+            </div>
+
+            <div class="detail-item full-width">
+              <span class="detail-icon">🏠</span>
+              <div class="detail-content">
+                <label>ที่อยู่</label>
+                <p>{{ selectedSomtopToView.address || '-' }}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- หมายเหตุ -->
+          <div class="detail-section" v-if="selectedSomtopToView.note">
+            <label class="section-label" style="font-size: 14px; color: #374151; font-weight: 600; margin-bottom: 8px; display: block;">หมายเหตุ</label>
+            <div style="background: #F9FAFB; padding: 16px; border-radius: 8px; border: 1px solid #E5E7EB; color: #374151; font-size: 14px; white-space: pre-wrap; line-height: 1.6;">
+              {{ selectedSomtopToView.note }}
+            </div>
+          </div>
+        </div>
+
+        <!-- เส้นคั่น -->
+        <hr style="border: 0; border-top: 1px solid #E5E7EB; margin: 24px 0;" />
+        
+        <div v-if="isLoadingHistory" class="text-center" style="padding: 20px; color: #6B7280;">
+          กำลังโหลดประวัติข้อมูล...
+        </div>
+
+        <div v-else class="history-sections">
+          <!-- 📅 ส่วนประวัติการลา -->
+          <div class="history-section mb-4">
+            <h4 style="font-size: 16px; font-weight: 600; color: #111827; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+              <span>📅</span> ประวัติการลาล่าสุด
+            </h4>
+            <div v-if="personLeaveHistory.length === 0" style="color: #6B7280; font-size: 14px; background: #F9FAFB; padding: 12px; border-radius: 8px; text-align: center;">ไม่มีประวัติการลา</div>
+            <div v-else class="table-responsive" style="max-height: 200px; overflow-y: auto; border: 1px solid #E5E7EB; border-radius: 8px;">
+              <table class="data-table small-table">
+                <thead>
+                  <tr class="text-center">
+                    <th>ประเภท</th>
+                    <th>วันที่ลา</th>
+                    <th class="text-center">จำนวนวัน</th>
+                    <th>สถานะ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(leave, i) in personLeaveHistory" :key="i" class="text-center">
+                    <td>{{ leave.leave_type_name }}</td>
+                    <td style="font-size: 13px;">{{ formatThaiDateShort(leave.start_date) }} - {{ formatThaiDateShort(leave.end_date) }}</td>
+                    <td class="text-center">{{ leave.total_days % 1 === 0 ? parseInt(leave.total_days) : leave.total_days }}</td>
+                    <td>
+                      <span class="status-badge" :class="getStatusClass(leave.status)" style="font-size: 11px; padding: 2px 8px;">
+                        {{ leave.status }}
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 📌 ส่วนประวัติการเข้าร่วมกิจกรรม -->
+          <div class="history-section">
+            <h4 style="font-size: 16px; font-weight: 600; color: #111827; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+              <span>📌</span> ประวัติการเข้าร่วมกิจกรรม
+            </h4>
+            <div v-if="personEventHistory.length === 0" style="color: #6B7280; font-size: 14px; background: #F9FAFB; padding: 12px; border-radius: 8px; text-align: center;">ไม่มีประวัติการเข้าร่วมกิจกรรม</div>
+            <div v-else class="table-responsive" style="max-height: 200px; overflow-y: auto; border: 1px solid #E5E7EB; border-radius: 8px;">
+              <table class="data-table small-table">
+                <thead>
+                  <tr>
+                    <th>ชื่องาน / กิจกรรม</th>
+                    <th>วันที่จัดงาน</th>
+                    <th>สถานะตอบรับ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(event, i) in personEventHistory" :key="i">
+                    <td style="font-weight: 500;">{{ event.title }}</td>
+                    <td style="font-size: 13px;">{{ formatThaiDateShort(event.start_date) }}</td>
+                    <td>
+                      <!-- ใช้ Badge สีตามสถานะตอบรับ -->
+                      <span class="status-badge" :class="event.status === 'ยืนยันเข้าร่วม' ? 'active' : (event.status === 'ไม่เข้าร่วม' ? 'inactive' : 'warning')" style="font-size: 11px; padding: 2px 8px;">
+                        {{ event.status }}
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-actions mt-4">
+          <button type="button" class="btn-secondary" @click="closeViewModal">ปิดหน้าต่าง</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
 
@@ -268,12 +425,20 @@ const somtopList = ref([])
 const isModalOpen = ref(false)
 const isEditing = ref(false)
 
+// === State สำหรับ Modal ดูรายละเอียด ===
+const isViewModalOpen = ref(false)
+const selectedSomtopToView = ref(null)
+
+// === State สำหรับประวัติ ===
+const personLeaveHistory = ref([])
+const personEventHistory = ref([])
+const isLoadingHistory = ref(false)
 
 // ⭐️ อัปเดตตัวแปร formData ให้รองรับ Title, FirstName, LastName
 const formData = ref({
   id: null, 
   title: 'นาย', firstName: '', lastName: '', 
-  idCard: '', 
+  idCard: '', occupation: '',
   dob_day: '', dob_month: '', dob_year: '', 
   position_id: '', 
   join_day: '', join_month: '', join_year: '', 
@@ -289,12 +454,26 @@ const currentPage = ref(1)
 const itemsPerPage = ref(50)
 
 // ฟังก์ชันต่างๆ
+// แปลงวันที่เป็นรูปแบบย่อ (เช่น 1 ก.ค. 2569)
+const formatThaiDateShort = (dateString) => {
+  if (!dateString) return '-';
+  const date = new Date(dateString);
+  const thaiMonths = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+  return `${date.getDate()} ${thaiMonths[date.getMonth()]} ${date.getFullYear() + 543}`;
+};
+
 const formatThaiDateFull = (dateStr) => {
   if (!dateStr || dateStr === '0000-00-00') return '-';
   const [year, month, day] = dateStr.split('-');  
   const monthNames = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
   return `${parseInt(day)} ${monthNames[parseInt(month) - 1]} ${parseInt(year) + 543}`;
 }
+
+const getStatusClass = (status) => {
+  if (status === 'อนุมัติ' || status === 'ยืนยันเข้าร่วม' || status === 'ใช้งาน') return 'active';
+  if (status === 'ไม่อนุมัติ' || status === 'ไม่เข้าร่วม' || status === 'ระงับ') return 'inactive';
+  return 'warning'; // สำหรับสถานะ 'รอตรวจสอบ'
+};
 
 const calculateAge = (dobStr) => {
   if (!dobStr || dobStr === '0000-00-00') return '-';
@@ -419,8 +598,8 @@ const saveData = async () => {
   }
 
   // เช็กว่ากรอกชื่อครบถ้วนหรือไม่
-  if (!formData.value.title || !formData.value.firstName || !formData.value.lastName) {
-    swalError('ข้อมูลไม่ครบถ้วน', 'กรุณาระบุคำนำหน้า ชื่อ และสกุล ให้ครบถ้วน');
+  if (!formData.value.title || !formData.value.firstName || !formData.value.lastName || !formData.value.occupation) {
+    swalError('ข้อมูลไม่ครบถ้วน', 'กรุณาระบุคำนำหน้า ชื่อ สกุล และอาชีพ ให้ครบถ้วน');
     return;
   }
 
@@ -431,6 +610,7 @@ const saveData = async () => {
     payload.append('title', formData.value.title)
     payload.append('first_name', formData.value.firstName)
     payload.append('last_name', formData.value.lastName)
+    payload.append('occupation', formData.value.occupation)
     payload.append('id_card', formData.value.idCard || '') // ⭐️ แก้ไขตรงนี้
     payload.append('dob', formattedDob)
     payload.append('address', formData.value.address || '') // ⭐️ แก้ไขตรงนี้
@@ -438,8 +618,6 @@ const saveData = async () => {
     payload.append('status', formData.value.status)
     payload.append('note', formData.value.note || '')       // ⭐️ แก้ไขตรงนี้
     payload.append('position_id', formData.value.position_id)
-    
-// ...
     
     if (formattedJoinDate) {
       payload.append('join_date', formattedJoinDate)
@@ -517,7 +695,8 @@ const openEditModal = (person) => {
     title: person.title || 'นาย',
     firstName: person.first_name || '',
     lastName: person.last_name || '',
-    idCard: person.id_card || '',       // ⭐️ แก้ไข: เติม || '' ป้องกันค่าหลุดเป็น null
+    idCard: person.id_card || '',       
+    occupation: person.occupation || '', 
     dob_day: dDay,
     dob_month: dMonth,
     dob_year: dYear,
@@ -525,10 +704,10 @@ const openEditModal = (person) => {
     join_day: jDay, 
     join_month: jMonth, 
     join_year: jYear, 
-    address: person.address || '',      // ⭐️ แก้ไข
-    phone: person.phone || '',          // ⭐️ แก้ไข
+    address: person.address || '',      
+    phone: person.phone || '',          
     status: person.status,
-    note: person.note || '',            // ⭐️ แก้ไข
+    note: person.note || '',            
     // ⭐️ ลบ position_id และ join_date ที่ประกาศซ้ำซ้อนด้านล่างออก
     photo: null,
     existing_photo_path: person.photo_path || ''
@@ -537,6 +716,33 @@ const openEditModal = (person) => {
 }
 
 const closeModal = () => isModalOpen.value = false
+
+// === ฟังก์ชันเปิด/ปิด Modal ดูรายละเอียด ===
+const openViewModal = async (person) => {
+  selectedSomtopToView.value = person
+  isViewModalOpen.value = true
+  
+  // ล้างค่าเก่าและโหลดข้อมูลใหม่
+  personLeaveHistory.value = []
+  personEventHistory.value = []
+  isLoadingHistory.value = true
+  
+  try {
+    const response = await api.get(`/somtop/${person.id}/history`)
+    personLeaveHistory.value = response.data.leaves || []
+    personEventHistory.value = response.data.events || []
+  } catch (error) {
+    console.error('ไม่สามารถดึงประวัติได้:', error)
+  } finally {
+    isLoadingHistory.value = false
+  }
+
+}
+
+const closeViewModal = () => {
+  isViewModalOpen.value = false
+  selectedSomtopToView.value = null
+}
 
 onMounted(() => {
   fetchSomtopList()
@@ -608,6 +814,35 @@ onMounted(() => {
 }
 .upload-controls { display: flex; flex-direction: column; gap: 8px; flex: 1; }
 .file-input { background-color: transparent !important; padding: 0 !important; border: none !important; }
+
+/* =========================================
+   View Modal Styles
+========================================= */
+.detail-modal { max-width: 650px; }
+.detail-grid { 
+  display: grid; 
+  grid-template-columns: 1fr 1fr; 
+  gap: 20px; 
+  margin-bottom: 24px; 
+}
+.detail-item { display: flex; align-items: flex-start; gap: 12px; }
+.detail-item.full-width { grid-column: span 2; }
+.detail-icon { 
+  font-size: 20px; 
+  background: #F3F4F6; 
+  width: 40px; 
+  height: 40px; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  border-radius: 10px; 
+  flex-shrink: 0; 
+}
+.detail-content { display: flex; flex-direction: column; gap: 4px; }
+.detail-content label { font-size: 12px; color: #6B7280; font-weight: 600; }
+.detail-content p { font-size: 14px; color: #111827; margin: 0; font-weight: 500; }
+.btn-icon.view { background-color: #F3F4F6; }
+.btn-icon.view:hover { background-color: #E5E7EB; }
 
 /* ส่วนอื่นๆ อาศัย CSS จาก global.css ที่คุณทำไว้แล้ว */
 </style>

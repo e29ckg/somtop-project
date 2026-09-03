@@ -44,7 +44,7 @@ exports.getAllEvents = async (req, res) => {
             params.push(courtCode);
         }
         
-        query += ` ORDER BY e.start_date ASC`;
+        query += ` ORDER BY e.start_date ASC LIMIT 100`; // จำกัดผลลัพธ์ไม่เกิน 100 รายการ
 
         const [events] = await pool.query(query, params);
 
@@ -84,7 +84,7 @@ exports.getEventParticipants = async (req, res) => {
                    CONCAT(s.title, s.first_name, ' ', s.last_name) AS full_name
             FROM event_participants ep
             JOIN somtop s ON ep.somtop_id = s.id
-            WHERE ep.event_id = ?
+            WHERE ep.event_id = ? 
         `;
         
         const [participants] = await pool.query(query, [id]);

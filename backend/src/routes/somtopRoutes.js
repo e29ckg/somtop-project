@@ -11,11 +11,9 @@ router.use(verifyToken);
 
 // Endpoint: /api/somtop
 router.get('/', somtopController.getAllSomtop);
-
 router.post('/', upload.single('photo'), somtopController.createSomtop);
-
 router.put('/', upload.single('photo'), somtopController.updateSomtop);
-
 router.delete('/', somtopController.deleteSomtop);
 
+router.get('/:id/history', somtopController.getSomtopHistory);
 module.exports = router;
