@@ -220,6 +220,8 @@ exports.exportToWord = async (req, res) => {
             SELECT 
                 lr.*, 
                 CONCAT(s.title, s.first_name, ' ', s.last_name) AS full_name, 
+                s.dob,          
+                s.join_date,        
                 lt.name AS leave_type_name
             FROM leave_requests lr
             LEFT JOIN somtop s ON lr.somtop_id = s.id
@@ -252,6 +254,13 @@ exports.exportToWord = async (req, res) => {
             return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear() + 543}`;
         };
 
+        // ⭐️ สร้างตัวแปรสำหรับวันที่ปัจจุบัน
+        const today = new Date();
+        const current_day = today.getDate();
+        const thaiMonths = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+        const current_month = thaiMonths[today.getMonth()];
+        const current_year = today.getFullYear() + 543;
+
         // แมปข้อมูลลงในตัวแปรของเอกสาร Word
         doc.render({
             full_name: leaveData.full_name || '-',
@@ -259,7 +268,12 @@ exports.exportToWord = async (req, res) => {
             start_date: formatThaiDate(leaveData.start_date),
             end_date: formatThaiDate(leaveData.end_date),
             total_days: leaveData.total_days ? (leaveData.total_days % 1 === 0 ? parseInt(leaveData.total_days) : parseFloat(leaveData.total_days)) : '0',
-            note: leaveData.note || '-'
+            note: leaveData.note || '-',
+            dob: formatThaiDate(leaveData.dob),
+            join_date: formatThaiDate(leaveData.join_date),
+            current_day: current_day,
+            current_month: current_month,
+            current_year: current_year
         });
 
         const buf = doc.getZip().generate({
