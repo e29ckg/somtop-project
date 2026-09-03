@@ -20,3 +20,5 @@ frontend/vite.config.js
 
 backend/src/config/google-service-account.json
 backup/*
+mysql-data/*
+

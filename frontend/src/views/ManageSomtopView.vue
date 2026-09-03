@@ -234,8 +234,10 @@
           </div>
 
           <div class="modal-actions full-width">
-            <button type="button" class="btn-secondary" @click="closeModal">ยกเลิก</button>
-            <button type="submit" class="btn-primary">บันทึกข้อมูล</button>
+            <button type="button" class="btn-secondary" @click="closeModal">ยกเลิก</button>            
+            <button type="submit" class="btn-primary" :disabled="isSaving">
+              {{ isSaving ? '⏳ กำลังบันทึก...' : 'บันทึกข้อมูล' }}
+            </button>
           </div>
         </form>
       </div>
@@ -399,6 +401,8 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import api from '../services/api' 
 import { swalSuccess, swalError, swalConfirm } from '../utils/swal'
+
+const isSaving = ref(false)
 
 // ข้อมูลพื้นฐานสำหรับกล่องเลือกวันเกิด
 const days = Array.from({length: 31}, (_, i) => String(i + 1).padStart(2, '0'))
@@ -582,12 +586,14 @@ const fetchSomtopList = async () => {
 }
 
 const saveData = async () => {
+  isSaving.value = true
   // ⭐️ 1. จัดการและเช็ก วัน/เดือน/ปีเกิด (บังคับกรอก)
   let formattedDob = null;
   if (formData.value.dob_year && formData.value.dob_month && formData.value.dob_day) {
     formattedDob = `${formData.value.dob_year}-${formData.value.dob_month}-${formData.value.dob_day}`;
   } else {
     swalError('ข้อมูลไม่ครบถ้วน', 'กรุณาระบุ วัน/เดือน/ปีเกิด ให้ครบถ้วน');
+    isSaving.value = false;
     return;
   }
 
@@ -600,6 +606,7 @@ const saveData = async () => {
   // เช็กว่ากรอกชื่อครบถ้วนหรือไม่
   if (!formData.value.title || !formData.value.firstName || !formData.value.lastName || !formData.value.occupation) {
     swalError('ข้อมูลไม่ครบถ้วน', 'กรุณาระบุคำนำหน้า ชื่อ สกุล และอาชีพ ให้ครบถ้วน');
+    isSaving.value = false;
     return;
   }
 
@@ -636,11 +643,13 @@ const saveData = async () => {
       await api.post('/somtop', payload, config)
       swalSuccess('บันทึกสำเร็จ', 'เพิ่มข้อมูลผู้พิพากษาสมทบใหม่สำเร็จ')
     }
-    
+    isSaving.value = false;
     closeModal()
     fetchSomtopList()
   } catch (error) {
     swalError('เกิดข้อผิดพลาด', error.response?.data?.message || 'ไม่สามารถบันทึกข้อมูลได้')
+  } finally {
+    isSaving.value = false;
   }
 }
 

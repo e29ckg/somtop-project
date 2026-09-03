@@ -299,7 +299,9 @@
 
           <div class="modal-actions full-width">
             <button type="button" class="btn-secondary" @click="closeModal">ยกเลิก</button>
-            <button type="submit" class="btn-primary">บันทึกข้อมูล</button>
+            <button type="submit" class="btn-primary" :disabled="isSaving">
+              {{ isSaving ? '⏳ กำลังบันทึก...' : 'บันทึกข้อมูล' }}
+            </button>
           </div>
         </form>
       </div>
@@ -325,6 +327,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import api from '../services/api'
 import { swalSuccess, swalError, swalConfirm } from '../utils/swal'
 
+const isSaving = ref(false)
 const isLoading = ref(false)
 
 const days = Array.from({length: 31}, (_, i) => String(i + 1).padStart(2, '0'))
@@ -618,8 +621,11 @@ const handleFileUpload = (event) => {
 }
 
 const saveData = async () => {
+  isSaving.value = true;
+  
   if (!formData.value.somtop_id) {
     swalError("ข้อมูลไม่ครบถ้วน", "กรุณาพิมพ์ค้นหาและคลิกเลือกชื่อ-สกุล (ผู้ขอลา) จากรายการที่ปรากฏขึ้นมา");
+    isSaving.value = false;
     return;
   }
   const start_date = getFilterDateStr(formData.value.start_year, formData.value.start_month, formData.value.start_day);
@@ -627,6 +633,7 @@ const saveData = async () => {
 
   if (!start_date || !end_date) {
     swalError("ข้อมูลไม่ครบถ้วน", "กรุณาระบุวันที่เริ่มต้นและวันที่สิ้นสุดให้ครบถ้วน (วัน/เดือน/ปี)");
+    isSaving.value = false;
     return;
   }
 
@@ -658,10 +665,13 @@ const saveData = async () => {
       swalSuccess('ยื่นเรื่องขอลาสำเร็จ', 'ข้อมูลการลาของคุณได้ถูกส่งเรียบร้อยแล้ว')
     }
     
+    isSaving.value = false;
     closeModal()
     fetchLeaves()
   } catch (error) {
     swalError('เกิดข้อผิดพลาด', error.response?.data?.message || 'ไม่สามารถบันทึกข้อมูลได้')
+  } finally {
+    isSaving.value = false;
   }
 }
 

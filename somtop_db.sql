@@ -199,3 +199,6 @@ ON DUPLICATE KEY UPDATE id=1;
 
 ALTER TABLE `somtop`
 ADD COLUMN `occupation` varchar(150) DEFAULT NULL COMMENT 'อาชีพ' AFTER `dob`;
+
+ALTER TABLE events 
+ADD UNIQUE KEY unique_event (title, start_date, court_code);

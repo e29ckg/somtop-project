@@ -71,7 +71,7 @@
                 </td>
                 <td class="no-print">
                   <div class="action-buttons">
-                    <button class="btn-icon manage-users" @click="openParticipantModal(event)" title="จัดการผู้เข้าร่วม">👥</button>
+                    <!-- <button class="btn-icon manage-users" @click="openParticipantModal(event)" title="จัดการผู้เข้าร่วม">👥</button> -->
                     <button class="btn-icon view" @click="openViewModal(event)" title="ดูรายละเอียดกิจกรรม">👁️</button>
                     <button class="btn-icon edit" @click="openEditModal(event)" title="แก้ไขกิจกรรม">✏️</button>
                     <button class="btn-icon delete" @click="deleteData(event.id)" title="ลบกิจกรรม">🗑️</button>
@@ -202,6 +202,45 @@
             </select>
           </div>
 
+          <!-- ⭐️ ส่วนจัดการผู้เข้าร่วมกิจกรรม -->
+          <div class="input-group full-width participant-selection-section">
+            <div class="section-header">
+              <!-- ค้นหาบรรทัดที่ 208 แล้วเปลี่ยนเป็นแบบนี้ -->
+            <label>ผู้เข้าร่วมกิจกรรม <span class="text-emerald-600">({{ formData.participants?.length || 0 }} ท่าน)</span></label>
+            <button type="button" class="btn-select-all" @click="toggleSelectAll">
+                {{ isAllSelected ? 'ยกเลิกการเลือกทั้งหมด' : '☑ เลือกทั้งหมด' }}
+              </button>
+            </div>
+            
+            <div class="participant-search">
+              <input 
+                type="text" 
+                v-model="participantSearchQuery" 
+                placeholder="🔍 พิมพ์ค้นหารายชื่อเพื่อเลือก..." 
+                class="search-input w-full"
+              />
+            </div>
+
+            <div class="participant-grid">
+              <label 
+                v-for="person in filteredSomtopList" 
+                :key="person.id" 
+                class="participant-checkbox-card" 
+                :class="{ 'selected': formData.participants.includes(person.id) }"
+              >
+                <input 
+                  type="checkbox" 
+                  :value="person.id" 
+                  v-model="formData.participants" 
+                />
+                <span class="person-name">{{ person.full_name }}</span>
+              </label>
+              <div v-if="filteredSomtopList.length === 0" class="no-results-msg">
+                ไม่พบรายชื่อที่ค้นหา
+              </div>
+            </div>
+          </div>
+
           <div class="input-group full-width upload-section">
             <label>แนบไฟล์เอกสาร (PDF, ภาพ, Word, Excel)</label>
             <input 
@@ -240,7 +279,9 @@
 
           <div class="modal-actions full-width">
             <button type="button" class="btn-secondary" @click="closeModal">ยกเลิก</button>
-            <button type="submit" class="btn-primary">บันทึกข้อมูล</button>
+            <button type="submit" class="btn-primary" :disabled="isSaving">
+              {{ isSaving ? '⏳ กำลังบันทึก...' : 'บันทึกข้อมูล' }}
+            </button>
           </div>
         </form>
       </div>
@@ -334,7 +375,7 @@
 
           <!-- แสดงรายชื่อผู้เข้าร่วม -->
           <div class="detail-section" v-if="viewParticipantsList && viewParticipantsList.length > 0">
-            <label class="section-label">ผู้เข้าร่วมกิจกรรม ({{ viewParticipantsList.length }} ท่าน)</label>
+            <label class="section-label">ผู้เข้าร่วมกิจกรรม ({{ viewParticipantsList?.length || 0 }} ท่าน)</label>
             <div class="participant-tags">
               <span v-for="person in viewParticipantsList" :key="person.somtop_id" class="participant-tag">
                 👤 {{ person.full_name }}
@@ -397,6 +438,8 @@ import { swalSuccess, swalError, swalConfirm } from '../utils/swal'
 // ==========================================
 // 1. Data Sources & Variables
 // ==========================================
+const isSaving = ref(false)
+
 const eventList = ref([])
 const eventTypes = ref([])
 const somtopList = ref([])
@@ -434,8 +477,11 @@ const formData = ref({
   id: null, event_type_id: '', title: '', description: '', location: '', status: 'รอดำเนินการ',
   start_day: '', start_month: '', start_year: '', start_hour: '08', start_minute: '30',
   end_day: '', end_month: '', end_year: '', end_hour: '16', end_minute: '30',
-  files: [], existing_file_paths: []
+  files: [], existing_file_paths: [], participants: []
 })
+
+
+
 
 const searchQuery = ref('')
 const participantSearchQuery = ref('')
@@ -505,10 +551,39 @@ const filteredList = computed(() => {
   return result.sort((a, b) => new Date(b.start_date) - new Date(a.start_date));
 })
 
+// กรองรายชื่อ
 const filteredSomtopList = computed(() => {
   if (!participantSearchQuery.value) return somtopList.value;
-  return somtopList.value.filter(p => p.full_name.toLowerCase().includes(participantSearchQuery.value.toLowerCase()));
+  const q = participantSearchQuery.value.toLowerCase();
+  return somtopList.value.filter(p => p.full_name.toLowerCase().includes(q));
 })
+
+// เช็คว่าเลือกครบทุกคนหรือยัง
+const isAllSelected = computed(() => {
+  return filteredSomtopList.value.length > 0 && 
+         filteredSomtopList.value.every(p => formData.value.participants.includes(p.id));
+})
+
+// ฟังก์ชันเลือกทั้งหมด/ยกเลิกทั้งหมด
+const toggleSelectAll = () => {
+  if (isAllSelected.value) {
+    // ยกเลิกการเลือกคนที่อยู่ในผลการค้นหาปัจจุบัน
+    const currentIds = filteredSomtopList.value.map(p => p.id);
+    formData.value.participants = formData.value.participants.filter(id => !currentIds.includes(id));
+  } else {
+    // เลือกทุกคนในผลการค้นหาปัจจุบัน
+    filteredSomtopList.value.forEach(p => {
+      if (!formData.value.participants.includes(p.id)) {
+        formData.value.participants.push(p.id);
+      }
+    });
+  }
+}
+
+// const filteredSomtopList = computed(() => {
+//   if (!participantSearchQuery.value) return somtopList.value;
+//   return somtopList.value.filter(p => p.full_name.toLowerCase().includes(participantSearchQuery.value.toLowerCase()));
+// })
 
 const totalPages = computed(() => Math.ceil(filteredList.value.length / itemsPerPage.value) || 1)
 const paginatedList = computed(() => {
@@ -580,49 +655,55 @@ const handleFileUpload = (event) => {
 }
 
 const saveData = async () => {
-  try {
-    const sHour = formData.value.start_hour || '00';
-    const sMin = formData.value.start_minute || '00';
-    const start_date = `${formData.value.start_year}-${formData.value.start_month}-${formData.value.start_day} ${sHour}:${sMin}:00`;
-    
-    let end_date = null;
-    if (formData.value.end_year && formData.value.end_month && formData.value.end_day) {
-      const eHour = formData.value.end_hour || '23';
-      const eMin = formData.value.end_minute || '59';
-      end_date = `${formData.value.end_year}-${formData.value.end_month}-${formData.value.end_day} ${eHour}:${eMin}:59`;
-    } else {
-      // 1. นำข้อมูลวันเวลาเริ่มต้นมาสร้าง Date Object (เดือนต้อง -1 เพราะ JavaScript นับเดือนเริ่มจาก 0)
-      const autoEndDate = new Date(
-        formData.value.start_year, 
-        parseInt(formData.value.start_month) - 1, 
-        formData.value.start_day, 
-        parseInt(sHour), 
-        parseInt(sMin), 
-        0
-      );
-      
-      // 2. บวกเวลาเพิ่มไป 2 ชั่วโมง
-      autoEndDate.setHours(autoEndDate.getHours() + 2);
-      
-      // 3. แปลงกลับและเติมเลข 0 นำหน้าให้เป็นรูปแบบ YYYY-MM-DD HH:mm:ss
-      const eYear = autoEndDate.getFullYear();
-      const eMonth = String(autoEndDate.getMonth() + 1).padStart(2, '0');
-      const eDay = String(autoEndDate.getDate()).padStart(2, '0');
-      const eHourStr = String(autoEndDate.getHours()).padStart(2, '0');
-      const eMinStr = String(autoEndDate.getMinutes()).padStart(2, '0');
-      
-      end_date = `${eYear}-${eMonth}-${eDay} ${eHourStr}:${eMinStr}:00`;
-    }
+  if (isSaving.value) return;
+  const sHour = formData.value.start_hour || '00';
+  const sMin = formData.value.start_minute || '00';
+  const start_date = `${formData.value.start_year}-${formData.value.start_month}-${formData.value.start_day} ${sHour}:${sMin}:00`;
+  
+  let end_date = null;
+  
+  // ตรวจสอบว่ามีการกรอกวันที่สิ้นสุดครบถ้วนหรือไม่
+  if (formData.value.end_year && formData.value.end_month && formData.value.end_day) {
+    const eHour = formData.value.end_hour || '23';
+    const eMin = formData.value.end_minute || '59';
+    end_date = `${formData.value.end_year}-${formData.value.end_month}-${formData.value.end_day} ${eHour}:${eMin}:59`;
+  } else {
+    // ⭐️ กรณีไม่กรอก end_date: สร้าง Date Object จากวันที่เริ่มต้นและบวกเพิ่ม 2 ชั่วโมง
+    const startDateObj = new Date(
+      parseInt(formData.value.start_year),
+      parseInt(formData.value.start_month) - 1, // เดือนของ JS เริ่มนับจาก 0
+      parseInt(formData.value.start_day),
+      parseInt(sHour),
+      parseInt(sMin),
+      0
+    );
 
+    // บวกเวลาเพิ่ม 2 ชั่วโมง
+    startDateObj.setHours(startDateObj.getHours() + 2);
+
+    // จัดรูปแบบตัวเลขให้เป็น 2 หลัก (เช่น 09, 14) ก่อนแปลงกลับเป็น String
+    const eYear = startDateObj.getFullYear();
+    const eMonth = String(startDateObj.getMonth() + 1).padStart(2, '0');
+    const eDay = String(startDateObj.getDate()).padStart(2, '0');
+    const eHour = String(startDateObj.getHours()).padStart(2, '0');
+    const eMinute = String(startDateObj.getMinutes()).padStart(2, '0');
+    
+    end_date = `${eYear}-${eMonth}-${eDay} ${eHour}:${eMinute}:00`;
+  }
+    
+  isSaving.value = true;
+  try {
     const payload = new FormData();
     if (formData.value.id) payload.append('id', formData.value.id);
     payload.append('event_type_id', formData.value.event_type_id);
     payload.append('title', formData.value.title);
-    payload.append('description', formData.value.description);
-    payload.append('location', formData.value.location);
+    payload.append('description', formData.value.description || '');
+    payload.append('location', formData.value.location || '');
     payload.append('status', formData.value.status);
     payload.append('start_date', start_date);
     payload.append('end_date', end_date);
+    
+    payload.append('participants', JSON.stringify(formData.value.participants || []));
     
     if (formData.value.files && formData.value.files.length > 0) {
       formData.value.files.forEach(file => payload.append('event_files', file));
@@ -641,6 +722,8 @@ const saveData = async () => {
     fetchEvents();
   } catch (error) {
     swalError('เกิดข้อผิดพลาด', error.response?.data?.message || 'ไม่สามารถบันทึกข้อมูลได้');
+  } finally {
+    isSaving.value = false;
   }
 }
 
@@ -739,24 +822,54 @@ const openAddModal = () => {
     id: null, event_type_id: '', title: '', description: '', location: '', status: 'รอดำเนินการ',
     start_day: '', start_month: '', start_year: '', start_hour: '08', start_minute: '30',
     end_day: '', end_month: '', end_year: '', end_hour: '16', end_minute: '30',
-    files: [], existing_file_paths: []
+    files: [], existing_file_paths: [], participants: []
   };
   isModalOpen.value = true;
 }
 
-const openEditModal = (item) => {
+// const openEditModal = (item) => {
+//   isEditing.value = true;
+//   const startParts = parseDateToParts(item.start_date);
+//   const endParts = parseDateToParts(item.end_date);
+//   formData.value = { 
+//     ...item,
+//     start_day: startParts.day, start_month: startParts.month, start_year: startParts.year,
+//     start_hour: startParts.hour, start_minute: startParts.minute,
+//     end_day: endParts.day, end_month: endParts.month, end_year: endParts.year,
+//     end_hour: endParts.hour, end_minute: endParts.minute,
+//     files: [], existing_file_paths: item.file_paths || []
+//   };
+//   isModalOpen.value = true;
+// }
+
+const openEditModal = async (item) => {
   isEditing.value = true;
+  participantSearchQuery.value = '';
+  
   const startParts = parseDateToParts(item.start_date);
   const endParts = parseDateToParts(item.end_date);
+
   formData.value = { 
     ...item,
+    location: item.location || '',
+    description: item.description || '',
     start_day: startParts.day, start_month: startParts.month, start_year: startParts.year,
     start_hour: startParts.hour, start_minute: startParts.minute,
     end_day: endParts.day, end_month: endParts.month, end_year: endParts.year,
     end_hour: endParts.hour, end_minute: endParts.minute,
-    files: [], existing_file_paths: item.file_paths || []
+    files: [], existing_file_paths: item.file_paths || [],
+    participants: item.participants || [] // เคลียร์ก่อนดึงใหม่
   };
+  
   isModalOpen.value = true;
+
+  // ⭐️ ดึงรายชื่อผู้เข้าร่วมเดิมมาแสดงติ๊กถูก
+  try {
+    const res = await api.get(`/events/${item.id}/participants`);
+    formData.value.participants = res.data.records.map(p => p.somtop_id);
+  } catch (error) {
+    console.error("ดึงข้อมูลผู้เข้าร่วมไม่สำเร็จ", error);
+  }
 }
 
 // ปรับฟังก์ชันเปิดหน้า View ให้ดึงข้อมูลผู้เข้าร่วมด้วย
@@ -1076,4 +1189,70 @@ onMounted(() => {
 .data-row.upcoming-row:hover td {
   background-color: #DCFCE7; 
 }
+
+/* =========================================
+   Participant Selection Section
+========================================= */
+.participant-selection-section {
+  background: #F9FAFB;
+  border: 1px solid #E5E7EB;
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.section-header label { margin: 0; }
+.btn-select-all {
+  background: #EFF6FF;
+  color: #3B82F6;
+  border: 1px solid #BFDBFE;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-select-all:hover { background: #DBEAFE; }
+
+.participant-search { margin-bottom: 12px; }
+
+.participant-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+  max-height: 250px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.participant-checkbox-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: #FFFFFF;
+  border: 1px solid #D1D5DB;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.participant-checkbox-card:hover { border-color: #9CA3AF; }
+.participant-checkbox-card.selected {
+  background: #F0FDF4;
+  border-color: #10B981;
+}
+.participant-checkbox-card input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #10B981;
+  cursor: pointer;
+}
+.person-name { font-size: 13px; font-weight: 500; color: #374151; }
+.no-results-msg { text-align: center; color: #9CA3AF; grid-column: 1 / -1; padding: 12px; }
 </style>
