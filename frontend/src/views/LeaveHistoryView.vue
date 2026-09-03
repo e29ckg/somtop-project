@@ -645,7 +645,7 @@ const saveData = async () => {
     payload.append('start_date', start_date)
     payload.append('end_date', end_date)
     payload.append('total_days', formData.value.total_days)
-    payload.append('note', formData.value.note)
+    payload.append('note', formData.value.note || '')
     payload.append('status', formData.value.status)
     
     if (formData.value.files && formData.value.files.length > 0) {
@@ -764,7 +764,7 @@ const openEditModal = (leave) => {
     end_month: eMonth, 
     end_day: eDay,
     total_days: leave.total_days, 
-    note: leave.note, 
+    note: leave.note || '', 
     status: leave.status, 
     files: [], 
     existing_file_paths: leave.file_paths || [] 
