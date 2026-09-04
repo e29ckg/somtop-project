@@ -132,7 +132,7 @@ exports.createEvent = async (req, res) => {
         
         const eventId = eventResult.insertId;
 
-        // 3. ⭐️ แปลง String เป็น Array และเพิ่มรายชื่อผู้เข้าร่วม
+        // 3. แปลง String เป็น Array และเพิ่มรายชื่อผู้เข้าร่วม
         if (participants) {
             try {
                 const parsedParticipants = JSON.parse(participants);
@@ -146,10 +146,45 @@ exports.createEvent = async (req, res) => {
             }
         }
 
-        // 4. ส่งข้อมูลขึ้น Google Calendar
+        // ==========================================
+        // ⭐️ 4. เตรียมข้อมูลรายชื่อผู้เข้าร่วมก่อนส่งขึ้น Google Calendar
+        // ==========================================
+        let finalDescription = description || '';
+        
+        try {
+            // ดึงรายชื่อผู้เข้าร่วมที่เพิ่งบันทึกไป โดยเรียงตามระดับอาวุโสและวันที่เข้ารับตำแหน่ง[cite: 3, 5]
+            const [participantRows] = await connection.query(`
+                SELECT CONCAT(s.title, s.first_name, ' ', s.last_name) AS full_name
+                FROM event_participants ep
+                JOIN somtop s ON ep.somtop_id = s.id
+                LEFT JOIN somtop_positions sp ON s.position_id = sp.id
+                WHERE ep.event_id = ?
+                ORDER BY 
+                    sp.level ASC,
+                    s.join_date ASC,
+                    s.first_name ASC,
+                    s.last_name ASC
+            `, [eventId]);
+
+            // ถ้าระบุผู้เข้าร่วม ให้นำรายชื่อมาต่อท้ายรายละเอียดเดิม[cite: 3]
+            if (participantRows.length > 0) {
+                finalDescription += '\n\nรายชื่อผู้เข้าร่วม:\n';
+                participantRows.forEach(p => {
+                    finalDescription += `- ${p.full_name}\n`;
+                });
+            }
+        } catch (dbError) {
+            console.error('Error fetching participants for Google Calendar:', dbError);
+        }
+
+        // 5. ส่งข้อมูลขึ้น Google Calendar
         try {
             const googleEventId = await insertEventToGoogleCalendar({
-                title, description, location, start_date, end_date
+                title, 
+                description: finalDescription, // ⭐️ ใช้ finalDescription ที่รวมรายชื่อแล้ว
+                location, 
+                start_date, 
+                end_date
             });
             
             if (googleEventId) {

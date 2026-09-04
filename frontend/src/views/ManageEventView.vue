@@ -1255,4 +1255,6 @@ onMounted(() => {
 }
 .person-name { font-size: 13px; font-weight: 500; color: #374151; }
 .no-results-msg { text-align: center; color: #9CA3AF; grid-column: 1 / -1; padding: 12px; }
+
+
 </style>
