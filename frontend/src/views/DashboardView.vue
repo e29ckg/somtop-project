@@ -505,27 +505,18 @@ onMounted(() => {
   fetchData()
 })
 </script>
-
 <style scoped>
 /* =========================================
-   Base Layout & Styling
+   Dashboard Specific Styles (เฉพาะหน้านี้)
 ========================================= */
-.dashboard-content { color: #333333; }
-.page-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 32px; }
-.page-title { font-size: 24px; font-weight: 600; margin: 0 0 4px 0; color: #111827; }
-.page-subtitle { color: #6B7280; margin: 0; font-size: 14px; }
 .header-actions { display: flex; gap: 12px; }
 .mb-0 { margin-bottom: 0 !important; }
 
-.btn-primary { background-color: #10B981; color: #FFFFFF; border: none; border-radius: 8px; padding: 10px 20px; font-size: 14px; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2); }
-.btn-primary:hover { background-color: #059669; }
-.btn-secondary { background-color: #FFFFFF; color: #374151; border: 1px solid #D1D5DB; border-radius: 8px; padding: 10px 20px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
-.btn-secondary:hover { background-color: #F3F4F6; }
-.btn-icon { background: #F3F4F6; border: 1px solid #E5E7EB; border-radius: 6px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 14px; color: #4B5563; transition: all 0.2s; }
-.btn-icon:hover { background: #E5E7EB; color: #111827;}
+/* Dashboard Primary Btn override (เพิ่ม Flex ให้ไอคอนตรงกับข้อความ) */
+.btn-primary { display: flex; align-items: center; gap: 8px; }
 
+/* Grid System */
 .grid-layout { display: grid; grid-template-columns: repeat(12, 1fr); gap: 24px; }
-.card { background-color: #FFFFFF; border-radius: 12px; padding: 24px; border: 1px solid #E5E7EB; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
 .card-title { font-size: 16px; font-weight: 600; margin: 0 0 16px 0; color: #111827; }
 .card-subtitle { font-size: 12px; color: #6B7280; margin-top: 4px; }
 .card-header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
@@ -554,8 +545,7 @@ onMounted(() => {
 .progress-bar { width: 100%; height: 6px; background-color: #E5E7EB; border-radius: 3px; overflow: hidden; }
 .progress-fill { height: 100%; background-color: #8B5CF6; border-radius: 3px; }
 
-/* Alert Table */
-.table-responsive { overflow-x: auto; }
+/* Alert Table Specifics */
 .alert-table { width: 100%; border-collapse: collapse; font-size: 14px; text-align: left; }
 .alert-table th { color: #6B7280; font-size: 13px; padding: 12px 0; border-bottom: 2px solid #E5E7EB; }
 .alert-table td { padding: 16px 0; border-bottom: 1px solid #E5E7EB; color: #374151; }
@@ -570,9 +560,7 @@ onMounted(() => {
 .view-history { color: #10B981; text-decoration: none; font-size: 14px; font-weight: 500;}
 .view-history:hover { text-decoration: underline; }
 
-/* =========================================
-   Custom Calendar Styling
-========================================= */
+/* Custom Calendar Styling */
 .calendar-header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .calendar-nav { display: flex; align-items: center; gap: 16px; }
 .legend { display: flex; gap: 12px; font-size: 12px; color: #6B7280; }
@@ -594,46 +582,98 @@ onMounted(() => {
 
 .date-number { font-size: 13px; font-weight: 500; text-align: right; margin: 2px 4px 4px auto; display: block; }
 .events-container { display: flex; flex-direction: column; gap: 4px; overflow-y: auto; max-height: 80px; padding-right: 2px; }
-/* Scrollbar ซ่อนไว้เพื่อความสวยงาม */
 .events-container::-webkit-scrollbar { width: 4px; }
 .events-container::-webkit-scrollbar-thumb { background-color: #D1D5DB; border-radius: 4px; }
 
-.event-pill { font-size: 10px; padding: 3px 6px; border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: default; border-left: 3px solid transparent; display: block; width: 100%; box-sizing: border-box;}
+.event-pill { font-size: 10px; padding: 3px 6px; border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; border-left: 3px solid transparent; display: block; width: 100%; box-sizing: border-box; transition: filter 0.2s;}
+.event-pill:hover { filter: brightness(0.9); }
 .pill-event { background-color: #EDE9FE; color: #5B21B6; border-left-color: #8B5CF6; }
 .pill-leave-approved { background-color: #D1FAE5; color: #065F46; border-left-color: #10B981; }
 .pill-leave-pending { background-color: #FEF3C7; color: #92400E; border-left-color: #F59E0B; }
 
-/* =========================================
-   Event Modal Styles
-========================================= */
-.event-pill { cursor: pointer; transition: filter 0.2s; }
-.event-pill:hover { filter: brightness(0.9); }
-
-.modal-overlay { 
-  position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-  background-color: rgba(17, 24, 39, 0.5); backdrop-filter: blur(2px);
-  display: flex; align-items: center; justify-content: center; z-index: 1000; 
-}
-.modal-card.detail-modal { 
-  background: #FFFFFF; width: 100%; max-width: 500px; 
-  border-radius: 12px; padding: 24px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); 
-}
-.modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #E5E7EB; padding-bottom: 16px; margin-bottom: 16px; }
-.modal-header h2 { margin: 0; font-size: 18px; color: #111827; }
-.close-btn { background: none; border: none; font-size: 20px; color: #9CA3AF; cursor: pointer; }
-.close-btn:hover { color: #111827; }
-
+/* Event Modal Styles (Overrides) */
+.modal-card.detail-modal { max-width: 500px; padding: 24px; }
 .modal-body { display: flex; flex-direction: column; gap: 12px; }
 .detail-group { display: flex; flex-direction: column; gap: 4px; }
 .detail-group label { font-size: 13px; color: #6B7280; font-weight: 500; }
 .detail-group p { margin: 0; font-size: 15px; color: #111827; }
-
 .text-purple-700 { color: #6D28D9; }
 .font-bold { font-weight: 600; }
 .text-sm { font-size: 13px; }
 .text-gray-500 { color: #6B7280; }
-
-.modal-actions { display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid #E5E7EB; padding-top: 20px; margin-top: 24px; }
 .btn-primary.edit-btn { background-color: #3B82F6; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2); }
 .btn-primary.edit-btn:hover { background-color: #2563EB; }
+
+/* =========================================
+   📱 Mobile Responsiveness (หน้าจอมือถือ)
+========================================= */
+@media (max-width: 768px) {
+  /* เปลี่ยน Grid จาก 12 คอลัมน์ ให้เหลือ 1 คอลัมน์ เรียงลงมา */
+  .grid-layout {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  /* บังคับการ์ดทุกใบให้เต็มจอ */
+  .kpi-card, 
+  .calendar-section, 
+  .assets-section, 
+  .events-section {
+    grid-column: span 1;
+  }
+
+  /* ปรับปฏิทินให้แสดงผลบนมือถือได้พอดี */
+  .calendar-header-flex {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .calendar-nav {
+    justify-content: space-between;
+  }
+  .legend {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .day-name {
+    padding: 8px 4px;
+    font-size: 11px;
+  }
+  .calendar-cell {
+    min-height: 60px; /* ลดความสูงของช่องวันที่ลง */
+    padding: 2px;
+  }
+  .date-number {
+    font-size: 11px;
+    margin: 2px 2px 2px auto;
+  }
+  .events-container {
+    max-height: 60px; /* ลดความสูงของกล่องข้อความกิจกรรม */
+  }
+  .event-pill {
+    font-size: 9px;
+    padding: 2px 4px;
+  }
+  
+  /* ปรับปุ่ม Header ให้กดง่ายขึ้นบนมือถือ */
+  .header-actions {
+    width: 100%;
+    margin-top: 12px;
+    flex-direction: column;
+  }
+  .header-actions button {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  /* ปรับการจัดเรียง Header ของการ์ด */
+  .card-header-flex {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .view-history {
+    align-self: flex-start;
+  }
+}
 </style>

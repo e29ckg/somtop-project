@@ -175,27 +175,28 @@ exports.createEvent = async (req, res) => {
 };
 
 // ==========================================
-// 4. แก้ไขข้อมูลกิจกรรม (เพิ่มไฟล์แนบ และอัปเดตผู้เข้าร่วม)
+// 4. แก้ไขข้อมูลกิจกรรม (เพิ่มไฟล์แนบ, อัปเดตผู้เข้าร่วม และซิงค์ Google Calendar)
 // ==========================================
 exports.updateEvent = async (req, res) => {
-    // ⭐️ ใช้ Transaction เพราะมีการทำงานหลายคำสั่งพร้อมกัน
+    // ใช้ Transaction เพราะมีการทำงานหลายคำสั่งพร้อมกัน
     const connection = await pool.getConnection();
     await connection.beginTransaction();
 
     try {
         const { id } = req.params;
-        // ⭐️ รับค่า participants เพิ่มเข้ามา
         const { event_type_id, title, description, start_date, end_date, location, status, participants } = req.body;
 
         if (!title || !start_date || !end_date || !event_type_id) {
             return res.status(400).json({ message: 'กรุณาระบุข้อมูลให้ครบถ้วน' });
         }
 
-        // 1. ดึงข้อมูลเดิมมาตรวจสอบหาไฟล์เก่า (เปลี่ยนใช้ connection แทน pool)
-        const [existing] = await connection.query('SELECT file_paths FROM events WHERE id = ?', [id]);
+        // 1. ดึงข้อมูลเดิมมาตรวจสอบหาไฟล์เก่า ⭐️ และดึง google_event_id เพื่อใช้ซิงค์ปฏิทิน[cite: 2]
+        const [existing] = await connection.query('SELECT file_paths, google_event_id FROM events WHERE id = ?', [id]);
         if (existing.length === 0) {
             return res.status(404).json({ message: 'ไม่พบข้อมูลกิจกรรม' });
         }
+
+        const googleEventId = existing[0].google_event_id; //[cite: 2]
 
         // 2. แปลงไฟล์เก่าให้เป็น Array
         let currentPaths = [];
@@ -217,7 +218,7 @@ exports.updateEvent = async (req, res) => {
         }
         const filePathsDb = currentPaths.length > 0 ? JSON.stringify(currentPaths) : null;
 
-        // 4. อัปเดตข้อมูลกิจกรรม
+        // 4. อัปเดตข้อมูลกิจกรรมลงฐานข้อมูล
         const query = `
             UPDATE events SET 
                 event_type_id = ?, title = ?, description = ?, start_date = ?, 
@@ -229,7 +230,7 @@ exports.updateEvent = async (req, res) => {
             location || '', status || 'รอดำเนินการ', filePathsDb, id
         ]);
 
-        // 5. ⭐️ แปลง String เป็น Array และอัปเดตผู้เข้าร่วม
+        // 5. แปลง String เป็น Array และอัปเดตผู้เข้าร่วม
         if (participants) {
             try {
                 const parsedParticipants = JSON.parse(participants);
@@ -247,6 +248,62 @@ exports.updateEvent = async (req, res) => {
             }
         }
 
+        // ==========================================
+        // 6. ⭐️ กระบวนการเตรียมและซิงค์ข้อมูลขึ้น Google Calendar
+        // ==========================================
+        try {
+            // ดึงรายชื่อผู้เข้าร่วมอัปเดตล่าสุดจากฐานข้อมูล โดยเรียงตามอาวุโสและวันที่เข้ารับตำแหน่ง[cite: 2]
+            const [participantRows] = await connection.query(`
+                SELECT CONCAT(s.title, s.first_name, ' ', s.last_name) AS full_name
+                FROM event_participants ep
+                JOIN somtop s ON ep.somtop_id = s.id
+                LEFT JOIN somtop_positions sp ON s.position_id = sp.id
+                WHERE ep.event_id = ?
+                ORDER BY 
+                    sp.level ASC,       
+                    s.join_date ASC,    
+                    s.first_name ASC,   
+                    s.last_name ASC     
+            `, [id]);
+
+            // นำรายละเอียดเดิม มาต่อท้ายด้วยรายชื่อผู้เข้าร่วมล่าสุด[cite: 2]
+            let finalDescription = description || '';
+            if (participantRows.length > 0) {
+                finalDescription += '\n\nรายชื่อผู้เข้าร่วม:\n';
+                participantRows.forEach(p => {
+                    finalDescription += `- ${p.full_name}\n`;
+                });
+            }
+
+            const eventData = { 
+                title, 
+                description: finalDescription, 
+                start_date, 
+                end_date, 
+                location 
+            };
+
+            // ลอจิกจัดการปฏิทินตามสถานะกิจกรรม[cite: 2]
+            if (status === 'ยกเลิก') {
+                if (googleEventId) {
+                    await deleteEventFromGoogleCalendar(googleEventId); //[cite: 2]
+                    await connection.query('UPDATE events SET google_event_id = NULL WHERE id = ?', [id]);
+                }
+            } else {
+                if (googleEventId) {
+                    await updateEventInGoogleCalendar(googleEventId, eventData); //[cite: 2]
+                } else {
+                    const newGoogleEventId = await insertEventToGoogleCalendar(eventData); //[cite: 2]
+                    if (newGoogleEventId) {
+                        await connection.query('UPDATE events SET google_event_id = ? WHERE id = ?', [newGoogleEventId, id]);
+                    }
+                }
+            }
+        } catch (googleError) {
+            console.error('ไม่สามารถอัปเดต Google Calendar ได้ (แต่บันทึกลงระบบสำเร็จแล้ว):', googleError); //[cite: 2]
+            // ไม่ต้อง throw error ปล่อยผ่านเพื่อให้การทำงานของเว็บไม่สะดุด[cite: 2]
+        }
+
         await connection.commit();
         res.status(200).json({ message: 'อัปเดตข้อมูลกิจกรรมและผู้เข้าร่วมสำเร็จ' });
     } catch (error) {
@@ -257,123 +314,6 @@ exports.updateEvent = async (req, res) => {
         connection.release();
     }
 };
-
-// ==========================================
-// 4. แก้ไขข้อมูลกิจกรรม (เพิ่มไฟล์แนบ + อัปเดต Google Calendar)
-// ==========================================
-// exports.updateEvent = async (req, res) => {
-//     try {
-//         const { id } = req.params;
-//         const { event_type_id, title, description, start_date, end_date, location, status } = req.body;
-
-//         if (!title || !start_date || !end_date || !event_type_id) {
-//             return res.status(400).json({ message: 'กรุณาระบุข้อมูลให้ครบถ้วน' });
-//         }
-
-//         // 1. ⭐️ ดึงข้อมูลเดิมมาตรวจสอบหาไฟล์เก่า และดึง google_event_id
-//         const [existing] = await pool.query('SELECT file_paths, google_event_id FROM events WHERE id = ?', [id]);
-//         if (existing.length === 0) {
-//             return res.status(404).json({ message: 'ไม่พบข้อมูลกิจกรรม' });
-//         }
-
-//         // ⭐️ ประกาศตัวแปร googleEventId ตรงนี้ เพื่อแก้ปัญหา is not defined
-//         const googleEventId = existing[0].google_event_id;
-
-//         // 2. แปลงไฟล์เก่าให้เป็น Array
-//         let currentPaths = [];
-//         if (existing[0].file_paths) {
-//             try {
-//                 currentPaths = JSON.parse(existing[0].file_paths);
-//                 if (!Array.isArray(currentPaths)) currentPaths = [existing[0].file_paths];
-//             } catch (e) {
-//                 currentPaths = [existing[0].file_paths];
-//             }
-//         }
-
-//         // 3. ถ้ามีการอัปโหลดไฟล์ใหม่ ให้นำมารวมกับไฟล์เก่า (Append)
-//         if (req.files && req.files.length > 0) {
-//             const protocol = req.secure ? 'https' : 'http';
-//             const host = req.headers.host;
-            
-//             // สร้าง Array ไฟล์ใหม่
-//             const newPaths = req.files.map(file => `${protocol}://${host}/uploads/events/${file.filename}`);
-            
-//             // นำไฟล์เก่าและไฟล์ใหม่มารวมกัน
-//             currentPaths = currentPaths.concat(newPaths);
-//         }
-
-//         const filePathsDb = currentPaths.length > 0 ? JSON.stringify(currentPaths) : null;
-
-//         // 4. อัปเดตข้อมูลลงฐานข้อมูล
-//         const query = `
-//             UPDATE events SET 
-//                 event_type_id = ?, title = ?, description = ?, start_date = ?, 
-//                 end_date = ?, location = ?, status = ?, file_paths = ?
-//             WHERE id = ?
-//         `;
-        
-//         await pool.query(query, [
-//             event_type_id, title, description || '', start_date, end_date, 
-//             location || '', status || 'รอดำเนินการ', filePathsDb, id
-//         ]);
-
-//         // ==========================================
-//         // 5. ซิงค์ข้อมูลที่เปลี่ยนแปลงขึ้น Google Calendar
-//         // ==========================================
-//         try {
-//             // ⭐️ ดึงรายชื่อผู้เข้าร่วมปัจจุบันจากฐานข้อมูล
-//             const [participantRows] = await pool.query(`
-//                 SELECT CONCAT(s.title, s.first_name, ' ', s.last_name) AS full_name
-//                 FROM event_participants ep
-//                 JOIN somtop s ON ep.somtop_id = s.id
-//                 WHERE ep.event_id = ?
-//             `, [id]);
-
-//             // ⭐️ นำรายละเอียดเดิม มาต่อท้ายด้วยรายชื่อผู้เข้าร่วม
-//             let finalDescription = description || '';
-            
-//             if (participantRows.length > 0) {
-//                 finalDescription += '\n\nรายชื่อผู้เข้าร่วม:\n';
-//                 participantRows.forEach(p => {
-//                     finalDescription += `- ${p.full_name}\n`;
-//                 });
-//             }
-
-//             // ใช้ finalDescription ในการจัดเตรียมข้อมูล
-//             const eventData = { 
-//                 title, 
-//                 description: finalDescription, 
-//                 start_date, 
-//                 end_date, 
-//                 location 
-//             };
-
-//             // ลอจิกอัปเดต Google Calendar (แบบแก้ไขบั๊กแล้ว)
-//             if (status === 'ยกเลิก') {
-//                 if (googleEventId) {
-//                     await deleteEventFromGoogleCalendar(googleEventId);
-//                     await pool.query('UPDATE events SET google_event_id = NULL WHERE id = ?', [id]);
-//                 }
-//             } else {
-//                 if (googleEventId) {
-//                     await updateEventInGoogleCalendar(googleEventId, eventData);
-//                 } else {
-//                     const newGoogleEventId = await insertEventToGoogleCalendar(eventData);
-//                     if (newGoogleEventId) {
-//                         await pool.query('UPDATE events SET google_event_id = ? WHERE id = ?', [newGoogleEventId, id]);
-//                     }
-//                 }
-//             }
-//         } catch (googleError) {
-//             console.error('ไม่สามารถอัปเดต Google Calendar ได้ (แต่บันทึกลงระบบสำเร็จแล้ว):', googleError);
-//         }
-
-//         res.status(200).json({ message: 'อัปเดตข้อมูลกิจกรรมและเพิ่มไฟล์สำเร็จ' });
-//     } catch (error) {
-//         console.error('Error updating event:', error);
-//         res.status(500).json({ message: 'ไม่สามารถอัปเดตกิจกรรมได้' });
-//     }
-// };
 
 // ==========================================
 // 5. ลบกิจกรรม (ลบไฟล์แนบ + ลบจาก Google Calendar)
