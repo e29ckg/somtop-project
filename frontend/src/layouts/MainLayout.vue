@@ -108,7 +108,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { swalConfirm } from '../utils/swal' // ⭐️ นำเข้า SweetAlert สำหรับยืนยันการลบ
 import api from '../services/api' // ⭐️ นำเข้า Axios instance สำหรับเรียก API
@@ -169,4 +169,12 @@ const handleLogout = async () => {
     }
   }
 }
+
+// เมื่อมีการเปลี่ยนหน้า (Route เปลี่ยน) ระบบจะทำงานฟังก์ชันนี้
+watch(() => route.path, () => {
+  // ตรวจสอบว่าเป็นหน้าจอมือถือหรือไม่ (ความกว้าง <= 768px)
+  if (window.innerWidth <= 768) {
+    isCollapsed.value = false // ปรับสถานะเป็น false เพื่อซ่อน/พับเมนูเก็บ[cite: 1]
+  }
+})
 </script>
