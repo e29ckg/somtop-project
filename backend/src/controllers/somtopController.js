@@ -15,25 +15,32 @@ const deletePhysicalFile = (relativePath) => {
 };
 
 // ==========================================
-// 1. ดึงข้อมูล พ.สมทบ ทั้งหมด (จัดเรียงตามอาวุโสแบบไดนามิก)
+// 1. ดึงข้อมูล พ.สมทบ ทั้งหมด (อัปเดตดึงข้อมูลวาระปัจจุบัน)
 // ==========================================
 exports.getAllSomtop = async (req, res) => {
     try {
         const courtCode = req.user.court_code; 
         
-        // ⭐️ ใช้ LEFT JOIN เพื่อดึงชื่อตำแหน่งและ Level จากตาราง somtop_positions
         let query = `
             SELECT 
                 s.id, s.title, s.first_name, s.last_name, s.id_card, s.court_code, 
+                s.occupation, 
                 DATE_FORMAT(s.dob, '%Y-%m-%d') AS dob,
                 DATE_FORMAT(s.join_date, '%Y-%m-%d') AS join_date,
-                s.position_id, s.occupation,
-                sp.name AS role_position, -- ส่งกลับไปในชื่อเดิมเพื่อให้ Frontend ไม่พัง
+                s.position_id, 
+                sp.name AS role_position,
                 sp.level AS position_level,
+                
+                wt.id AS current_term_id,
+                wt.generation_name AS current_term_name,
+                
                 s.address, s.phone, s.status, s.note, s.photo_path, 
                 CONCAT(s.title, s.first_name, ' ', s.last_name) AS full_name 
             FROM somtop s
             LEFT JOIN somtop_positions sp ON s.position_id = sp.id
+            -- ⭐️ JOIN ประวัติวาระ โดยดึงเฉพาะวาระที่ "กำลังดำรงตำแหน่ง"
+            LEFT JOIN somtop_term_history sth ON s.id = sth.somtop_id AND sth.status = 'กำลังดำรงตำแหน่ง'
+            LEFT JOIN working_terms wt ON sth.term_id = wt.id
         `;
         let params = [];
         
@@ -42,13 +49,13 @@ exports.getAllSomtop = async (req, res) => {
             params.push(courtCode);
         }
         
-        // ⭐️ เปลี่ยนมาจัดเรียงตาม sp.level ที่ตั้งไว้ในตารางแทน
+        // จัดเรียงตามระดับอาวุโสของตำแหน่ง และวันที่เข้ารับตำแหน่ง
         query += ` 
             ORDER BY 
-                sp.level ASC,       -- 1. เรียงตามระดับอาวุโสของตำแหน่ง (เลขน้อยขึ้นก่อน)
-                s.join_date ASC,    -- 2. เรียงตามวันที่เข้ารับตำแหน่ง
-                s.first_name ASC,   -- 3. เรียงตามตัวอักษรชื่อ
-                s.last_name ASC     -- 4. เรียงตามตัวอักษรนามสกุล
+                sp.level ASC, 
+                s.join_date ASC, 
+                s.first_name ASC, 
+                s.last_name ASC
         `;
         
         const [rows] = await pool.query(query, params);
@@ -66,104 +73,163 @@ exports.getAllSomtop = async (req, res) => {
 };
 
 // ==========================================
-// 2. เพิ่มข้อมูลใหม่
+// 2. เพิ่มข้อมูล พ.สมทบ ใหม่ (พร้อมกำหนดวาระ)
 // ==========================================
 exports.createSomtop = async (req, res) => {
+    // ⭐️ ใช้ Transaction เพราะต้อง Insert ลง 2 ตาราง
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
     let photoPath = null;
+
     try {
-        // ⭐️ เปลี่ยน role_position เป็น position_id และเพิ่ม join_date
-        const { title, first_name, last_name, id_card, dob, occupation, join_date, position_id, address, phone, status, note } = req.body;
+        const { title, first_name, last_name, id_card, dob, occupation, join_date, position_id, address, phone, status, note, term_id } = req.body;
         const courtCode = req.user.court_code; 
-        
-        if (!title || !first_name || !last_name || !occupation) {
-            if (req.file) deletePhysicalFile(`uploads/somtop/${req.file.filename}`);
-            return res.status(400).json({ message: 'กรุณาระบุคำนำหน้า ชื่อ สกุล และอาชีพ ให้ครบถ้วน' });
+
+        if (!title || !first_name || !last_name) {
+            if (req.file) deletePhysicalFile(req.file.path);
+            return res.status(400).json({ message: 'กรุณากรอกคำนำหน้า ชื่อ และนามสกุลให้ครบถ้วน' });
         }
 
         if (req.file) {
             photoPath = `uploads/somtop/${req.file.filename}`;
         }
 
+        // 1. บันทึกข้อมูล พ.สมทบ ลงตารางหลัก
         const query = `
             INSERT INTO somtop 
-                (title, first_name, last_name, id_card, court_code, dob, occupation, join_date, position_id, address, phone, status, note, photo_path) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (title, first_name, last_name, id_card, court_code, dob, occupation, join_date, position_id, address, phone, status, note, photo_path)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
-        
-        await pool.query(query, [
+
+        const [result] = await connection.query(query, [
             title, first_name, last_name, id_card || null, courtCode, 
             dob || null, occupation || null, join_date || null, position_id || null, 
             address || null, phone || null, status || 'ใช้งาน', 
             note || null, photoPath
         ]);
 
-        res.status(201).json({ message: 'เพิ่มข้อมูลผู้พิพากษาสมทบสำเร็จ' });
-    } catch (error) {
-        console.error('Error creating somtop:', error);
-        
-        if (photoPath) deletePhysicalFile(photoPath);
+        const newSomtopId = result.insertId;
 
-        if (error.code === 'ER_DUP_ENTRY') {
-            return res.status(400).json({ message: 'เลขบัตรประชาชนนี้ถูกใช้งานแล้ว กรุณาตรวจสอบอีกครั้ง' });
+        // ⭐️ 2. ถ้ามีการเลือกรุ่น (term_id) ให้บันทึกลงตารางประวัติด้วย
+        if (term_id) {
+            await connection.query(
+                `INSERT INTO somtop_term_history (somtop_id, term_id, status) VALUES (?, ?, 'กำลังดำรงตำแหน่ง')`,
+                [newSomtopId, term_id]
+            );
         }
 
-        res.status(500).json({ message: 'ไม่สามารถบันทึกข้อมูลได้' });
+        // 3. ยืนยันการบันทึกข้อมูลทั้งหมด
+        await connection.commit();
+
+        if (typeof logActivity === 'function') {
+            logActivity(req, 'เพิ่มข้อมูล', 'จัดการ พ.สมทบ', `เพิ่มผู้พิพากษาสมทบ: ${title}${first_name} ${last_name}`);
+        }
+
+        res.status(201).json({ message: 'เพิ่มข้อมูลผู้พิพากษาสมทบสำเร็จ' });
+    } catch (error) {
+        // ถ้ายกเลิก หรือเกิด Error ให้ Rollback ข้อมูลกลับทั้งหมด
+        await connection.rollback();
+        if (photoPath) deletePhysicalFile(photoPath); // ลบไฟล์ที่เพิ่งอัปโหลดทิ้งด้วย
+        
+        console.error('Error creating somtop:', error);
+        if (error.code === 'ER_DUP_ENTRY') {
+            return res.status(400).json({ message: 'เลขบัตรประชาชนนี้มีอยู่ในระบบแล้ว' });
+        }
+        res.status(500).json({ message: 'ไม่สามารถเพิ่มข้อมูลได้' });
+    } finally {
+        connection.release();
     }
 };
 
 // ==========================================
-// 3. แก้ไขข้อมูล
+// 3. แก้ไขข้อมูล พ.สมทบ (และจัดการต่อวาระ)
 // ==========================================
 exports.updateSomtop = async (req, res) => {
+    // ⭐️ ใช้ Transaction ในการอัปเดตข้อมูลเช่นกัน
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
+    let newPhotoPath = null;
+    let oldPhotoPath = null;
+
     try {
-        // ⭐️ เปลี่ยน role_position เป็น position_id และเพิ่ม join_date
-        const { id, title, first_name, last_name, id_card, dob, occupation, join_date, position_id, address, phone, status, note } = req.body;
+        const id = req.params.id || req.body.id;
+        const { title, first_name, last_name, id_card, dob, occupation, join_date, position_id, address, phone, status, note, term_id } = req.body;
 
-        if (!id || !title || !first_name || !last_name || !occupation) {
-            return res.status(400).json({ message: 'ข้อมูลไม่ครบถ้วน (ต้องการคำนำหน้า ชื่อ สกุล และอาชีพ)' });
-        }
+        if (!id) return res.status(400).json({ message: 'ไม่พบ ID ที่ต้องการแก้ไข' });
 
-        const [existing] = await pool.query('SELECT photo_path FROM somtop WHERE id = ?', [id]);
+        // ดึงรูปภาพเดิมมาตรวจสอบ
+        const [existing] = await connection.query('SELECT photo_path FROM somtop WHERE id = ?', [id]);
         if (existing.length === 0) {
-            return res.status(404).json({ message: 'ไม่พบข้อมูลที่ต้องการแก้ไข' });
+            if (req.file) deletePhysicalFile(req.file.path);
+            return res.status(404).json({ message: 'ไม่พบข้อมูลผู้พิพากษาสมทบ' });
         }
-        
-        let photoPath = existing[0].photo_path;
 
+        oldPhotoPath = existing[0].photo_path;
+        let finalPhotoPath = oldPhotoPath;
+
+        // ถ้ามีการอัปโหลดรูปใหม่
         if (req.file) {
-            photoPath = `uploads/somtop/${req.file.filename}`;
+            newPhotoPath = `uploads/somtop/${req.file.filename}`;
+            finalPhotoPath = newPhotoPath;
         }
 
-        const query = `
+        // 1. อัปเดตข้อมูลหลัก
+        const updateQuery = `
             UPDATE somtop SET 
-                title = ?, first_name = ?, last_name = ?, id_card = ?, dob = ?, occupation = ?, join_date = ?, 
-                position_id = ?, address = ?, phone = ?, status = ?, note = ?, photo_path = ? 
+                title = ?, first_name = ?, last_name = ?, id_card = ?, 
+                dob = ?, occupation = ?, join_date = ?, position_id = ?, 
+                address = ?, phone = ?, status = ?, note = ?, photo_path = ?
             WHERE id = ?
         `;
-        
-        await pool.query(query, [
-            title, first_name, last_name, id_card || null, dob || null, occupation || null, join_date || null,
-            position_id || null, address || null, phone || null, status || 'ใช้งาน', 
-            note || null, photoPath, id
+
+        await connection.query(updateQuery, [
+            title, first_name, last_name, id_card || null, dob || null, occupation || null, 
+            join_date || null, position_id || null, address || null, 
+            phone || null, status || 'ใช้งาน', note || null, finalPhotoPath, id
         ]);
 
-        if (req.file && existing[0].photo_path) {
-            deletePhysicalFile(existing[0].photo_path);
+        // ⭐️ 2. จัดการประวัติการต่อวาระ (Term History)
+        if (term_id) {
+            // 2.1 ปรับสถานะวาระอื่นๆ ที่กำลังดำรงตำแหน่งอยู่ (และไม่ใช่รุ่นที่กำลังเลือก) ให้เป็น 'หมดวาระ'
+            await connection.query(
+                `UPDATE somtop_term_history SET status = 'หมดวาระ' 
+                 WHERE somtop_id = ? AND status = 'กำลังดำรงตำแหน่ง' AND term_id != ?`,
+                [id, term_id]
+            );
+
+            // 2.2 เพิ่มวาระใหม่ หรือถ้ามีประวัติรุ่นนี้อยู่แล้ว ให้อัปเดตสถานะเป็น 'กำลังดำรงตำแหน่ง' (ป้องกัน ER_DUP_ENTRY)
+            await connection.query(
+                `INSERT INTO somtop_term_history (somtop_id, term_id, status) 
+                 VALUES (?, ?, 'กำลังดำรงตำแหน่ง')
+                 ON DUPLICATE KEY UPDATE status = 'กำลังดำรงตำแหน่ง'`,
+                [id, term_id]
+            );
+        }
+
+        // ยืนยันการบันทึก
+        await connection.commit();
+
+        // เมื่อ Commit สำเร็จ ค่อยลบไฟล์รูปภาพเก่าทิ้ง (ป้องกันไฟล์หายตอน Error)
+        if (newPhotoPath && oldPhotoPath) {
+            deletePhysicalFile(oldPhotoPath);
+        }
+
+        if (typeof logActivity === 'function') {
+            logActivity(req, 'อัปเดตข้อมูล', 'จัดการ พ.สมทบ', `อัปเดตข้อมูล ID: ${id}`);
         }
 
         res.status(200).json({ message: 'อัปเดตข้อมูลสำเร็จ' });
     } catch (error) {
+        await connection.rollback(); // ย้อนกลับข้อมูลหากพังกลางคัน
+        if (newPhotoPath) deletePhysicalFile(newPhotoPath); // ลบรูปที่เพิ่งอัปโหลดไปทิ้ง
+
         console.error('Error updating somtop:', error);
-        
-        if (req.file) {
-            deletePhysicalFile(`uploads/somtop/${req.file.filename}`);
-        }
-
         if (error.code === 'ER_DUP_ENTRY') {
-            return res.status(400).json({ message: 'เลขบัตรประชาชนนี้ถูกใช้งานโดยบุคคลอื่นในระบบแล้ว กรุณาตรวจสอบอีกครั้ง' });
+            return res.status(400).json({ message: 'เลขบัตรประชาชนนี้ซ้ำกับบุคคลอื่นในระบบ' });
         }
-
         res.status(500).json({ message: 'ไม่สามารถอัปเดตข้อมูลได้' });
+    } finally {
+        connection.release();
     }
 };
 
@@ -192,13 +258,13 @@ exports.deleteSomtop = async (req, res) => {
 };
 
 // ==========================================
-// 4. ดึงประวัติการลาและกิจกรรมของ พ.สมทบ (รายบุคคล)
+// 4. ดึงประวัติการลา กิจกรรม และวาระการทำงาน (รายบุคคล)
 // ==========================================
 exports.getSomtopHistory = async (req, res) => {
     try {
         const { id } = req.params;
 
-        // 1. ดึงประวัติการลา (JOIN กับ leave_types)
+        // 1. ดึงประวัติการลา
         const queryLeaves = `
             SELECT lr.start_date, lr.end_date, lr.total_days, lr.status, lt.name as leave_type_name 
             FROM leave_requests lr 
@@ -208,7 +274,7 @@ exports.getSomtopHistory = async (req, res) => {
         `;
         const [leaves] = await pool.query(queryLeaves, [id]);
 
-        // 2. ดึงประวัติกิจกรรม (JOIN กับ events)
+        // 2. ดึงประวัติกิจกรรม
         const queryEvents = `
             SELECT e.title, e.start_date, e.end_date, ep.status 
             FROM event_participants ep 
@@ -218,7 +284,24 @@ exports.getSomtopHistory = async (req, res) => {
         `;
         const [events] = await pool.query(queryEvents, [id]);
 
-        res.status(200).json({ leaves, events });
+        // ⭐️ 3. เพิ่มการดึงประวัติวาระการทำงาน
+        const queryTerms = `
+            SELECT 
+                sth.id,
+                wt.generation_name, 
+                wt.start_date, 
+                wt.end_date, 
+                sth.status, 
+                sth.note 
+            FROM somtop_term_history sth
+            JOIN working_terms wt ON sth.term_id = wt.id
+            WHERE sth.somtop_id = ?
+            ORDER BY wt.start_date DESC
+        `;
+        const [terms] = await pool.query(queryTerms, [id]);
+
+        // ส่งข้อมูลทั้ง 3 ส่วนกลับไปให้ Frontend
+        res.status(200).json({ leaves, events, terms });
     } catch (error) {
         console.error('Error fetching somtop history:', error);
         res.status(500).json({ message: 'เกิดข้อผิดพลาดในการดึงประวัติ' });

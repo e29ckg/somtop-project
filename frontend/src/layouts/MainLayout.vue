@@ -58,6 +58,10 @@
             <span class="nav-icon">🏷️</span>
             <span class="sidebar-text">ประเภทการลา</span>
           </router-link>
+          <router-link to="/manage-terms" class="nav-item">
+            <span class="nav-icon">⏳</span>
+            <span class="sidebar-text">จัดการวาระการทำงาน</span>
+          </router-link>
           <router-link to="/manage-templates" class="nav-item">
             <span class="nav-icon">📄</span>
             <span class="sidebar-text">จัดการเทมเพลตเอกสาร</span>
@@ -143,6 +147,12 @@ const currentRouteName = computed(() => {
   if (route.path === '/manage-courts') return 'จัดการข้อมูลศาล'
   if (route.path === '/manage-titles') return 'จัดการคำนำหน้า'
   if (route.path === '/activity-logs') return 'ประวัติการใช้งาน'
+  if (route.path === '/manage-positions') return 'จัดการตำแหน่ง'
+  if (route.path === '/manage-leave-types') return 'จัดการประเภทการลา'
+  if (route.path === '/manage-templates') return 'จัดการเทมเพลตเอกสาร'
+  if (route.path === '/manage-event-types') return 'จัดการประเภทกิจกรรม'
+  if (route.path === '/manage-calendar-sync') return 'ตั้งค่า Google Calendar'
+  if (route.path === '/manage-terms') return 'จัดการวาระการทำงาน'
   return 'รายละเอียด'
 })
 

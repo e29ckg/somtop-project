@@ -25,12 +25,22 @@
           <label>รายการ</label>
         </div>
 
-        <div class="search-box">
+        <!-- ⭐️ จัดกลุ่มตัวกรองและค้นหาให้อยู่ชิดขวา -->
+        <div style="display: flex; gap: 12px; width: 100%; max-width: 450px; justify-content: flex-end;">
+          <!-- ⭐️ ตัวกรองสถานะ -->
+          <select v-model="statusFilter" class="search-input" style="max-width: 180px; cursor: pointer;">
+            <option value="ใช้งาน">ดำรงตำแหน่งปัจจุบัน</option>
+            <option value="พ้นสภาพ">พ้นจากตำแหน่ง</option>
+            <option value="ทั้งหมด">ทั้งหมด</option>
+          </select>
+
+          <!-- กล่องค้นหาเดิม -->
           <input 
             type="text" 
             v-model="searchQuery" 
             placeholder="🔍 ค้นหาชื่อ-สกุล..." 
             class="search-input"
+            style="flex: 1;"
           />
         </div>
       </div>
@@ -223,6 +233,28 @@
             </select>
           </div>
 
+          <!-- ⭐️ เพิ่มกล่องเลือกรุ่นวาระการทำงาน -->
+          <div class="input-group">
+            <label>รุ่นวาระการทำงาน (ปัจจุบัน) <span style="color: #DC2626;">*</span></label>
+            <select v-model="formData.term_id" required>
+              <option value="" disabled>-- เลือกรุ่นวาระการทำงาน --</option>
+              
+              <!-- วนลูปข้อมูลรุ่นวาระที่ดึงมาจาก API -->
+              <option v-for="term in termList" :key="term.id" :value="term.id">
+                {{ term.generation_name }} 
+                (เริ่ม {{ formatThaiDateFull(term.start_date) }})
+              </option>
+              
+              <!-- เผื่อกรณีแก้ไขข้อมูลแล้วรุ่นนั้นถูกลบไปแล้ว ให้แสดงค่าเดิม -->
+              <option 
+                v-if="formData.term_id && !termList.find(t => t.id === formData.term_id)" 
+                :value="formData.term_id"
+              >
+                รุ่นวาระที่ถูกระงับ/ยกเลิกไปแล้ว (ID: {{ formData.term_id }})
+              </option>
+            </select>
+          </div>
+
           <div class="input-group full-width">
             <label>ที่อยู่</label>
             <textarea v-model="formData.address" rows="2" placeholder="บ้านเลขที่, ถนน, ตำบล, อำเภอ, จังหวัด..."></textarea>
@@ -319,10 +351,53 @@
         <!-- เส้นคั่น -->
         <hr style="border: 0; border-top: 1px solid #E5E7EB; margin: 24px 0;" />
         
-        <div v-if="isLoadingHistory" class="text-center" style="padding: 20px; color: #6B7280;">
-          กำลังโหลดประวัติข้อมูล...
-        </div>
+        <div class="history-section mb-4">
+          <h4 style="font-size: 16px; font-weight: 600; color: #111827; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span>⏳</span> ประวัติการดำรงตำแหน่ง (วาระ)
+                </div>
+                
+                <!-- ⭐️ ป้ายแสดงจำนวนวาระต่อเนื่อง (แสดงเฉพาะเมื่อ > 1) -->
+                <span v-if="consecutiveTermsCount > 1" class="status-badge active" style="font-size: 12px; font-weight: 600; padding: 4px 10px;">
+                  ต่อเนื่อง {{ consecutiveTermsCount }} วาระ
+                </span>
+              </h4>
+          <div v-if="personTermHistory.length === 0" style="color: #6B7280; font-size: 14px; background: #F9FAFB; padding: 12px; border-radius: 8px; text-align: center;">ไม่มีประวัติวาระการทำงาน</div>
+          <div v-else class="table-responsive" style="max-height: 200px; overflow-y: auto; border: 1px solid #E5E7EB; border-radius: 8px;">
+            <table class="data-table small-table">
+              <thead>
+                <tr>
+                  <th>รุ่นที่ (วาระ)</th>
+                  <th>ระยะเวลา</th>
+                  <th>สถานะ</th>
+                  <th class="text-center" width="60">จัดการ</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(term, i) in personTermHistory" :key="i">
+                  <td style="font-weight: 500;">{{ term.generation_name }}</td>
+                  <td style="font-size: 13px;">{{ formatThaiDateShort(term.start_date) }} - {{ formatThaiDateShort(term.end_date) }}</td>
+                  <td>
+                    <span class="status-badge" :class="term.status === 'กำลังดำรงตำแหน่ง' ? 'active' : (term.status === 'หมดวาระ' ? 'warning' : 'inactive')" style="font-size: 11px; padding: 2px 8px;">
+                      {{ term.status }}
+                    </span>
+                  </td>
+                  <td class="text-center">
+                        <!-- ⭐️ เพิ่มปุ่มลบประวัติ -->
+                        <button class="btn-icon delete" @click="deleteTermHistoryRecord(term.id)" title="ลบประวัตินี้" style="padding: 2px 6px; font-size: 12px;">🗑️</button>
+                      </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>        
 
+        <div v-if="isLoadingHistory" class="text-center" style="padding: 20px; color: #6B7280;">
+          กำลังโหลดประวัติการลาและกิจกรรม...
+        </div>
+        <div v-else-if="personLeaveHistory.length === 0 && personEventHistory.length === 0" class="text-center" style="padding: 20px; color: #6B7280;">
+          ไม่มีประวัติการลาและกิจกรรมของผู้พิพากษาสมทบนี้
+        </div>
         <div v-else class="history-sections">
           <!-- 📅 ส่วนประวัติการลา -->
           <div class="history-section mb-4">
@@ -426,6 +501,7 @@ const dobYears = Array.from({length: 81}, (_, i) => {
 
 // === State ทั่วไป ===
 const somtopList = ref([])
+const termList = ref([])
 const isModalOpen = ref(false)
 const isEditing = ref(false)
 
@@ -436,6 +512,7 @@ const selectedSomtopToView = ref(null)
 // === State สำหรับประวัติ ===
 const personLeaveHistory = ref([])
 const personEventHistory = ref([])
+const personTermHistory = ref([])
 const isLoadingHistory = ref(false)
 
 // ⭐️ อัปเดตตัวแปร formData ให้รองรับ Title, FirstName, LastName
@@ -447,6 +524,7 @@ const formData = ref({
   position_id: '', 
   join_day: '', join_month: '', join_year: '', 
   address: '', phone: '', status: 'ใช้งาน', note: '',
+  term_id: '',
   photo: null, existing_photo_path: ''
 })
 
@@ -454,6 +532,7 @@ const previewPhotoUrl = ref('')
 
 // === State ระบบค้นหาและแบ่งหน้า ===
 const searchQuery = ref('')
+const statusFilter = ref('ใช้งาน')
 const currentPage = ref(1)
 const itemsPerPage = ref(50)
 
@@ -544,11 +623,25 @@ const fetchPositions = async () => {
 
 // กรองข้อมูล
 const filteredSomtopList = computed(() => {
-  if (!searchQuery.value) return somtopList.value;
-  return somtopList.value.filter(person => 
-    person.full_name.toLowerCase().includes(searchQuery.value.toLowerCase())
-  );
+  let result = somtopList.value;
+
+  // 1. กรองตามสถานะการดำรงตำแหน่ง (ถ้าไม่ได้เลือก 'ทั้งหมด')
+  if (statusFilter.value !== 'ทั้งหมด') {
+    result = result.filter(person => person.status === statusFilter.value);
+  }
+
+  // 2. กรองตามคำค้นหาชื่อ-สกุล
+  if (searchQuery.value) {
+    const q = searchQuery.value.toLowerCase();
+    result = result.filter(person => 
+      person.full_name.toLowerCase().includes(q)
+    );
+  }
+
+  return result;
 })
+
+
 
 const totalPages = computed(() => Math.ceil(filteredSomtopList.value.length / itemsPerPage.value) || 1)
 const paginatedSomtopList = computed(() => {
@@ -560,7 +653,7 @@ const changePage = (page) => {
   if (page >= 1 && page <= totalPages.value) currentPage.value = page;
 }
 
-watch(searchQuery, () => currentPage.value = 1);
+watch([searchQuery, statusFilter], () => currentPage.value = 1);
 
 const handlePhotoUpload = (event) => {
   const file = event.target.files[0]
@@ -582,6 +675,16 @@ const fetchSomtopList = async () => {
     somtopList.value = response.data.records || []
   } catch (error) {
     console.error("ดึงข้อมูลไม่สำเร็จ:", error)
+  }
+}
+
+// ⭐️ ฟังก์ชันดึงข้อมูลวาระการทำงาน (เพื่อให้แสดงใน Dropdown)
+const fetchTerms = async () => {
+  try {
+    const response = await api.get('/working-terms')
+    termList.value = response.data.records || []
+  } catch (error) {
+    console.error("ดึงข้อมูลวาระการทำงานไม่สำเร็จ:", error)
   }
 }
 
@@ -618,14 +721,15 @@ const saveData = async () => {
     payload.append('first_name', formData.value.firstName)
     payload.append('last_name', formData.value.lastName)
     payload.append('occupation', formData.value.occupation)
-    payload.append('id_card', formData.value.idCard || '') // ⭐️ แก้ไขตรงนี้
+    payload.append('id_card', formData.value.idCard || '') 
     payload.append('dob', formattedDob)
-    payload.append('address', formData.value.address || '') // ⭐️ แก้ไขตรงนี้
-    payload.append('phone', formData.value.phone || '')     // ⭐️ แก้ไขตรงนี้
+    payload.append('address', formData.value.address || '') 
+    payload.append('phone', formData.value.phone || '')     
     payload.append('status', formData.value.status)
-    payload.append('note', formData.value.note || '')       // ⭐️ แก้ไขตรงนี้
+    payload.append('note', formData.value.note || '')  
     payload.append('position_id', formData.value.position_id)
-    
+    payload.append('term_id', formData.value.term_id)
+
     if (formattedJoinDate) {
       payload.append('join_date', formattedJoinDate)
     }
@@ -666,6 +770,60 @@ const deleteData = async (id) => {
   }
 }
 
+// === ฟังก์ชันสำหรับลบประวัติวาระการทำงาน ===
+const deleteTermHistoryRecord = async (historyId) => {
+  const result = await swalConfirm(
+    'ยืนยันการลบประวัติ', 
+    'คุณแน่ใจหรือไม่ว่าต้องการลบประวัติการดำรงตำแหน่งนี้?'
+  )
+
+  if (result.isConfirmed) {
+    try {
+      // เรียกใช้ API ลบประวัติ (ที่เราเคยสร้างไว้ใน termHistoryController)
+      await api.delete(`/term-history/${historyId}`)
+      swalSuccess('ลบประวัติสำเร็จ', 'ข้อมูลถูกลบออกจากระบบแล้ว')
+      
+      // รีเฟรชข้อมูลใน Modal ใหม่ให้เป็นปัจจุบัน
+      if (selectedSomtopToView.value) {
+        openViewModal(selectedSomtopToView.value)
+      }
+      
+      // รีเฟรชตารางรายชื่อหลักด้วย (เผื่อเผลอลบวาระปัจจุบันทิ้งไป หน้าหลักจะได้อัปเดตตาม)
+      fetchSomtopList()
+      
+    } catch (error) {
+      swalError('ลบข้อมูลไม่สำเร็จ', error.response?.data?.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อ')
+    }
+  }
+}
+
+// === คำนวณจำนวนวาระที่ต่อเนื่องกับวาระล่าสุด ===
+const consecutiveTermsCount = computed(() => {
+  if (!personTermHistory.value || personTermHistory.value.length === 0) return 0;
+  
+  let count = 1; // เริ่มนับจากวาระล่าสุดเป็น 1 เสมอ
+  
+  // ลูปเช็กย้อนหลัง (Index 0 คือวาระล่าสุด, Index 1 คือวาระก่อนหน้า)
+  for (let i = 0; i < personTermHistory.value.length - 1; i++) {
+    const newerTermStart = new Date(personTermHistory.value[i].start_date);
+    const olderTermEnd = new Date(personTermHistory.value[i+1].end_date);
+    
+    // คำนวณช่องว่างระหว่างวาระ (หน่วยเป็นวัน)
+    const gapTime = newerTermStart.getTime() - olderTermEnd.getTime();
+    const gapDays = gapTime / (1000 * 3600 * 24);
+    
+    // ถ้าระยะห่างไม่เกิน 180 วัน (ประมาณ 6 เดือน) ถือว่าดำรงตำแหน่งต่อเนื่อง
+    if (gapDays <= 180) {
+      count++;
+    } else {
+      break; // หากเว้นช่วงนานกว่านั้น ถือว่าขาดตอน ให้หยุดนับทันที
+    }
+  }
+  
+  return count;
+})
+
+
 const openAddModal = () => {
   isEditing.value = false
   previewPhotoUrl.value = ''
@@ -673,7 +831,9 @@ const openAddModal = () => {
     id: null, title: 'นาย', firstName: '', lastName: '', idCard: '', 
     dob_day: '', dob_month: '', dob_year: '', 
     position_id: '', join_day: '', join_month: '', join_year: '',
-    address: '', phone: '', status: 'ใช้งาน', note: '', photo: null, existing_photo_path: ''
+    address: '', phone: '', status: 'ใช้งาน', note: '',
+    term_id: '',
+    photo: null, existing_photo_path: ''
   }
   isModalOpen.value = true
 }
@@ -716,8 +876,8 @@ const openEditModal = (person) => {
     address: person.address || '',      
     phone: person.phone || '',          
     status: person.status,
-    note: person.note || '',            
-    // ⭐️ ลบ position_id และ join_date ที่ประกาศซ้ำซ้อนด้านล่างออก
+    note: person.note || '',  
+    term_id: person.current_term_id || '',
     photo: null,
     existing_photo_path: person.photo_path || ''
   }
@@ -734,12 +894,14 @@ const openViewModal = async (person) => {
   // ล้างค่าเก่าและโหลดข้อมูลใหม่
   personLeaveHistory.value = []
   personEventHistory.value = []
+  personTermHistory.value = []
   isLoadingHistory.value = true
   
   try {
     const response = await api.get(`/somtop/${person.id}/history`)
     personLeaveHistory.value = response.data.leaves || []
     personEventHistory.value = response.data.events || []
+    personTermHistory.value = response.data.terms || []
   } catch (error) {
     console.error('ไม่สามารถดึงประวัติได้:', error)
   } finally {
@@ -753,10 +915,12 @@ const closeViewModal = () => {
   selectedSomtopToView.value = null
 }
 
+
 onMounted(() => {
   fetchSomtopList()
   fetchTitles()
   fetchPositions()
+  fetchTerms()
 })
 </script>
 

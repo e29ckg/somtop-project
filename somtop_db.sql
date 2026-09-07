@@ -202,3 +202,46 @@ ADD COLUMN `occupation` varchar(150) DEFAULT NULL COMMENT 'อาชีพ' AFTE
 
 ALTER TABLE events 
 ADD UNIQUE KEY unique_event (title, start_date, court_code);
+
+CREATE TABLE working_terms (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    generation_name VARCHAR(100) NOT NULL COMMENT 'รุ่นที่ (เช่น รุ่นที่ 1, วาระปี 2567-2570)',
+    start_date DATE NOT NULL COMMENT 'ตั้งแต่วันที่เริ่มต้น',
+    end_date DATE NOT NULL COMMENT 'วันหมดวาระ',
+    
+    -- ⭐️ ฟิลด์ที่แนะนำเพิ่มเติมเพื่อให้ระบบสมบูรณ์
+    court_code VARCHAR(50) NOT NULL COMMENT 'รหัสศาล (เพื่อให้แยกข้อมูลวาระของแต่ละศาลได้)',
+    status ENUM('กำลังดำรงตำแหน่ง', 'หมดวาระ', 'ยกเลิก') DEFAULT 'กำลังดำรงตำแหน่ง' COMMENT 'สถานะของวาระ',
+    note TEXT NULL COMMENT 'หมายเหตุเพิ่มเติม',
+    
+    -- มาตรฐานการเก็บเวลาของระบบ
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    INDEX idx_term_court_code (court_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE somtop 
+ADD COLUMN term_id INT NULL COMMENT 'อ้างอิงวาระการทำงาน (รุ่นที่)' AFTER position_id,
+ADD CONSTRAINT fk_somtop_term FOREIGN KEY (term_id) REFERENCES working_terms(id) ON DELETE SET NULL;
+
+CREATE TABLE somtop_term_history (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    somtop_id INT(11) NOT NULL COMMENT 'อ้างอิง ID ของ พ.สมทบ',
+    term_id INT NOT NULL COMMENT 'อ้างอิง ID ของวาระการทำงาน (ตาราง working_terms)',
+    
+    -- สถานะแยกเฉพาะวาระนั้นๆ เผื่อกรณีลาออกก่อนหมดวาระ
+    status ENUM('กำลังดำรงตำแหน่ง', 'หมดวาระ', 'พ้นจากตำแหน่ง') DEFAULT 'กำลังดำรงตำแหน่ง' COMMENT 'สถานะในวาระนี้',
+    note TEXT NULL COMMENT 'หมายเหตุเพิ่มเติม (เช่น ลาออกก่อนกำหนด, ต่อวาระ)',
+    
+    -- มาตรฐานการเก็บเวลาของระบบ
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    -- ตั้งค่า Foreign Key เพื่อเชื่อมข้อมูลและลบอัตโนมัติหากมีการลบข้อมูลหลัก
+    FOREIGN KEY (somtop_id) REFERENCES somtop(id) ON DELETE CASCADE,
+    FOREIGN KEY (term_id) REFERENCES working_terms(id) ON DELETE CASCADE,
+    
+    -- ป้องกันการเผลอเพิ่มประวัติรุ่นเดียวกันซ้ำให้กับคนเดิม
+    UNIQUE KEY unique_somtop_term (somtop_id, term_id)
+);

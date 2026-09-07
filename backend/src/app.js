@@ -18,6 +18,8 @@ const positionRoutes = require('./routes/positionRoutes');
 const leaveTypeRoutes = require('./routes/leaveTypeRoutes');
 const templateRoutes = require('./routes/templateRoutes');
 const settingRoutes = require('./routes/settingRoutes');
+const termHistoryRoutes = require('./routes/termHistoryRoutes');
+const workingTermRoutes = require('./routes/workingTermRoutes');
 
 
 const app = express();
@@ -45,6 +47,8 @@ app.use('/api/positions', positionRoutes);
 app.use('/api/leave-types', leaveTypeRoutes);
 app.use('/api/templates', templateRoutes);
 app.use('/api/settings', settingRoutes);
+app.use('/api/term-history', termHistoryRoutes);
+app.use('/api/working-terms', workingTermRoutes);
 
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
