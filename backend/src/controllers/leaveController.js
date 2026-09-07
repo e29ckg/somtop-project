@@ -236,8 +236,22 @@ exports.exportToWord = async (req, res) => {
 
         const leaveData = rows[0];
 
+        let templateFileName = 'leave_template.docx'; // ค่าเริ่มต้น
+        
+        if (leaveData.leave_type_name === 'ลาป่วย') {
+            templateFileName = 'leave_template_sick.docx';
+        } else if (leaveData.leave_type_name === 'ลากิจส่วนตัว') {
+            templateFileName = 'leave_template_personal.docx';
+        } else if (leaveData.leave_type_name === 'ลาพักผ่อน') {
+            templateFileName = 'leave_template_vacation.docx';
+        } else if (leaveData.leave_type_name === 'ลาไปต่างประเทศ') {
+            templateFileName = 'leave_template_abroad.docx';
+        } else if (leaveData.leave_type_name === 'ลาประชุม') {
+            templateFileName = 'leave_template_meeting.docx';
+        }
+
         // โหลด Template
-        const templatePath = path.resolve(__dirname, '../../templates/leave_template.docx');
+        const templatePath = path.resolve(__dirname, `../../templates/${templateFileName}`);
         const content = fs.readFileSync(templatePath, 'binary');
 
         const zip = new PizZip(content);

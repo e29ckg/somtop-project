@@ -25,3 +25,29 @@ exports.uploadTemplate = (req, res) => {
         res.status(500).json({ message: 'เกิดข้อผิดพลาดในการอัปโหลดเทมเพลต' });
     }
 };
+
+// ==========================================
+// ดาวน์โหลดไฟล์เทมเพลตเดิมไปแก้ไข
+// ==========================================
+exports.downloadTemplate = (req, res) => {
+    try {
+        const templateType = req.query.type; // รับค่าประเภท เช่น 'leave_template_sick'
+        
+        if (!templateType) {
+            return res.status(400).json({ message: 'กรุณาระบุประเภทแบบฟอร์ม' });
+        }
+
+        const fileName = templateType + '.docx';
+        const filePath = path.join(__dirname, '../../templates/', fileName);
+
+        // เช็กว่ามีไฟล์นี้ในโฟลเดอร์หรือไม่
+        if (fs.existsSync(filePath)) {
+            res.download(filePath, fileName); // บังคับดาวน์โหลดไฟล์
+        } else {
+            res.status(404).json({ message: 'ไม่พบไฟล์แบบฟอร์มนี้ในระบบ' });
+        }
+    } catch (error) {
+        console.error('Error downloading template:', error);
+        res.status(500).json({ message: 'เกิดข้อผิดพลาดในการดาวน์โหลดเทมเพลต' });
+    }
+};
