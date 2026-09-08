@@ -246,7 +246,79 @@ CREATE TABLE somtop_term_history (
     UNIQUE KEY unique_somtop_term (somtop_id, term_id)
 );
 
--------------------
-
 ALTER TABLE event_participants 
 MODIFY COLUMN status ENUM('รอตอบรับ', 'เข้าร่วม', 'ไม่เข้าร่วม', 'ลาประชุม') DEFAULT 'เข้าร่วม' COMMENT 'สถานะการเข้าร่วม';
+
+-------------------
+
+-- ==========================================
+-- 1. ตารางประเภทเวรปฏิบัติหน้าที่ (duty_types)
+-- ==========================================
+CREATE TABLE duty_types (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL COMMENT 'ชื่อประเภทเวร เช่น เวร, เวรต่อเนื่อง',
+    status ENUM('ใช้งาน', 'ระงับ') DEFAULT 'ใช้งาน' COMMENT 'สถานะให้เลือกใช้งาน',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- เพิ่มข้อมูลประเภทเวรเริ่มต้นตามที่คุณต้องการ
+INSERT INTO duty_types (name) VALUES 
+('เวร'), 
+('เวรต่อเนื่อง');
+
+-- ==========================================
+-- 2. ตารางตารางเวรปฏิบัติหน้าที่ (duty_schedules)
+-- ==========================================
+CREATE TABLE duty_schedules (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    somtop_id INT(11) NOT NULL COMMENT 'เชื่อมกับตาราง somtop (ผู้ที่ต้องขึ้นเวร)',
+    duty_type_id INT NOT NULL COMMENT 'เชื่อมกับตาราง duty_types (ประเภทเวร)',
+    court_code VARCHAR(50) NOT NULL COMMENT 'รหัสศาล (เพื่อแยกตารางเวรของแต่ละศาล)',
+    duty_date DATE NOT NULL COMMENT 'วันที่ขึ้นเวร',
+    
+    -- หากต้องการระบุเวลาเริ่มต้น-สิ้นสุด (ถ้ามี)
+    -- start_time TIME NULL COMMENT 'เวลาเริ่มเวร',
+    -- end_time TIME NULL COMMENT 'เวลาสิ้นสุดเวร',
+    
+    note TEXT COMMENT 'หมายเหตุเพิ่มเติม (เช่น แลกเวรกับใคร)',
+    status ENUM('รอปฏิบัติหน้าที่', 'ปฏิบัติหน้าที่เสร็จสิ้น', 'ขอเปลี่ยนเวร', 'ยกเลิก') DEFAULT 'รอปฏิบัติหน้าที่' COMMENT 'สถานะการขึ้นเวร',
+    
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    -- ตั้งค่า Foreign Key
+    FOREIGN KEY (somtop_id) REFERENCES somtop(id) ON DELETE CASCADE,
+    FOREIGN KEY (duty_type_id) REFERENCES duty_types(id) ON DELETE RESTRICT,
+    
+    -- เพิ่ม Index สำหรับการค้นหาตามศาลและวันที่ให้ไวขึ้น
+    INDEX idx_duty_court_date (court_code, duty_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE holidays (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL COMMENT 'ชื่อวันหยุด เช่น วันขึ้นปีใหม่, วันสงกรานต์',
+    holiday_date DATE NOT NULL COMMENT 'วันที่หยุดราชการ/วันหยุดพิเศษ',
+    
+    -- ใช้ DEFAULT NULL เพื่อให้แยกว่าเป็นวันหยุดทั่วประเทศ หรือหยุดเฉพาะศาล
+    court_code VARCHAR(50) DEFAULT NULL COMMENT 'รหัสศาล (ถ้าเป็น NULL คือหยุดทั่วประเทศ, ถ้าระบุรหัสคือหยุดเฉพาะที่)',
+    
+    status ENUM('ใช้งาน', 'ระงับ') DEFAULT 'ใช้งาน' COMMENT 'สถานะให้เปิด/ปิดการใช้งานวันหยุดนี้',
+    
+    -- มาตรฐานการเก็บเวลาของระบบ
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    -- เพิ่ม Index เพื่อให้ระบบตรวจสอบหาวันหยุดได้รวดเร็วขึ้นตอนจัดเวร
+    INDEX idx_holiday_date (holiday_date),
+    INDEX idx_holiday_court (court_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ตัวอย่างการเพิ่มข้อมูลวันหยุดทั่วประเทศ (court_code ปล่อยว่าง)
+INSERT INTO holidays (name, holiday_date, court_code) VALUES 
+('วันขึ้นปีใหม่', '2027-01-01', NULL),
+('วันมาฆบูชา', '2027-02-20', NULL);
+
+-- ตัวอย่างการเพิ่มข้อมูลวันหยุดประจำจังหวัด (ใส่ court_code ของศาลนั้นๆ)
+INSERT INTO holidays (name, holiday_date, court_code) VALUES 
+('วันหยุดพิเศษประจำจังหวัด (งานกาชาด)', '2027-03-15', 'pkkjc');
