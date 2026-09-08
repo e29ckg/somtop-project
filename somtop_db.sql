@@ -249,4 +249,4 @@ CREATE TABLE somtop_term_history (
 -------------------
 
 ALTER TABLE event_participants 
-MODIFY COLUMN status ENUM('รอตอบรับ', 'เข้าร่วม', 'ไม่เข้าร่วม', 'ลาประชุม') DEFAULT 'รอตอบรับ' COMMENT 'สถานะการเข้าร่วม';
+MODIFY COLUMN status ENUM('รอตอบรับ', 'เข้าร่วม', 'ไม่เข้าร่วม', 'ลาประชุม') DEFAULT 'เข้าร่วม' COMMENT 'สถานะการเข้าร่วม';

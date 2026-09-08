@@ -326,7 +326,7 @@
 
                 <!-- ปุ่มพิมพ์ใบลา -->
                 <button 
-                  v-if="getParticipantStatus(person.id).status === 'ลาประชุม'" 
+                  v-if="canPrintMeetingLeave(person.id)" 
                   @click="printMeetingLeave(person.id)"
                   class="btn-icon btn-print-leave" 
                   title="พิมพ์ใบลาการประชุม (Word)"
@@ -832,7 +832,7 @@ const toggleParticipant = async (somtopId, isChecked) => {
     });
     if (isChecked) {
       const person = somtopList.value.find(p => p.id === somtopId);
-      currentParticipants.value.push({ somtop_id: somtopId, status: 'รอตอบรับ', full_name: person?.full_name });
+      currentParticipants.value.push({ somtop_id: somtopId, status: 'เข้าร่วม', full_name: person?.full_name });
     }
     else currentParticipants.value = currentParticipants.value.filter(p => p.somtop_id !== somtopId);
   } catch (error) {
@@ -929,6 +929,10 @@ const getParticipantStatus = (somtopId) => {
   return currentParticipants.value.find(p => p.somtop_id === somtopId) || { status: 'รอตอบรับ' };
 };
 
+const canPrintMeetingLeave = (somtopId) => {
+  return getParticipantStatus(somtopId).status === 'ลาประชุม';
+};
+
 const updateStatus = async (somtopId, newStatus) => {
   try {
     await api.put('/events/participants/status', {
@@ -945,6 +949,8 @@ const updateStatus = async (somtopId, newStatus) => {
 };
 
 const printMeetingLeave = async (somtopId) => {
+  if (!canPrintMeetingLeave(somtopId)) return;
+
   try {
     const response = await api.get(`/events/${selectedEvent.value.id}/participants/${somtopId}/export-leave`, {
       responseType: 'blob'

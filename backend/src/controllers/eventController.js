@@ -34,7 +34,7 @@ exports.getAllEvents = async (req, res) => {
                 DATE_FORMAT(e.end_date, '%Y-%m-%d %H:%i:%s') AS end_date,
                 e.location, e.status, e.created_by, u.full_name AS creator_name,
                 e.file_paths,
-                (SELECT COUNT(*) FROM event_participants ep WHERE ep.event_id = e.id) AS participant_count
+                (SELECT COUNT(*) FROM event_participants ep WHERE ep.event_id = e.id AND ep.status = 'เข้าร่วม') AS participant_count
             FROM events e
             LEFT JOIN users u ON e.created_by = u.id
             LEFT JOIN event_types et ON e.event_type_id = et.id
@@ -457,7 +457,7 @@ exports.manageParticipant = async (req, res) => {
         // 2. บันทึก/ลบ ข้อมูลในฐานข้อมูลของเรา
         let successMessage = '';
         if (action === 'add') {
-            await pool.query('INSERT IGNORE INTO event_participants (event_id, somtop_id) VALUES (?, ?)', [event_id, somtop_id]);
+            await pool.query("INSERT IGNORE INTO event_participants (event_id, somtop_id, status) VALUES (?, ?, 'เข้าร่วม')", [event_id, somtop_id]);
             successMessage = 'เพิ่มผู้เข้าร่วมสำเร็จ';
         } else if (action === 'remove') {
             await pool.query('DELETE FROM event_participants WHERE event_id = ? AND somtop_id = ?', [event_id, somtop_id]);
