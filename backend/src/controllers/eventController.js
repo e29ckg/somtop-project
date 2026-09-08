@@ -553,7 +553,7 @@ exports.exportMeetingLeaveToWord = async (req, res) => {
         // ดึงข้อมูลกิจกรรมและผู้ลา
         const query = `
             SELECT 
-                e.title as event_title, e.start_date, e.location,
+                e.title as event_title, e.start_date, e.end_date, e.location,
                 CONCAT(s.title, s.first_name, ' ', s.last_name) AS full_name
             FROM event_participants ep
             JOIN events e ON ep.event_id = e.id
@@ -581,15 +581,44 @@ exports.exportMeetingLeaveToWord = async (req, res) => {
             return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear() + 543}`;
         };
 
+        const formatThaiMonthYear = (dateString) => {
+            if (!dateString) return '-';
+            const d = new Date(dateString);
+            const months = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+            return `${months[d.getMonth()]} ${d.getFullYear() + 543}`;
+        };
+
+        const formatTime = (dateString) => {
+            if (!dateString) return '-';
+            return new Date(dateString).toLocaleTimeString('th-TH', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+            });
+        };
+
+        const eventMonthYear = formatThaiMonthYear(data.start_date);
+        const eventTime = formatTime(data.start_date);
+
         doc.render({
             full_name: data.full_name,
             leave_type_name: 'ลาประชุม',
             event_title: data.event_title,
             start_date: formatThaiDate(data.start_date),
-            end_date: formatThaiDate(data.start_date),
+            end_date: formatThaiDate(data.end_date || data.start_date),
             total_days: 1,
             note: `${data.event_title}${data.location ? ` ณ ${data.location}` : ''}`,
             location: data.location || '-',
+            event_location: data.location || '-',
+            month_year: eventMonthYear,
+            event_month_year: eventMonthYear,
+            month: eventMonthYear.split(' ')[0],
+            year: eventMonthYear.split(' ')[1],
+            event_month: eventMonthYear.split(' ')[0],
+            event_year: eventMonthYear.split(' ')[1],
+            time: eventTime,
+            event_time: eventTime,
+            start_time: eventTime,
             dob: '-',
             join_date: '-',
             current_day: new Date().getDate(),
