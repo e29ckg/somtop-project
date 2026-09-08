@@ -1,3 +1,5 @@
+const PizZip = require('pizzip');
+const Docxtemplater = require('docxtemplater');
 const pool = require('../config/db');
 const fs = require('fs');
 const path = require('path');
@@ -526,5 +528,83 @@ exports.manageParticipant = async (req, res) => {
     } catch (error) {
         console.error('Error managing participant:', error);
         res.status(500).json({ message: 'เกิดข้อผิดพลาดในการจัดการผู้เข้าร่วม' });
+    }
+};
+
+// === 1. อัปเดตสถานะผู้เข้าร่วม ===
+exports.updateParticipantStatus = async (req, res) => {
+    try {
+        const { event_id, somtop_id, status } = req.body;
+        await pool.query(
+            'UPDATE event_participants SET status = ? WHERE event_id = ? AND somtop_id = ?', 
+            [status, event_id, somtop_id]
+        );
+        res.status(200).json({ message: 'อัปเดตสถานะสำเร็จ' });
+    } catch (error) {
+        res.status(500).json({ message: 'เกิดข้อผิดพลาดในการอัปเดตสถานะ' });
+    }
+};
+
+// === 2. พิมพ์ใบลาการประชุม ===
+exports.exportMeetingLeaveToWord = async (req, res) => {
+    try {
+        const { event_id, somtop_id } = req.params;
+
+        // ดึงข้อมูลกิจกรรมและผู้ลา
+        const query = `
+            SELECT 
+                e.title as event_title, e.start_date, e.location,
+                CONCAT(s.title, s.first_name, ' ', s.last_name) AS full_name
+            FROM event_participants ep
+            JOIN events e ON ep.event_id = e.id
+            JOIN somtop s ON ep.somtop_id = s.id
+            WHERE ep.event_id = ? AND ep.somtop_id = ?
+        `;
+        const [rows] = await pool.query(query, [event_id, somtop_id]);
+
+        if (rows.length === 0) return res.status(404).json({ message: 'ไม่พบข้อมูล' });
+        
+        const data = rows[0];
+        
+        // ใช้ template ประชุมเมื่อมีไฟล์ หากถูกลบหรือยังไม่อัปโหลดให้ใช้ template ทั่วไปแทน
+        const meetingTemplatePath = path.resolve(__dirname, '../../templates/leave_template_meeting.docx');
+        const fallbackTemplatePath = path.resolve(__dirname, '../../templates/leave_template.docx');
+        const templatePath = fs.existsSync(meetingTemplatePath) ? meetingTemplatePath : fallbackTemplatePath;
+        const content = fs.readFileSync(templatePath, 'binary');
+        const zip = new PizZip(content);
+        const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+
+        const formatThaiDate = (dateString) => {
+            if (!dateString) return '-';
+            const d = new Date(dateString);
+            const months = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+            return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear() + 543}`;
+        };
+
+        doc.render({
+            full_name: data.full_name,
+            leave_type_name: 'ลาประชุม',
+            event_title: data.event_title,
+            start_date: formatThaiDate(data.start_date),
+            end_date: formatThaiDate(data.start_date),
+            total_days: 1,
+            note: `${data.event_title}${data.location ? ` ณ ${data.location}` : ''}`,
+            location: data.location || '-',
+            dob: '-',
+            join_date: '-',
+            current_day: new Date().getDate(),
+            current_month: ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'][new Date().getMonth()],
+            current_year: new Date().getFullYear() + 543
+        });
+
+        const buf = doc.getZip().generate({ type: 'nodebuffer', compression: 'DEFLATE' });
+        const outputFilename = `ใบลาประชุม_${data.full_name.replace(/\s+/g, '_')}.docx`;
+        
+        res.setHeader('Content-Disposition', `attachment; filename=${encodeURIComponent(outputFilename)}`);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        res.send(buf);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'สร้างไฟล์ใบลาประชุมไม่สำเร็จ' });
     }
 };

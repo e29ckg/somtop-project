@@ -245,3 +245,8 @@ CREATE TABLE somtop_term_history (
     -- ป้องกันการเผลอเพิ่มประวัติรุ่นเดียวกันซ้ำให้กับคนเดิม
     UNIQUE KEY unique_somtop_term (somtop_id, term_id)
 );
+
+-------------------
+
+ALTER TABLE event_participants 
+MODIFY COLUMN status ENUM('รอตอบรับ', 'เข้าร่วม', 'ไม่เข้าร่วม', 'ลาประชุม') DEFAULT 'รอตอบรับ' COMMENT 'สถานะการเข้าร่วม';

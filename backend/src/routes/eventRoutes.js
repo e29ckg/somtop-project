@@ -26,6 +26,9 @@ router.put('/:id', uploadEvent.array('event_files', 10), eventController.updateE
 router.delete('/:id', eventController.deleteEvent);                    // ลบกิจกรรม
 router.post('/delete-file', eventController.deleteSingleFile);         // ลบไฟล์แนบทีละไฟล์
 
+router.put('/participants/status', eventController.updateParticipantStatus);
+router.get('/:event_id/participants/:somtop_id/export-leave', eventController.exportMeetingLeaveToWord);
+
 // ==========================================
 // Endpoints สำหรับจัดการคนเข้าร่วมหลังสร้างกิจกรรมไปแล้ว
 // ==========================================

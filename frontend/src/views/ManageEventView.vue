@@ -71,7 +71,7 @@
                 </td>
                 <td class="no-print">
                   <div class="action-buttons">
-                    <!-- <button class="btn-icon manage-users" @click="openParticipantModal(event)" title="จัดการผู้เข้าร่วม">👥</button> -->
+                    <button class="btn-icon manage-users" @click="openParticipantModal(event)" title="จัดการผู้เข้าร่วม">👥</button>
                     <button class="btn-icon view" @click="openViewModal(event)" title="ดูรายละเอียดกิจกรรม">👁️</button>
                     <button class="btn-icon edit" @click="openEditModal(event)" title="แก้ไขกิจกรรม">✏️</button>
                     <button class="btn-icon delete" @click="deleteData(event.id)" title="ลบกิจกรรม">🗑️</button>
@@ -301,18 +301,43 @@
           </div>
 
           <div class="participant-list">
-            <label v-for="person in filteredSomtopList" :key="person.id" class="participant-item">
-              <input 
-                type="checkbox" 
-                :checked="isParticipant(person.id)" 
-                @change="toggleParticipant(person.id, $event.target.checked)"
-              />
-              <span class="person-name">{{ person.full_name }}</span>
-            </label>
-            <div v-if="filteredSomtopList.length === 0" class="text-center text-muted py-4">ไม่พบรายชื่อที่ค้นหา</div>
-          </div>
-        </div>
+            <div v-for="person in filteredSomtopList" :key="person.id" class="participant-item">
+              <label class="participant-label">
+                <input 
+                  type="checkbox" 
+                  :checked="isParticipant(person.id)" 
+                  @change="toggleParticipant(person.id, $event.target.checked)"
+                />
+                <span class="person-name">{{ person.full_name }}</span>
+              </label>
 
+              <!-- ⭐️ กล่องเลือกสถานะ และปุ่มพิมพ์ใบลา -->
+              <div v-if="isParticipant(person.id)" class="participant-actions">
+                <select 
+                  v-model="getParticipantStatus(person.id).status" 
+                  @change="updateStatus(person.id, $event.target.value)"
+                  class="status-select"
+                >
+                  <option value="รอตอบรับ">รอตอบรับ</option>
+                  <option value="เข้าร่วม">เข้าร่วม</option>
+                  <option value="ไม่เข้าร่วม">ไม่เข้าร่วม</option>
+                  <option value="ลาประชุม">ลาประชุม</option>
+                </select>
+
+                <!-- ปุ่มพิมพ์ใบลา -->
+                <button 
+                  v-if="getParticipantStatus(person.id).status === 'ลาประชุม'" 
+                  @click="printMeetingLeave(person.id)"
+                  class="btn-icon btn-print-leave" 
+                  title="พิมพ์ใบลาการประชุม (Word)"
+                >
+                  🖨️
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
         <div class="modal-actions full-width">
           <button type="button" class="btn-primary" @click="closeParticipantModal">เสร็จสิ้น</button>
         </div>
@@ -783,7 +808,7 @@ const openParticipantModal = async (event) => {
   try {
     const response = await api.get(`/events/${event.id}/participants`);
     const participants = response.data.records || [];
-    currentParticipants.value = participants.map(p => p.somtop_id);
+    currentParticipants.value = participants;
     isParticipantModalOpen.value = true;
   } catch (error) {
     swalError('ผิดพลาด', 'ไม่สามารถดึงรายชื่อผู้เข้าร่วมได้');
@@ -796,7 +821,7 @@ const closeParticipantModal = () => {
   fetchEvents();
 }
 
-const isParticipant = (somtopId) => currentParticipants.value.includes(somtopId);
+const isParticipant = (somtopId) => currentParticipants.value.some(p => p.somtop_id === somtopId);
 
 const toggleParticipant = async (somtopId, isChecked) => {
   try {
@@ -805,8 +830,11 @@ const toggleParticipant = async (somtopId, isChecked) => {
       somtop_id: somtopId,
       action: isChecked ? 'add' : 'remove'
     });
-    if (isChecked) currentParticipants.value.push(somtopId);
-    else currentParticipants.value = currentParticipants.value.filter(id => id !== somtopId);
+    if (isChecked) {
+      const person = somtopList.value.find(p => p.id === somtopId);
+      currentParticipants.value.push({ somtop_id: somtopId, status: 'รอตอบรับ', full_name: person?.full_name });
+    }
+    else currentParticipants.value = currentParticipants.value.filter(p => p.somtop_id !== somtopId);
   } catch (error) {
     console.error("จัดการผู้เข้าร่วมไม่สำเร็จ:", error);
     swalError('เกิดข้อผิดพลาด', 'ไม่สามารถอัปเดตรายชื่อได้');
@@ -895,6 +923,52 @@ const openFilePreview = (url, eventId) => {
 const closeModal = () => isModalOpen.value = false;
 const closeViewModal = () => { isViewModalOpen.value = false; selectedEventToView.value = null; };
 const closeFilePreview = () => { isPreviewOpen.value = false; previewUrl.value = ''; };
+
+// ฟังก์ชันดึงสถานะของคนๆ นั้น (ต้องอัปเดต fetchParticipants ให้ส่ง status กลับมาด้วย)
+const getParticipantStatus = (somtopId) => {
+  return currentParticipants.value.find(p => p.somtop_id === somtopId) || { status: 'รอตอบรับ' };
+};
+
+const updateStatus = async (somtopId, newStatus) => {
+  try {
+    await api.put('/events/participants/status', {
+      event_id: selectedEvent.value.id,
+      somtop_id: somtopId,
+      status: newStatus
+    });
+    // อัปเดต state ในหน้าจอ
+    const p = currentParticipants.value.find(p => p.somtop_id === somtopId);
+    if (p) p.status = newStatus;
+  } catch (error) {
+    swalError('เกิดข้อผิดพลาด', 'อัปเดตสถานะไม่สำเร็จ');
+  }
+};
+
+const printMeetingLeave = async (somtopId) => {
+  try {
+    const response = await api.get(`/events/${selectedEvent.value.id}/participants/${somtopId}/export-leave`, {
+      responseType: 'blob'
+    });
+    
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    
+    let filename = `ใบลาประชุม_${somtopId}.docx`;
+    const disposition = response.headers['content-disposition'];
+    if (disposition && disposition.includes('filename=')) {
+      filename = decodeURIComponent(disposition.split('filename=')[1]);
+    }
+
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    swalError('เกิดข้อผิดพลาด', 'ไม่สามารถสร้างไฟล์ใบลาได้');
+  }
+};
 
 onMounted(() => {
   fetchEvents();
@@ -1256,5 +1330,67 @@ onMounted(() => {
 .person-name { font-size: 13px; font-weight: 500; color: #374151; }
 .no-results-msg { text-align: center; color: #9CA3AF; grid-column: 1 / -1; padding: 12px; }
 
+/* =========================================
+   สไตล์สำหรับรายชื่อผู้เข้าร่วมและสถานะ (Participant List)
+========================================= */
+.participant-item { 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  padding: 12px 16px; 
+  border-bottom: 1px solid #E5E7EB; 
+  transition: background 0.2s; 
+}
 
+.participant-item:last-child { 
+  border-bottom: none; 
+}
+
+.participant-item:hover { 
+  background-color: #F9FAFB; 
+}
+
+.participant-label { 
+  display: flex; 
+  align-items: center; 
+  gap: 12px; 
+  cursor: pointer; 
+  flex: 1; 
+}
+
+.participant-actions { 
+  display: flex; 
+  gap: 8px; 
+  align-items: center; 
+}
+
+/* ช่อง Dropdown เลือกสถานะ */
+.status-select { 
+  padding: 4px 8px; 
+  border-radius: 6px; 
+  border: 1px solid #D1D5DB; 
+  font-size: 13px; 
+  background-color: #FFFFFF;
+  color: #374151;
+  outline: none;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.status-select:focus {
+  border-color: #10B981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.1);
+}
+
+/* ปุ่มพิมพ์ใบลา (สีโทนแดงอ่อน) */
+.btn-print-leave { 
+  background-color: #FEF2F2; 
+  color: #DC2626; 
+  border-color: #FCA5A5; 
+}
+
+.btn-print-leave:hover { 
+  background-color: #FEE2E2; 
+  border-color: #F87171; 
+}
 </style>
