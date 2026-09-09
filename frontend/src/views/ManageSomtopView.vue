@@ -304,12 +304,20 @@
                 <p>{{ selectedSomtopToView.id_card || '-' }}</p>
               </div>
             </div>
-
+            
             <div class="detail-item">
               <span class="detail-icon">🎂</span>
               <div class="detail-content">
                 <label>วัน/เดือน/ปีเกิด</label>
-                <p>{{ formatThaiDateFull(selectedSomtopToView.dob) }}</p>
+                <p>{{ formatThaiDateFull(selectedSomtopToView.dob) }} </p>
+              </div>
+            </div>
+            
+            <div class="detail-item">
+              <span class="detail-icon">🎂</span>
+              <div class="detail-content">
+                <label>อายุ</label>
+                <p>{{ calculateAge(selectedSomtopToView.dob) }} ปี</p>
               </div>
             </div>
 
@@ -1252,12 +1260,12 @@ onMounted(() => {
 }
 .detail-grid { 
   display: grid; 
-  grid-template-columns: 1fr 1fr; 
+  grid-template-columns: repeat(3, minmax(0, 1fr)); 
   gap: 20px; 
   margin-bottom: 24px; 
 }
 .detail-item { display: flex; align-items: flex-start; gap: 12px; }
-.detail-item.full-width { grid-column: span 2; }
+.detail-item.full-width { grid-column: span 3; }
 .detail-icon { 
   font-size: 20px; 
   background: #F3F4F6; 
@@ -1281,6 +1289,14 @@ onMounted(() => {
     height: calc(100vh - 32px);
     max-height: calc(100vh - 32px);
     padding: 20px;
+  }
+
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-item.full-width {
+    grid-column: span 1;
   }
 }
 
