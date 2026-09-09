@@ -111,12 +111,38 @@
 
           <div class="input-group">
             <label>ตั้งแต่วันที่เริ่มต้น <span style="color: #DC2626;">*</span></label>
-            <input type="date" v-model="formData.start_date" required />
+            <div class="date-inputs">
+              <select v-model="formData.start_day" required>
+                <option value="">วัน</option>
+                <option v-for="day in days" :key="day" :value="day">{{ parseInt(day) }}</option>
+              </select>
+              <select v-model="formData.start_month" required>
+                <option value="">เดือน</option>
+                <option v-for="month in thaiMonths" :key="month.value" :value="month.value">{{ month.label }}</option>
+              </select>
+              <select v-model="formData.start_year" required>
+                <option value="">ปี</option>
+                <option v-for="year in termYears" :key="year.value" :value="year.value">{{ year.label }}</option>
+              </select>
+            </div>
           </div>
 
           <div class="input-group">
             <label>วันหมดวาระ <span style="color: #DC2626;">*</span></label>
-            <input type="date" v-model="formData.end_date" required />
+            <div class="date-inputs">
+              <select v-model="formData.end_day" required>
+                <option value="">วัน</option>
+                <option v-for="day in days" :key="day" :value="day">{{ parseInt(day) }}</option>
+              </select>
+              <select v-model="formData.end_month" required>
+                <option value="">เดือน</option>
+                <option v-for="month in thaiMonths" :key="month.value" :value="month.value">{{ month.label }}</option>
+              </select>
+              <select v-model="formData.end_year" required>
+                <option value="">ปี</option>
+                <option v-for="year in termYears" :key="year.value" :value="year.value">{{ year.label }}</option>
+              </select>
+            </div>
           </div>
 
           <div class="input-group full-width">
@@ -157,10 +183,25 @@ const isEditing = ref(false)
 const formData = ref({ 
   id: null, 
   generation_name: '', 
-  start_date: '', 
-  end_date: '', 
+  start_day: '', start_month: '', start_year: '',
+  end_day: '', end_month: '', end_year: '',
   status: 'กำลังดำรงตำแหน่ง',
   note: '' 
+})
+
+const days = Array.from({ length: 31 }, (_, index) => String(index + 1).padStart(2, '0'))
+const thaiMonths = [
+  { value: '01', label: 'มกราคม' }, { value: '02', label: 'กุมภาพันธ์' },
+  { value: '03', label: 'มีนาคม' }, { value: '04', label: 'เมษายน' },
+  { value: '05', label: 'พฤษภาคม' }, { value: '06', label: 'มิถุนายน' },
+  { value: '07', label: 'กรกฎาคม' }, { value: '08', label: 'สิงหาคม' },
+  { value: '09', label: 'กันยายน' }, { value: '10', label: 'ตุลาคม' },
+  { value: '11', label: 'พฤศจิกายน' }, { value: '12', label: 'ธันวาคม' }
+]
+const currentYear = new Date().getFullYear()
+const termYears = Array.from({ length: 15 }, (_, index) => {
+  const value = String(currentYear - 5 + index)
+  return { value, label: String(Number(value) + 543) }
 })
 
 // === 2. ระบบค้นหา & แบ่งหน้า ===
@@ -211,14 +252,24 @@ const fetchData = async () => {
 }
 
 const saveData = async () => {
+  const startDate = `${formData.value.start_year}-${formData.value.start_month}-${formData.value.start_day}`
+  const endDate = `${formData.value.end_year}-${formData.value.end_month}-${formData.value.end_day}`
+
   // ตรวจสอบวันหมดวาระ ต้องไม่น้อยกว่าวันที่เริ่มต้น
-  if (new Date(formData.value.end_date) < new Date(formData.value.start_date)) {
+  if (new Date(endDate) < new Date(startDate)) {
     swalError('ข้อมูลไม่ถูกต้อง', 'วันหมดวาระ ต้องอยู่หลังวันที่เริ่มต้น');
     return;
   }
 
   try {
-    const payload = { ...formData.value };
+    const payload = {
+      id: formData.value.id,
+      generation_name: formData.value.generation_name,
+      start_date: startDate,
+      end_date: endDate,
+      status: formData.value.status,
+      note: formData.value.note
+    };
     
     if (isEditing.value) {
       await api.put(`/working-terms/${payload.id}`, payload)
@@ -251,7 +302,10 @@ const deleteData = async (id) => {
 const openAddModal = () => {
   isEditing.value = false
   formData.value = { 
-    id: null, generation_name: '', start_date: '', end_date: '', status: 'กำลังดำรงตำแหน่ง', note: '' 
+    id: null, generation_name: '',
+    start_day: '', start_month: '', start_year: '',
+    end_day: '', end_month: '', end_year: '',
+    status: 'กำลังดำรงตำแหน่ง', note: '' 
   }
   isModalOpen.value = true
 }
@@ -259,14 +313,22 @@ const openAddModal = () => {
 const openEditModal = (item) => {
   isEditing.value = true
   
-  // ตัด Timezone (T00:00:00.000Z) ออกเพื่อให้แสดงใน <input type="date"> ได้ถูกต้อง
-  const formatForInput = (dateStr) => dateStr ? dateStr.split('T')[0] : '';
+  const splitDate = (dateStr) => {
+    const [year = '', month = '', day = ''] = (dateStr || '').split('T')[0].split('-')
+    return { day, month, year }
+  }
+  const startDate = splitDate(item.start_date)
+  const endDate = splitDate(item.end_date)
   
   formData.value = { 
     id: item.id, 
     generation_name: item.generation_name, 
-    start_date: formatForInput(item.start_date), 
-    end_date: formatForInput(item.end_date), 
+    start_day: startDate.day,
+    start_month: startDate.month,
+    start_year: startDate.year,
+    end_day: endDate.day,
+    end_month: endDate.month,
+    end_year: endDate.year,
     status: item.status || 'กำลังดำรงตำแหน่ง',
     note: item.note || '' 
   }
