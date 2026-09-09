@@ -142,6 +142,7 @@ exports.unlockUser = async (req, res) => {
         );
 
         if (result.affectedRows > 0) {
+            logActivity(req, 'ปลดล็อกบัญชี', 'จัดการผู้ใช้งาน', `ปลดล็อกผู้ใช้งาน ID: ${id}`);
             res.status(200).json({ message: 'ปลดล็อกบัญชีสำเร็จ' });
         } else {
             res.status(404).json({ message: 'ไม่พบผู้ใช้งาน' });

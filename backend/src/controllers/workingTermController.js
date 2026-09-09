@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { logActivity } = require('../utils/logger');
 
 // ==========================================
 // 1. ดึงข้อมูลวาระการทำงานทั้งหมด (ของศาลนั้นๆ)
@@ -49,6 +50,7 @@ exports.createTerm = async (req, res) => {
             status || 'กำลังดำรงตำแหน่ง', note || null
         ]);
 
+        logActivity(req, 'เพิ่มข้อมูล', 'จัดการวาระการทำงาน', `เพิ่มวาระ: ${generation_name}`);
         res.status(201).json({ message: 'เพิ่มวาระการทำงานสำเร็จ' });
     } catch (error) {
         console.error('Error creating working term:', error);
@@ -80,6 +82,7 @@ exports.updateTerm = async (req, res) => {
             id, courtCode
         ]);
 
+        logActivity(req, 'อัปเดตข้อมูล', 'จัดการวาระการทำงาน', `อัปเดตวาระ ID: ${id}`);
         res.status(200).json({ message: 'อัปเดตข้อมูลสำเร็จ' });
     } catch (error) {
         console.error('Error updating working term:', error);
@@ -98,6 +101,7 @@ exports.deleteTerm = async (req, res) => {
         if (!id) return res.status(400).json({ message: 'ไม่ได้ระบุ ID ที่ต้องการลบ' });
 
         await pool.query('DELETE FROM working_terms WHERE id = ? AND court_code = ?', [id, courtCode]);
+        logActivity(req, 'ลบข้อมูล', 'จัดการวาระการทำงาน', `ลบวาระ ID: ${id}`);
         res.status(200).json({ message: 'ลบข้อมูลสำเร็จ' });
     } catch (error) {
         console.error('Error deleting working term:', error);

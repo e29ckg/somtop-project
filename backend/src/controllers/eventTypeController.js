@@ -1,4 +1,5 @@
 const pool = require('../config/db'); 
+const { logActivity } = require('../utils/logger');
 
 // ==========================================
 // ดึงข้อมูลประเภทกิจกรรมทั้งหมดที่เปิดใช้งาน
@@ -31,6 +32,7 @@ exports.createEventType = async (req, res) => {
     try {
         const { name, status } = req.body;
         await pool.query("INSERT INTO event_types (name, status) VALUES (?, ?)", [name, status || 'ใช้งาน']);
+        logActivity(req, 'เพิ่มข้อมูล', 'จัดการประเภทกิจกรรม', `เพิ่มประเภทกิจกรรม: ${name}`);
         res.status(201).json({ message: 'เพิ่มข้อมูลสำเร็จ' });
     } catch (error) {
         res.status(500).json({ message: 'ไม่สามารถบันทึกได้' });
@@ -41,6 +43,7 @@ exports.updateEventType = async (req, res) => {
     try {
         const { id, name, status } = req.body;
         await pool.query("UPDATE event_types SET name = ?, status = ? WHERE id = ?", [name, status, id]);
+        logActivity(req, 'อัปเดตข้อมูล', 'จัดการประเภทกิจกรรม', `อัปเดตประเภทกิจกรรม ID: ${id}`);
         res.status(200).json({ message: 'อัปเดตข้อมูลสำเร็จ' });
     } catch (error) {
         res.status(500).json({ message: 'ไม่สามารถอัปเดตได้' });
@@ -51,6 +54,7 @@ exports.deleteEventType = async (req, res) => {
     try {
         const { id } = req.params; // รับค่าผ่าน URL Param
         await pool.query("DELETE FROM event_types WHERE id = ?", [id]);
+        logActivity(req, 'ลบข้อมูล', 'จัดการประเภทกิจกรรม', `ลบประเภทกิจกรรม ID: ${id}`);
         res.status(200).json({ message: 'ลบข้อมูลสำเร็จ' });
     } catch (error) {
         res.status(500).json({ message: 'ไม่สามารถลบได้ (อาจมีกิจกรรมที่ใช้ประเภทนี้อยู่)' });

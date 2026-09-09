@@ -62,6 +62,10 @@
             <span class="nav-icon">⏳</span>
             <span class="sidebar-text">จัดการวาระการทำงาน</span>
           </router-link>
+          <router-link to="/manage-decorations" class="nav-item">
+             <span class="nav-icon">🎖️</span>
+             <span class="sidebar-text">ชั้นตราเครื่องราชฯ</span>
+          </router-link>
           <router-link to="/manage-templates" class="nav-item">
             <span class="nav-icon">📄</span>
             <span class="sidebar-text">จัดการเทมเพลตเอกสาร</span>
@@ -149,6 +153,7 @@ const currentRouteName = computed(() => {
   if (route.path === '/activity-logs') return 'ประวัติการใช้งาน'
   if (route.path === '/manage-positions') return 'จัดการตำแหน่ง'
   if (route.path === '/manage-leave-types') return 'จัดการประเภทการลา'
+  if (route.path === '/manage-decorations') return 'จัดการชั้นตราเครื่องราชฯ'
   if (route.path === '/manage-templates') return 'จัดการเทมเพลตเอกสาร'
   if (route.path === '/manage-event-types') return 'จัดการประเภทกิจกรรม'
   if (route.path === '/manage-calendar-sync') return 'ตั้งค่า Google Calendar'

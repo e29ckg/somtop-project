@@ -390,7 +390,52 @@
               </tbody>
             </table>
           </div>
-        </div>        
+        </div>  
+
+        <!-- 🎖️ ส่วนประวัติเครื่องราชอิสริยาภรณ์ -->
+        <div class="history-section mb-4">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h4 style="font-size: 16px; font-weight: 600; color: #111827; display: flex; align-items: center; gap: 8px;">
+              <span>🎖️</span> ประวัติเครื่องราชอิสริยาภรณ์
+            </h4>
+            <button class="btn-primary" style="padding: 4px 10px; font-size: 12px;" @click="openAddDecorationModal(selectedSomtopToView.id)">
+              + เพิ่มประวัติ
+            </button>
+          </div>
+
+          <div v-if="personDecorationHistory.length === 0" style="color: #6B7280; font-size: 14px; background: #F9FAFB; padding: 12px; border-radius: 8px; text-align: center;">ไม่มีประวัติการรับเครื่องราชฯ</div>
+          
+          <div v-else class="table-responsive" style="border: 1px solid #E5E7EB; border-radius: 8px;">
+            <table class="data-table small-table">
+              <thead>
+                <tr>
+                  <th>วันที่ได้รับ</th>
+                  <th>ชั้นตรา</th>
+                  <th>ราชกิจจาฯ</th>
+                  <th>หลักฐาน</th>
+                  <th class="text-center">จัดการ</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(dec, i) in personDecorationHistory" :key="i">
+                  <td style="font-size: 13px;">{{ formatThaiDateShort(dec.received_date) }}</td>
+                  <td style="font-weight: 500; color: #047857;">{{ dec.decoration_name }} ({{ dec.short_name }})</td>
+                  <td style="font-size: 13px;">{{ dec.gazette_ref || '-' }}</td>
+                  <td>
+                    <a v-if="dec.file_path" :href="dec.file_path" target="_blank" class="text-blue-500 underline text-sm">
+                      ดูไฟล์ 📎
+                    </a>
+                    <span v-else class="text-muted text-sm">-</span>
+                  </td>
+                  <td class="text-center">
+                    <button class="btn-icon edit" @click="openEditDecorationModal(dec)" title="แก้ไข">✏️</button>
+                    <button class="btn-icon delete" @click="deleteDecorationData(dec.id)" title="ลบ">🗑️</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>      
 
         <div v-if="isLoadingHistory" class="text-center" style="padding: 20px; color: #6B7280;">
           กำลังโหลดประวัติการลาและกิจกรรม...
@@ -469,6 +514,77 @@
       </div>
     </div>
 
+    <!-- 🎖️ Modal: ฟอร์มเพิ่มประวัติเครื่องราชอิสริยาภรณ์ -->
+    <div v-if="isDecorationModalOpen" class="modal-overlay no-print">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2>{{ decorationForm.id ? 'แก้ไขประวัติเครื่องราชอิสริยาภรณ์' : 'เพิ่มประวัติเครื่องราชอิสริยาภรณ์' }}</h2>
+          <button class="close-btn" @click="closeDecorationModal">✕</button>
+        </div>
+        
+        <form @submit.prevent="saveDecorationData" class="form-grid">
+          
+          <div class="input-group full-width">
+            <label>ชั้นตราเครื่องราชอิสริยาภรณ์ <span class="text-danger">*</span></label>
+            <select v-model="decorationForm.decoration_id" required>
+              <option value="" disabled>-- เลือกชั้นตรา --</option>
+              <option v-for="dec in masterDecorations" :key="dec.id" :value="dec.id">
+                {{ dec.name }} ({{ dec.short_name }})
+              </option>
+            </select>
+          </div>
+
+          <div class="input-group full-width">
+            <label>วันที่ได้รับพระราชทาน <span class="text-danger">*</span></label>
+            <div class="date-inputs">
+              <select v-model="decorationForm.received_day" required>
+                <option value="">วัน</option>
+                <option v-for="d in days" :key="d" :value="d">{{ parseInt(d) }}</option>
+              </select>
+              <select v-model="decorationForm.received_month" required>
+                <option value="">เดือน</option>
+                <option v-for="m in thaiMonths" :key="m.value" :value="m.value">{{ m.label }}</option>
+              </select>
+              <select v-model="decorationForm.received_year" required>
+                <option value="">ปี พ.ศ.</option>
+                <option v-for="y in dobYears" :key="y.value" :value="y.value">{{ y.label }}</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="input-group full-width">
+            <label>อ้างอิงราชกิจจานุเบกษา</label>
+            <input type="text" v-model="decorationForm.gazette_ref" placeholder="เช่น เล่ม 141 ตอนที่ 1 ข หน้า 20" />
+          </div>
+
+          <div class="input-group full-width upload-section">
+            <label>แนบไฟล์ประกาศนียบัตรกำกับเครื่องราชฯ (PDF, ภาพ)</label>
+            <input 
+              type="file" 
+              accept=".pdf,image/*" 
+              @change="handleDecorationFileUpload" 
+              class="file-input" 
+            />
+            <!-- แสดงชื่อไฟล์ที่เลือก -->
+            <ul v-if="decorationForm.file" class="file-list mt-2">
+              <li>📄 {{ decorationForm.file.name }}</li>
+            </ul>
+            <small v-else-if="decorationForm.existing_file_path" class="text-muted">มีไฟล์แนบเดิมแล้ว หากเลือกไฟล์ใหม่ ระบบจะเปลี่ยนไฟล์เดิม</small>
+          </div>
+
+          <div class="input-group full-width">
+            <label>หมายเหตุ</label>
+            <textarea v-model="decorationForm.note" rows="2" placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)"></textarea>
+          </div>
+
+          <div class="modal-actions full-width">
+            <button type="button" class="btn-secondary" @click="closeDecorationModal">ยกเลิก</button>
+            <button type="submit" class="btn-primary">บันทึกข้อมูล</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
   </div>
 </template>
 
@@ -514,6 +630,22 @@ const personLeaveHistory = ref([])
 const personEventHistory = ref([])
 const personTermHistory = ref([])
 const isLoadingHistory = ref(false)
+
+// === State สำหรับประวัติเครื่องราชฯ ===
+const personDecorationHistory = ref([])
+const masterDecorations = ref([])
+const isDecorationModalOpen = ref(false)
+
+const decorationForm = ref({
+  id: null,
+  somtop_id: null,
+  decoration_id: '',
+  received_date: '',
+  gazette_ref: '',
+  note: '',
+  file: null,
+  existing_file_path: ''
+})
 
 // ⭐️ อัปเดตตัวแปร formData ให้รองรับ Title, FirstName, LastName
 const formData = ref({
@@ -902,6 +1034,10 @@ const openViewModal = async (person) => {
     personLeaveHistory.value = response.data.leaves || []
     personEventHistory.value = response.data.events || []
     personTermHistory.value = response.data.terms || []
+    // ⭐️ ดึงประวัติเครื่องราชฯ
+    const decRes = await api.get(`/decorations/${person.id}`)
+    personDecorationHistory.value = decRes.data.records || []
+
   } catch (error) {
     console.error('ไม่สามารถดึงประวัติได้:', error)
   } finally {
@@ -915,12 +1051,128 @@ const closeViewModal = () => {
   selectedSomtopToView.value = null
 }
 
+// === ดึง Master Data ตอนเปิดหน้า ===
+const fetchMasterDecorations = async () => {
+  try {
+    const response = await api.get('/decorations/master')
+    masterDecorations.value = response.data.records || []
+  } catch (error) {
+    console.error('ไม่สามารถดึงข้อมูลชั้นตราได้', error)
+  }
+}
+
+// === ฟังก์ชันจัดการไฟล์แนบเครื่องราชฯ ===
+const handleDecorationFileUpload = (event) => {
+  const file = event.target.files[0]
+  if (file) {
+    decorationForm.value.file = file
+  } else {
+    decorationForm.value.file = null
+  }
+}
+
+// === ฟังก์ชันเปิด-ปิด Modal ===
+const openAddDecorationModal = (somtopId) => {
+  decorationForm.value = {
+    id: null,
+    somtop_id: somtopId,
+    decoration_id: '',
+    received_day: '',
+    received_month: '',
+    received_year: '',
+    gazette_ref: '',
+    note: '',
+    file: null,
+    existing_file_path: ''
+  }
+  isDecorationModalOpen.value = true
+}
+
+const openEditDecorationModal = (decoration) => {
+  const dateOnly = decoration.received_date?.split('T')[0] || ''
+  const [year = '', month = '', day = ''] = dateOnly.split('-')
+
+  decorationForm.value = {
+    id: decoration.id,
+    somtop_id: selectedSomtopToView.value?.id || null,
+    decoration_id: decoration.decoration_id,
+    received_day: day,
+    received_month: month,
+    received_year: year,
+    gazette_ref: decoration.gazette_ref || '',
+    note: decoration.note || '',
+    file: null,
+    existing_file_path: decoration.file_path || ''
+  }
+  isDecorationModalOpen.value = true
+}
+
+const closeDecorationModal = () => {
+  isDecorationModalOpen.value = false
+}
+
+const deleteDecorationData = async (id) => {
+  const result = await swalConfirm('ยืนยันการลบ', 'คุณแน่ใจหรือไม่ว่าต้องการลบประวัติเครื่องราชฯ นี้?')
+  if (!result.isConfirmed) return
+
+  try {
+    await api.delete(`/decorations/${id}`)
+    swalSuccess('ลบสำเร็จ', 'ลบประวัติเครื่องราชฯ เรียบร้อยแล้ว')
+    if (selectedSomtopToView.value) openViewModal(selectedSomtopToView.value)
+  } catch (error) {
+    swalError('ลบข้อมูลไม่สำเร็จ', error.response?.data?.message || 'ไม่สามารถลบข้อมูลได้')
+  }
+}
+
+// === ฟังก์ชันบันทึกข้อมูลไป Backend ===
+const saveDecorationData = async () => {
+  if (!decorationForm.value.received_day || !decorationForm.value.received_month || !decorationForm.value.received_year) {
+    swalError('ข้อมูลไม่ครบถ้วน', 'กรุณาระบุวันที่ได้รับพระราชทานให้ครบถ้วน')
+    return
+  }
+
+  // ประกอบวันที่ YYYY-MM-DD
+  const formattedDate = `${decorationForm.value.received_year}-${decorationForm.value.received_month}-${decorationForm.value.received_day}`
+
+  try {
+    const payload = new FormData()
+    payload.append('somtop_id', decorationForm.value.somtop_id)
+    payload.append('decoration_id', decorationForm.value.decoration_id)
+    payload.append('received_date', formattedDate)
+    
+    if (decorationForm.value.gazette_ref) payload.append('gazette_ref', decorationForm.value.gazette_ref)
+    if (decorationForm.value.note) payload.append('note', decorationForm.value.note)
+    if (decorationForm.value.file) payload.append('file', decorationForm.value.file) // ⭐️ แนบไฟล์
+
+    const config = { headers: { 'Content-Type': 'multipart/form-data' } }
+    
+    if (decorationForm.value.id) {
+      await api.put(`/decorations/${decorationForm.value.id}`, payload, config)
+    } else {
+      await api.post('/decorations', payload, config)
+    }
+    
+    swalSuccess('บันทึกสำเร็จ', decorationForm.value.id
+      ? 'แก้ไขประวัติเครื่องราชอิสริยาภรณ์เรียบร้อยแล้ว'
+      : 'เพิ่มประวัติเครื่องราชอิสริยาภรณ์เรียบร้อยแล้ว')
+    closeDecorationModal()
+    
+    // โหลดประวัติใหม่ เพื่ออัปเดตตารางในหน้าต่างดูรายละเอียดแบบเรียลไทม์
+    if (selectedSomtopToView.value) {
+       openViewModal(selectedSomtopToView.value) 
+    }
+    
+  } catch (error) {
+    swalError('เกิดข้อผิดพลาด', error.response?.data?.message || 'ไม่สามารถบันทึกข้อมูลได้')
+  }
+}
 
 onMounted(() => {
   fetchSomtopList()
   fetchTitles()
   fetchPositions()
   fetchTerms()
+  fetchMasterDecorations()
 })
 </script>
 

@@ -8,6 +8,11 @@ if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
 }
 
+const decorationUploadDir = path.join(__dirname, '../../uploads/decorations/');
+if (!fs.existsSync(decorationUploadDir)) {
+    fs.mkdirSync(decorationUploadDir, { recursive: true });
+}
+
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         cb(null, uploadDir);
@@ -35,4 +40,35 @@ const upload = multer({
     limits: { fileSize: 2 * 1024 * 1024 } // จำกัดขนาดไฟล์ 2MB
 });
 
+const decorationStorage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, decorationUploadDir);
+    },
+    filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, 'decoration_' + uniqueSuffix + path.extname(file.originalname).toLowerCase());
+    }
+});
+
+const decorationFileFilter = (req, file, cb) => {
+    const allowedMimeTypes = [
+        'application/pdf',
+        'image/jpeg',
+        'image/png'
+    ];
+
+    if (allowedMimeTypes.includes(file.mimetype)) {
+        cb(null, true);
+    } else {
+        cb(new Error('รองรับเฉพาะไฟล์ PDF, JPG และ PNG เท่านั้น'), false);
+    }
+};
+
+const uploadDecoration = multer({
+    storage: decorationStorage,
+    fileFilter: decorationFileFilter,
+    limits: { fileSize: 10 * 1024 * 1024 }
+});
+
 module.exports = upload;
+module.exports.uploadDecoration = uploadDecoration;

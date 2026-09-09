@@ -322,3 +322,54 @@ INSERT INTO holidays (name, holiday_date, court_code) VALUES
 -- ตัวอย่างการเพิ่มข้อมูลวันหยุดประจำจังหวัด (ใส่ court_code ของศาลนั้นๆ)
 INSERT INTO holidays (name, holiday_date, court_code) VALUES 
 ('วันหยุดพิเศษประจำจังหวัด (งานกาชาด)', '2027-03-15', 'pkkjc');
+
+
+-- ==========================================
+-- 1. ตารางข้อมูลชั้นตราเครื่องราชอิสริยาภรณ์ (Master Data)
+-- ==========================================
+CREATE TABLE master_decorations (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL COMMENT 'ชื่อเต็มชั้นตรา',
+    short_name VARCHAR(50) NULL COMMENT 'ชื่อย่อ (เช่น ท.ช., ป.ม.)',
+    sort_order INT NOT NULL DEFAULT 99 COMMENT 'ลำดับเกียรติยศ (เลขน้อย = สูงสุด เพื่อใช้เรียงลำดับเวลาแสดงผล)',
+    status ENUM('ใช้งาน', 'ระงับ') DEFAULT 'ใช้งาน' COMMENT 'สถานะการแสดงผลใน Dropdown',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- เพิ่มข้อมูลเริ่มต้น (ตัวอย่าง 10 ชั้นตราพื้นฐานที่มักจะได้รับตามลำดับ)
+INSERT INTO master_decorations (name, short_name, sort_order) VALUES
+('ประถมาภรณ์ช้างเผือก', 'ป.ช.', 1),
+('ประถมาภรณ์มงกุฎไทย', 'ป.ม.', 2),
+('ทวีติยาภรณ์ช้างเผือก', 'ท.ช.', 3),
+('ทวีติยาภรณ์มงกุฎไทย', 'ท.ม.', 4),
+('ตริตาภรณ์ช้างเผือก', 'ต.ช.', 5),
+('ตริตาภรณ์มงกุฎไทย', 'ต.ม.', 6),
+('จัตุรถาภรณ์ช้างเผือก', 'จ.ช.', 7),
+('จัตุรถาภรณ์มงกุฎไทย', 'จ.ม.', 8),
+('เบญจมาภรณ์ช้างเผือก', 'บ.ช.', 9),
+('เบญจมาภรณ์มงกุฎไทย', 'บ.ม.', 10);
+
+-- ==========================================
+-- 2. ตารางประวัติการได้รับเครื่องราชฯ ของ พ.สมทบ (Transaction)
+-- ==========================================
+CREATE TABLE somtop_decorations (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    somtop_id INT(11) NOT NULL COMMENT 'อ้างอิง ID ของ พ.สมทบ',
+    decoration_id INT NOT NULL COMMENT 'อ้างอิง ID ของชั้นตรา',
+    
+    received_date DATE NOT NULL COMMENT 'วันที่ได้รับพระราชทาน',
+    gazette_ref VARCHAR(255) NULL COMMENT 'อ้างอิงราชกิจจานุเบกษา (เช่น เล่ม/ตอน/หน้า)',
+    file_path VARCHAR(255) NULL COMMENT 'เก็บ path ไฟล์ประกาศนียบัตร (PDF/Image)',
+    note TEXT NULL COMMENT 'หมายเหตุเพิ่มเติม',
+    
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    -- ตั้งค่า Foreign Key (ถ้าลบ พ.สมทบ ประวัติเครื่องราชฯ ก็จะถูกลบตามไปด้วยอัตโนมัติ)
+    FOREIGN KEY (somtop_id) REFERENCES somtop(id) ON DELETE CASCADE,
+    FOREIGN KEY (decoration_id) REFERENCES master_decorations(id) ON DELETE RESTRICT,
+    
+    -- ป้องกันการเพิ่มประวัติชั้นตราเดียวกันซ้ำให้กับบุคคลเดิม
+    UNIQUE KEY unique_somtop_decoration (somtop_id, decoration_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

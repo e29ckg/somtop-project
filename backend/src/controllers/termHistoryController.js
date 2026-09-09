@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { logActivity } = require('../utils/logger');
 
 // ==========================================
 // เพิ่ม พ.สมทบ เข้าสู่วาระการทำงาน
@@ -31,6 +32,7 @@ exports.addTermHistory = async (req, res) => {
             note || null
         ]);
 
+        logActivity(req, 'เพิ่มข้อมูล', 'ประวัติวาระการทำงาน', `เพิ่มประวัติวาระให้ พ.สมทบ ID: ${somtop_id}`);
         res.status(201).json({ message: 'เพิ่มประวัติวาระการทำงานสำเร็จ' });
     } catch (error) {
         console.error('Error adding term history:', error);
@@ -76,6 +78,7 @@ exports.deleteTermHistory = async (req, res) => {
     try {
         const { id } = req.params;
         await pool.query('DELETE FROM somtop_term_history WHERE id = ?', [id]);
+        logActivity(req, 'ลบข้อมูล', 'ประวัติวาระการทำงาน', `ลบประวัติวาระ ID: ${id}`);
         res.status(200).json({ message: 'ลบข้อมูลประวัติสำเร็จ' });
     } catch (error) {
         console.error('Error deleting term history:', error);

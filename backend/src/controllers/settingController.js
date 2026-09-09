@@ -2,6 +2,7 @@ const pool = require('../config/db');
 const fs = require('fs');
 const path = require('path');
 const { insertEventToGoogleCalendar } = require('../utils/googleCalendar');
+const { logActivity } = require('../utils/logger');
 
 // ==========================================
 // 1. ดึงข้อมูลการตั้งค่าปฏิทิน
@@ -26,6 +27,7 @@ exports.saveCalendarSettings = async (req, res) => {
             'UPDATE calendar_settings SET calendar_id = ?, is_sync_enabled = ? WHERE id = 1',
             [calendar_id || '', is_sync_enabled ? 1 : 0]
         );
+        logActivity(req, 'อัปเดตข้อมูล', 'ตั้งค่าปฏิทิน', 'อัปเดตการตั้งค่าปฏิทิน');
         res.status(200).json({ message: 'บันทึกการตั้งค่าสำเร็จ' });
     } catch (error) {
         console.error('Error saving settings:', error);
@@ -110,6 +112,7 @@ exports.saveServiceAccountJson = async (req, res) => {
         // 3. เขียนไฟล์ทับลงไป (จัดรูปแบบสวยงามด้วยการแทรกบรรทัดใหม่)
         fs.writeFileSync(targetFile, JSON.stringify(parsedJson, null, 2), 'utf8');
 
+        logActivity(req, 'อัปโหลดไฟล์', 'ตั้งค่าปฏิทิน', 'อัปเดต Service Account สำหรับ Google Calendar');
         res.status(200).json({ message: 'สร้าง/อัปเดตไฟล์ Service Account สำเร็จ' });
     } catch (error) {
         console.error('Error saving service account JSON:', error);

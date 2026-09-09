@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { logActivity } = require('../utils/logger');
 
 exports.uploadTemplate = (req, res) => {
     try {
@@ -19,6 +20,7 @@ exports.uploadTemplate = (req, res) => {
         // ย้ายและเปลี่ยนชื่อไฟล์ชั่วคราว ไปทับไฟล์เทมเพลตเดิม
         fs.renameSync(req.file.path, finalPath);
 
+        logActivity(req, 'อัปโหลดไฟล์', 'จัดการเทมเพลต', `อัปเดตเทมเพลต: ${templateType}`);
         res.status(200).json({ message: 'อัปโหลดและอัปเดตเทมเพลตสำเร็จ' });
     } catch (error) {
         console.error('Error uploading template:', error);

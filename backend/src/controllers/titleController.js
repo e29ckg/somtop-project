@@ -36,7 +36,7 @@ exports.createTitle = async (req, res) => {
         const { name, status } = req.body;
         await pool.query("INSERT INTO name_titles (name, status) VALUES (?, ?)", [name, status || 'ใช้งาน']);
         
-        logActivity('createTitle', req.user.id, { name, status });
+        logActivity(req, 'เพิ่มข้อมูล', 'จัดการคำนำหน้า', `เพิ่มคำนำหน้า: ${name}`);
         res.status(201).json({ message: 'เพิ่มข้อมูลสำเร็จ' });
     } catch (error) {
         console.error('Error creating title:', error);
@@ -50,7 +50,7 @@ exports.updateTitle = async (req, res) => {
     try {
         const { id, name, status } = req.body;
         await pool.query("UPDATE name_titles SET name = ?, status = ? WHERE id = ?", [name, status, id]);
-        logActivity('updateTitle', req.user.id, { id, name, status });
+        logActivity(req, 'อัปเดตข้อมูล', 'จัดการคำนำหน้า', `อัปเดตคำนำหน้า ID: ${id}`);
         res.status(200).json({ message: 'อัปเดตสำเร็จ' });
     } catch (error) {
         console.error('Error updating title:', error);
@@ -63,7 +63,7 @@ exports.deleteTitle = async (req, res) => {
     try {
         const { id } = req.body;
         await pool.query("DELETE FROM name_titles WHERE id = ?", [id]);
-        logActivity('deleteTitle', req.user.id, { id });
+        logActivity(req, 'ลบข้อมูล', 'จัดการคำนำหน้า', `ลบคำนำหน้า ID: ${id}`);
         res.status(200).json({ message: 'ลบข้อมูลสำเร็จ' });
     } catch (error) {
         res.status(500).json({ message: 'ลบไม่ได้ อาจถูกใช้งานอยู่' });

@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { logActivity } = require('../utils/logger');
 
 // ==========================================
 // 1. สำหรับ Dropdown หน้าฟอร์ม (ดึงเฉพาะที่ 'ใช้งาน' เรียงตามลำดับอาวุโส)
@@ -38,6 +39,7 @@ exports.createPosition = async (req, res) => {
             "INSERT INTO somtop_positions (name, level, status) VALUES (?, ?, ?)", 
             [name, level || 99, status || 'ใช้งาน']
         );
+        logActivity(req, 'เพิ่มข้อมูล', 'จัดการตำแหน่ง', `เพิ่มตำแหน่ง: ${name}`);
         res.status(201).json({ message: 'เพิ่มตำแหน่งใหม่สำเร็จ' });
     } catch (error) {
         if (error.code === 'ER_DUP_ENTRY') {
@@ -57,6 +59,7 @@ exports.updatePosition = async (req, res) => {
             "UPDATE somtop_positions SET name = ?, level = ?, status = ? WHERE id = ?", 
             [name, level || 99, status, id]
         );
+        logActivity(req, 'อัปเดตข้อมูล', 'จัดการตำแหน่ง', `อัปเดตตำแหน่ง ID: ${id}`);
         res.status(200).json({ message: 'อัปเดตข้อมูลสำเร็จ' });
     } catch (error) {
         if (error.code === 'ER_DUP_ENTRY') {
@@ -70,6 +73,7 @@ exports.deletePosition = async (req, res) => {
     try {
         const { id } = req.params;
         await pool.query("DELETE FROM somtop_positions WHERE id = ?", [id]);
+        logActivity(req, 'ลบข้อมูล', 'จัดการตำแหน่ง', `ลบตำแหน่ง ID: ${id}`);
         res.status(200).json({ message: 'ลบข้อมูลสำเร็จ' });
     } catch (error) {
         res.status(500).json({ message: 'ไม่สามารถลบได้ (อาจมีรายชื่อ พ.สมทบ ที่ใช้ตำแหน่งนี้อยู่)' });

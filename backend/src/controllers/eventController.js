@@ -4,6 +4,7 @@ const pool = require('../config/db');
 const fs = require('fs');
 const path = require('path');
 const { insertEventToGoogleCalendar, updateEventInGoogleCalendar, deleteEventFromGoogleCalendar } = require('../utils/googleCalendar');
+const { logActivity } = require('../utils/logger');
 
 const deletePhysicalFiles = (filePathsJson) => {
     if (!filePathsJson) return;
@@ -200,6 +201,7 @@ exports.createEvent = async (req, res) => {
         }
 
         await connection.commit(); 
+        logActivity(req, 'เพิ่มข้อมูล', 'จัดการกิจกรรม', `เพิ่มกิจกรรม: ${title}`);
         res.status(201).json({ message: 'สร้างกิจกรรมสำเร็จ' });
 
     } catch (error) {
@@ -342,6 +344,7 @@ exports.updateEvent = async (req, res) => {
         }
 
         await connection.commit();
+        logActivity(req, 'อัปเดตข้อมูล', 'จัดการกิจกรรม', `อัปเดตกิจกรรม ID: ${id}`);
         res.status(200).json({ message: 'อัปเดตข้อมูลกิจกรรมและผู้เข้าร่วมสำเร็จ' });
     } catch (error) {
         await connection.rollback();
@@ -385,7 +388,7 @@ exports.deleteEvent = async (req, res) => {
 
         // 4. ลบข้อมูลกิจกรรมออกจากฐานข้อมูล
         await pool.query('DELETE FROM events WHERE id = ?', [id]);
-        
+        logActivity(req, 'ลบข้อมูล', 'จัดการกิจกรรม', `ลบกิจกรรม ID: ${id}`);
         res.status(200).json({ message: 'ลบกิจกรรมและไฟล์แนบสำเร็จ' });
     } catch (error) {
         console.error('Error deleting event:', error);
@@ -427,6 +430,7 @@ exports.deleteSingleFile = async (req, res) => {
         // ส่งเฉพาะชื่อไฟล์หรือ URL ไปให้ Helper ลบไฟล์ตามที่คุณออกแบบไว้
         deletePhysicalFiles(JSON.stringify([file_url]));
 
+        logActivity(req, 'ลบไฟล์', 'จัดการกิจกรรม', `ลบไฟล์แนบจากกิจกรรม ID: ${id}`);
         res.status(200).json({ message: 'ลบไฟล์สำเร็จ' });
     } catch (error) {
         console.error('Error deleting single file:', error);
@@ -539,6 +543,7 @@ exports.updateParticipantStatus = async (req, res) => {
             'UPDATE event_participants SET status = ? WHERE event_id = ? AND somtop_id = ?', 
             [status, event_id, somtop_id]
         );
+        logActivity(req, 'อัปเดตข้อมูล', 'ผู้เข้าร่วมกิจกรรม', `อัปเดตสถานะผู้เข้าร่วม กิจกรรม ID: ${event_id}, พ.สมทบ ID: ${somtop_id}`);
         res.status(200).json({ message: 'อัปเดตสถานะสำเร็จ' });
     } catch (error) {
         res.status(500).json({ message: 'เกิดข้อผิดพลาดในการอัปเดตสถานะ' });

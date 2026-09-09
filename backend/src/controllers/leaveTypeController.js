@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { logActivity } = require('../utils/logger');
 
 exports.getAllActive = async (req, res) => {
     try {
@@ -22,6 +23,7 @@ exports.createLeaveType = async (req, res) => {
     try {
         const { name, status } = req.body;
         await pool.query("INSERT INTO leave_types (name, status) VALUES (?, ?)", [name, status || 'ใช้งาน']);
+        logActivity(req, 'เพิ่มข้อมูล', 'จัดการประเภทการลา', `เพิ่มประเภทการลา: ${name}`);
         res.status(201).json({ message: 'เพิ่มข้อมูลสำเร็จ' });
     } catch (error) {
         res.status(500).json({ message: 'ไม่สามารถบันทึกได้' });
@@ -32,6 +34,7 @@ exports.updateLeaveType = async (req, res) => {
     try {
         const { id, name, status } = req.body;
         await pool.query("UPDATE leave_types SET name = ?, status = ? WHERE id = ?", [name, status, id]);
+        logActivity(req, 'อัปเดตข้อมูล', 'จัดการประเภทการลา', `อัปเดตประเภทการลา ID: ${id}`);
         res.status(200).json({ message: 'อัปเดตข้อมูลสำเร็จ' });
     } catch (error) {
         res.status(500).json({ message: 'ไม่สามารถอัปเดตได้' });
@@ -42,6 +45,7 @@ exports.deleteLeaveType = async (req, res) => {
     try {
         const { id } = req.params;
         await pool.query("DELETE FROM leave_types WHERE id = ?", [id]);
+        logActivity(req, 'ลบข้อมูล', 'จัดการประเภทการลา', `ลบประเภทการลา ID: ${id}`);
         res.status(200).json({ message: 'ลบข้อมูลสำเร็จ' });
     } catch (error) {
         res.status(500).json({ message: 'ไม่สามารถลบได้ (อาจมีประวัติการลาที่อ้างอิงประเภทนี้อยู่)' });

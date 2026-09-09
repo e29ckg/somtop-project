@@ -12,6 +12,7 @@ import ManageTitleView from '../views/ManageTitleView.vue'
 import ManageEventView from '../views/ManageEventView.vue'
 import ManageEventTypeView from '../views/ManageEventTypeView.vue'
 import ManagePositionView from '../views/ManagePositionView.vue'
+import ManageDecorationView from '../views/ManageDecorationView.vue'
 import ManageLeaveTypeView from '../views/ManageLeaveTypeView.vue'
 import ManageTemplateView from '../views/ManageTemplateView.vue'
 import ManageGoogleCalendarView from '../views/ManageGoogleCalendarView.vue'
@@ -79,6 +80,11 @@ const router = createRouter({
           path: 'manage-positions',
           name: 'manage-positions',
           component: ManagePositionView
+        },
+        {
+          path: 'manage-decorations',
+          name: 'manage-decorations',
+          component: ManageDecorationView
         },
         {
           path: 'manage-leave-types',

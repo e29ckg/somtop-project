@@ -20,6 +20,7 @@ const templateRoutes = require('./routes/templateRoutes');
 const settingRoutes = require('./routes/settingRoutes');
 const termHistoryRoutes = require('./routes/termHistoryRoutes');
 const workingTermRoutes = require('./routes/workingTermRoutes');
+const decorationRoutes = require('./routes/decorationRoutes');
 
 
 const app = express();
@@ -49,6 +50,7 @@ app.use('/api/templates', templateRoutes);
 app.use('/api/settings', settingRoutes);
 app.use('/api/term-history', termHistoryRoutes);
 app.use('/api/working-terms', workingTermRoutes);
+app.use('/api/decorations', decorationRoutes);
 
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
