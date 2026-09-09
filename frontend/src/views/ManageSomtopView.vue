@@ -1243,7 +1243,13 @@ onMounted(() => {
 /* =========================================
    View Modal Styles
 ========================================= */
-.detail-modal { max-width: 650px; }
+.detail-modal {
+  width: min(1440px, calc(100vw - 32px));
+  max-width: none;
+  height: calc(100vh - 32px);
+  max-height: calc(100vh - 32px);
+  box-sizing: border-box;
+}
 .detail-grid { 
   display: grid; 
   grid-template-columns: 1fr 1fr; 
@@ -1268,6 +1274,15 @@ onMounted(() => {
 .detail-content p { font-size: 14px; color: #111827; margin: 0; font-weight: 500; }
 .btn-icon.view { background-color: #F3F4F6; }
 .btn-icon.view:hover { background-color: #E5E7EB; }
+
+@media (max-width: 768px) {
+  .detail-modal {
+    width: 100%;
+    height: calc(100vh - 32px);
+    max-height: calc(100vh - 32px);
+    padding: 20px;
+  }
+}
 
 /* ส่วนอื่นๆ อาศัย CSS จาก global.css ที่คุณทำไว้แล้ว */
 </style>
