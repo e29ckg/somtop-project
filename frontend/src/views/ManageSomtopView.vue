@@ -402,12 +402,12 @@
 
         <!-- 🎖️ ส่วนประวัติเครื่องราชอิสริยาภรณ์ -->
         <div class="history-section mb-4">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
             <h4 style="font-size: 16px; font-weight: 600; color: #111827; display: flex; align-items: center; gap: 8px;">
               <span>🎖️</span> ประวัติเครื่องราชอิสริยาภรณ์
             </h4>
             <button class="btn-primary" style="padding: 4px 10px; font-size: 12px;" @click="openAddDecorationModal(selectedSomtopToView.id)">
-              + เพิ่มประวัติเครื่องราชอิสริยาภรณ์
+              + เพิ่มประวัติเครื่องราชฯ
             </button>
           </div>
 

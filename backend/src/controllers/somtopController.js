@@ -270,7 +270,7 @@ exports.getSomtopHistory = async (req, res) => {
             FROM leave_requests lr 
             LEFT JOIN leave_types lt ON lr.leave_type_id = lt.id 
             WHERE lr.somtop_id = ? 
-            ORDER BY lr.created_at DESC
+            ORDER BY lr.start_date DESC
         `;
         const [leaves] = await pool.query(queryLeaves, [id]);
 
