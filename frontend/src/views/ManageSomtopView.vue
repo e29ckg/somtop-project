@@ -407,7 +407,7 @@
               <span>🎖️</span> ประวัติเครื่องราชอิสริยาภรณ์
             </h4>
             <button class="btn-primary" style="padding: 4px 10px; font-size: 12px;" @click="openAddDecorationModal(selectedSomtopToView.id)">
-              + เพิ่มประวัติ
+              + เพิ่มประวัติเครื่องราชอิสริยาภรณ์
             </button>
           </div>
 
@@ -436,8 +436,10 @@
                     <span v-else class="text-muted text-sm">-</span>
                   </td>
                   <td class="text-center">
-                    <button class="btn-icon edit" @click="openEditDecorationModal(dec)" title="แก้ไข">✏️</button>
-                    <button class="btn-icon delete" @click="deleteDecorationData(dec.id)" title="ลบ">🗑️</button>
+                    <div class="decoration-actions">
+                      <button class="btn-icon edit" @click="openEditDecorationModal(dec)" title="แก้ไข" style="padding: 2px 6px; font-size: 12px;">✏️</button>
+                      <button class="btn-icon delete" @click="deleteDecorationData(dec.id)" title="ลบ" style="padding: 2px 6px; font-size: 12px;">🗑️</button>
+                    </div>
                   </td>
                 </tr>
               </tbody>
@@ -1282,6 +1284,12 @@ onMounted(() => {
 .detail-content p { font-size: 14px; color: #111827; margin: 0; font-weight: 500; }
 .btn-icon.view { background-color: #F3F4F6; }
 .btn-icon.view:hover { background-color: #E5E7EB; }
+.decoration-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
 
 @media (max-width: 768px) {
   .detail-modal {
