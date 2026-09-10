@@ -123,8 +123,8 @@
                         <button class="btn-icon" @click="exportToWord(leave.id)" title="พิมพ์แบบฟอร์มใบลา (Word)">🖨️</button>
                         <!-- วนลูปแสดงปุ่มไฟล์ทั้งหมด -->
                         <template v-if="leave.file_path && leave.file_path.length > 0">
-                          <a v-for="(file, fIndex) in leave.file_path" :key="fIndex" 
-                            :href="file" target="_blank" 
+                          <a v-for="(file, fIndex) in leave.file_path" :key="fIndex" @click="openPdfPreview(file)"
+                            target="_blank" 
                             class="btn-icon" :title="'ดูไฟล์ที่ ' + (fIndex + 1)">
                             📎
                           </a>
@@ -284,13 +284,21 @@
                 📄 {{ file.name }}
               </li>
             </ul>
+                       
 
             <!-- แสดงไฟล์เดิมที่มีอยู่แล้ว -->
-            <div v-if="isEditing && formData.existing_file_paths && formData.existing_file_paths.length > 0" class="file-hint">
+            <div v-if="isEditing && formData.existing_file_paths && formData.existing_file_paths.length > 0" class="file-hint mt-3">
               <p class="mb-1 text-gray-700">ไฟล์แนบเดิม:</p>
-              <ul class="existing-files">
-                <li v-for="(file, index) in formData.existing_file_paths" :key="index">
-                  <a :href="file" target="_blank">ดูไฟล์ที่ {{ index + 1 }}</a>
+              <ul class="existing-files list-none pl-0">
+                <li v-for="(file, index) in formData.existing_file_paths" :key="index" style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                  <span style="font-size: 16px;">{{ getFileIcon(file) }}</span>
+                  <a href="#" @click.prevent="openPdfPreview(file)" class="text-blue-700 underline text-sm" style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                    {{ getFileName(file) }}
+                  </a>
+                  <!-- ปุ่มลบไฟล์ (สีแดงอ่อน) -->
+                  <button type="button" @click.prevent="deleteFileInline(file)" title="ลบไฟล์นี้" style="background-color: #FCE8E8; color: #EF4444; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                    🗑️
+                  </button>
                 </li>
               </ul>
               <small class="text-muted">(หากเลือกอัปโหลดไฟล์ใหม่ ระบบจะลบไฟล์เก่าทิ้งทั้งหมด)</small>
@@ -573,17 +581,7 @@ const fetchLeaves = async () => {
     const response = await api.get('/leaves')
     const records = response.data.records || []
     
-    leaveList.value = records.map(item => {
-      let parsedPaths = [];
-      if (item.file_paths) {
-        try {
-          parsedPaths = typeof item.file_paths === 'string' ? JSON.parse(item.file_paths) : item.file_paths;
-        } catch(e) { 
-          parsedPaths = [item.file_paths]; // สำรองกรณี Backend ส่งมาเป็น string ธรรมดา 1 ไฟล์
-        }
-      }
-      return { ...item, file_paths: parsedPaths };
-    });
+    leaveList.value = records
   } catch (error) {
     console.error('ดึงข้อมูลประวัติการลาไม่สำเร็จ:', error)
   }
@@ -767,12 +765,45 @@ const openEditModal = (leave) => {
     note: leave.note || '', 
     status: leave.status, 
     files: [], 
-    existing_file_paths: leave.file_paths || [] 
+    existing_file_paths: leave.file_path || [] 
   }
   isModalOpen.value = true
 }
-
 const closeModal = () => isModalOpen.value = false
+
+// ==========================================
+// 4. File Management & Inline Deletion
+// ==========================================
+const deleteFileInline = async (fileUrl) => {
+  if (!formData.value.id) return;
+  const result = await swalConfirm('ยืนยันการลบไฟล์', 'คุณแน่ใจหรือไม่ว่าต้องการลบเอกสารนี้?');
+  if (result.isConfirmed) {
+    try {
+      await api.post('/leaves/delete-file', { id: formData.value.id, file_url: fileUrl });
+      formData.value.existing_file_paths = formData.value.existing_file_paths.filter(url => url !== fileUrl);
+      swalSuccess('ลบไฟล์สำเร็จ', 'เอกสารถูกลบเรียบร้อยแล้ว');
+      fetchLeaves();
+    } catch (error) {
+      swalError('ลบไฟล์ไม่สำเร็จ', 'เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์');
+    }
+  }
+}
+
+const deleteCurrentFile = async () => {
+  if (!formData.value.id) return;
+  const result = await swalConfirm('ยืนยันการลบไฟล์', 'คุณแน่ใจหรือไม่ว่าต้องการลบเอกสารนี้?');
+  if (result.isConfirmed) {
+    try {
+      await api.post('/leaves/delete-file', { id: formData.value.id, file_url: previewUrl.value });
+      formData.value.existing_file_paths = formData.value.existing_file_paths.filter(url => url !== previewUrl.value);
+      closeFilePreview();
+      swalSuccess('ลบไฟล์สำเร็จ', 'เอกสารถูกลบเรียบร้อยแล้ว');
+      fetchLeaves();
+    } catch (error) {
+      swalError('ลบไฟล์ไม่สำเร็จ', 'เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์');
+    }
+  }
+}
 
 // ==========================================
 // ฟังก์ชันส่งออกเป็นไฟล์ Word (ดาวน์โหลดไฟล์)
@@ -812,6 +843,13 @@ const exportToWord = async (id) => {
     swalError('เกิดข้อผิดพลาด', 'ไม่สามารถดาวน์โหลดไฟล์แบบฟอร์มใบลาได้');
   }
 }
+
+const openFilePreview = (url, eventId) => {
+  previewUrl.value = url;
+  if (eventId) formData.value.id = eventId;
+  isPreviewOpen.value = true;
+}
+
 
 onMounted(() => {
   fetchLeaves()
@@ -915,5 +953,72 @@ onMounted(() => {
   margin-top: 8px;
   font-size: 13px;
   color: #059669;
+}
+/* =========================================
+   สไตล์สำหรับปุ่มไฟล์แนบ (File Attachments)
+========================================= */
+.section-label {
+  font-size: 14px;
+  color: #374151;
+  font-weight: 600;
+  display: block;
+}
+
+.file-grid { 
+  display: grid; 
+  grid-template-columns: 1fr; 
+  gap: 10px; 
+  margin-top: 8px;
+}
+
+.file-attachment-btn { 
+  display: flex; 
+  align-items: center; 
+  gap: 12px; 
+  padding: 12px 16px; 
+  background-color: #FFFFFF; 
+  border: 1px solid #E5E7EB; 
+  border-radius: 8px; 
+  cursor: pointer; 
+  transition: all 0.2s ease; 
+  text-align: left; 
+  width: 100%; 
+  box-shadow: 0 1px 2px rgba(0,0,0,0.02); 
+}
+
+/* เอฟเฟกต์เมื่อเมาส์ชี้ (Hover) จะเปลี่ยนเป็นสีฟ้าและยกตัวขึ้นเล็กน้อย */
+.file-attachment-btn:hover { 
+  border-color: #BFDBFE; 
+  background-color: #EFF6FF; 
+  box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.1); 
+  transform: translateY(-1px);
+}
+
+.file-icon { 
+  font-size: 20px; 
+  flex-shrink: 0;
+}
+
+/* ตั้งค่าให้ชื่อไฟล์ตัดจบด้วย ... หากชื่อยาวเกินไป */
+.file-name { 
+  color: #3B82F6; 
+  font-size: 14px; 
+  font-weight: 500; 
+  flex: 1; 
+  overflow: hidden; 
+  text-overflow: ellipsis; 
+  white-space: nowrap; 
+}
+
+.file-action { 
+  color: #3B82F6; 
+  font-size: 13px; 
+  font-weight: 600; 
+  opacity: 0; 
+  transition: opacity 0.2s; 
+}
+
+.file-attachment-btn:hover .file-action { 
+  opacity: 1; 
 }
 </style>

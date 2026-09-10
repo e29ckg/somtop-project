@@ -377,6 +377,7 @@
                 <tr>
                   <th>รุ่นที่ (วาระ)</th>
                   <th>ระยะเวลา</th>
+                  <th>หลักฐาน</th>
                   <th>สถานะ</th>
                   <th class="text-center" width="60">จัดการ</th>
                 </tr>
@@ -385,6 +386,14 @@
                 <tr v-for="(term, i) in personTermHistory" :key="i">
                   <td style="font-weight: 500;">{{ term.generation_name }}</td>
                   <td style="font-size: 13px;">{{ formatThaiDateShort(term.start_date) }} - {{ formatThaiDateShort(term.end_date) }}</td>
+                  <td>
+                    <div v-if="term.file_paths && term.file_paths.length > 0" class="file-list">
+                      <a v-for="file_path in term.file_paths" :key="file_path" :href="file_path" target="_blank" class="text-blue-500 underline text-sm">
+                        ดูไฟล์ 📎
+                      </a>
+                    </div>
+                    <span v-else class="text-muted text-sm">-</span>
+                  </td>
                   <td>
                     <span class="status-badge" :class="term.status === 'กำลังดำรงตำแหน่ง' ? 'active' : (term.status === 'หมดวาระ' ? 'warning' : 'inactive')" style="font-size: 11px; padding: 2px 8px;">
                       {{ term.status }}

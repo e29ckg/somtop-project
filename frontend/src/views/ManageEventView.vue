@@ -259,7 +259,7 @@
 
             <!-- แสดงไฟล์เดิมที่มีอยู่แล้วตอนกดแก้ไข -->
             <div v-if="isEditing && formData.existing_file_paths && formData.existing_file_paths.length > 0" class="file-hint mt-3">
-              <p class="mb-2 text-gray-700 font-bold">ไฟล์แนบเดิม:</p>
+              <p class="mb-1 text-gray-700 font-bold">ไฟล์แนบเดิม:</p>
               <ul class="existing-files list-none pl-0">
                 <li v-for="(file, index) in formData.existing_file_paths" :key="index" style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                   <!-- ไอคอนและชื่อไฟล์ -->

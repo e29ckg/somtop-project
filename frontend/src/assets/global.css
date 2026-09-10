@@ -731,4 +731,53 @@ body {
   .pdf-modal {
     height: 90vh;
   }
+
+  /* =========================================
+   Form Inputs & Uploads
+========================================= */
+.date-inputs {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.date-inputs select {
+  flex: 1;
+  min-width: 60px; 
+}
+.time-separator {
+  color: #6B7280;
+  font-size: 13px;
+  margin: 0 4px;
+}
+
+.upload-section {
+  background-color: #F9FAFB;
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px dashed #D1D5DB;
+}
+.file-list {
+  margin-top: 10px;
+  padding-left: 0;
+  list-style: none;
+  font-size: 13px;
+  color: #4B5563;
+}
+.file-list li { margin-bottom: 4px; }
+.existing-file-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.delete-inline {
+  background-color: #FEE2E2;
+  color: #EF4444;
+  border: none;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.delete-inline:hover { background-color: #FCA5A5; }
 }

@@ -291,6 +291,7 @@ exports.getSomtopHistory = async (req, res) => {
                 wt.generation_name, 
                 wt.start_date, 
                 wt.end_date, 
+                wt.file_paths,
                 sth.status, 
                 sth.note 
             FROM somtop_term_history sth
@@ -298,10 +299,24 @@ exports.getSomtopHistory = async (req, res) => {
             WHERE sth.somtop_id = ?
             ORDER BY wt.start_date DESC
         `;
-        const [terms] = await pool.query(queryTerms, [id]);
-
+        const [terms] = await pool.query(queryTerms, [id] );
+        // ⭐️ แปลง String JSON ให้เป็น Array เหมือนที่เคยทำในระบบประวัติการลา[cite: 2]
+        const termsData = terms.map(row => {
+            if (row.file_paths) {
+                try {
+                    let parsedPaths = JSON.parse(row.file_paths);
+                    row.file_paths = Array.isArray(parsedPaths) ? parsedPaths : [row.file_paths];
+                } catch (e) {
+                    row.file_paths = [row.file_paths];
+                }
+            } else {
+                row.file_paths = [];
+            }
+            return row;
+        });
+        
         // ส่งข้อมูลทั้ง 3 ส่วนกลับไปให้ Frontend
-        res.status(200).json({ leaves, events, terms });
+        res.status(200).json({ leaves, events, terms: termsData});
     } catch (error) {
         console.error('Error fetching somtop history:', error);
         res.status(500).json({ message: 'เกิดข้อผิดพลาดในการดึงประวัติ' });

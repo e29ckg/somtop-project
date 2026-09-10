@@ -21,6 +21,7 @@ router.put('/', uploadPdf.array('leave_files', 10), leaveController.updateLeave)
 // router.post('/update', uploadPdf.single('leave_file'), leaveController.updateLeave);
 
 router.delete('/:id', leaveController.deleteLeave);
+router.post('/delete-file', leaveController.deleteSingleFile);         // ลบไฟล์แนบทีละไฟล์
 router.get('/:id/export-word', leaveController.exportToWord);
 
 module.exports = router;
