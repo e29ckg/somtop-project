@@ -41,14 +41,15 @@
               <th>รุ่นที่ (วาระ)</th>
               <th>ตั้งแต่วันที่เริ่มต้น</th>
               <th>วันหมดวาระ</th>
-              <th>หมายเหตุ</th>
+              <th>ไฟล์แนบ</th>
               <th width="120">สถานะ</th>
+              <th>หมายเหตุ</th>
               <th width="120" class="no-print text-center">จัดการ</th>
             </tr>
           </thead>
           <tbody>
             <tr v-if="isLoading">
-              <td colspan="6" class="text-center py-8">
+              <td colspan="7" class="text-center py-8">
                 <div class="loading-spinner"></div>
                 <div class="text-muted mt-2">กำลังดึงข้อมูล...</div>
               </td>
@@ -58,12 +59,27 @@
                 <td class="font-bold" style="color: #111827;">{{ term.generation_name }}</td>
                 <td>{{ formatThaiDate(term.start_date) }}</td>
                 <td>{{ formatThaiDate(term.end_date) }}</td>
-                <td class="text-muted">{{ term.note || '-' }}</td>
+                <td>
+                  <div v-if="normalizeFilePaths(term.file_paths).length > 0" class="term-file-links">
+                    <a
+                      v-for="fileUrl in normalizeFilePaths(term.file_paths)"
+                      :key="fileUrl"
+                      :href="fileUrl"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="term-file-link"
+                    >
+                       ดูไฟล์ 📎 
+                    </a>
+                  </div>
+                  <span v-else class="text-muted">-</span>
+                </td>
                 <td>
                   <span class="status-badge" :class="getStatusClass(term.status)">
                     {{ term.status }}
                   </span>
                 </td>
+                <td class="text-muted">{{ term.note || '-' }}</td>
                 <td class="no-print text-center">
                   <div class="action-buttons justify-center">
                     <button class="btn-icon edit" @click="openEditModal(term)" title="แก้ไข">✏️</button>
@@ -72,7 +88,7 @@
                 </td>
               </tr>
               <tr v-if="filteredList.length === 0">
-                <td colspan="6" class="text-center text-muted">ไม่พบข้อมูลที่ค้นหา</td>
+                <td colspan="7" class="text-center text-muted">ไม่พบข้อมูลที่ค้นหา</td>
               </tr>
             </template>
           </tbody>
@@ -159,6 +175,36 @@
             <textarea v-model="formData.note" rows="2" placeholder="รายละเอียดเพิ่มเติม..."></textarea>
           </div>
 
+          <div class="input-group full-width upload-section">
+            <label>ไฟล์แนบวาระการทำงาน</label>
+            <input
+              type="file"
+              multiple
+              accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
+              @change="handleFileUpload"
+              class="file-input"
+            />
+            <small class="text-muted">รองรับ PDF, รูปภาพ, Word และ Excel</small>
+
+            <ul v-if="formData.files.length > 0" class="file-list mt-2">
+              <li v-for="file in formData.files" :key="`${file.name}-${file.lastModified}`">
+                {{ file.name }}
+              </li>
+            </ul>
+
+            <div v-if="formData.existing_file_paths.length > 0" class="existing-files mt-2">
+              <small class="text-muted">ไฟล์แนบเดิม</small>
+              <ul class="file-list">
+                <li v-for="fileUrl in formData.existing_file_paths" :key="fileUrl">
+                  <div class="existing-file-row">
+                    <a :href="fileUrl" target="_blank" rel="noopener noreferrer">{{ getFileName(fileUrl) }}</a>
+                    <button type="button" class="btn-icon delete" title="ลบไฟล์" @click="deleteTermFile(fileUrl)">🗑️</button>
+                  </div>
+                </li>
+              </ul>
+            </div>
+          </div>
+
           <div class="modal-actions full-width mt-4">
             <button type="button" class="btn-secondary" @click="closeModal">ยกเลิก</button>
             <button type="submit" class="btn-primary">บันทึกข้อมูล</button>
@@ -186,7 +232,9 @@ const formData = ref({
   start_day: '', start_month: '', start_year: '',
   end_day: '', end_month: '', end_year: '',
   status: 'กำลังดำรงตำแหน่ง',
-  note: '' 
+  note: '',
+  files: [],
+  existing_file_paths: []
 })
 
 const days = Array.from({ length: 31 }, (_, index) => String(index + 1).padStart(2, '0'))
@@ -199,8 +247,8 @@ const thaiMonths = [
   { value: '11', label: 'พฤศจิกายน' }, { value: '12', label: 'ธันวาคม' }
 ]
 const currentYear = new Date().getFullYear()
-const termYears = Array.from({ length: 15 }, (_, index) => {
-  const value = String(currentYear - 5 + index)
+const termYears = Array.from({ length: 30 }, (_, index) => {
+  const value = String(currentYear - 25 + index)
   return { value, label: String(Number(value) + 543) }
 })
 
@@ -238,6 +286,44 @@ const getStatusClass = (status) => {
   return '';
 }
 
+const getFileName = (fileUrl) => {
+  try {
+    return decodeURIComponent(fileUrl.split('/').pop())
+  } catch {
+    return fileUrl
+  }
+}
+
+const normalizeFilePaths = (filePaths) => {
+  if (!filePaths) return []
+  if (Array.isArray(filePaths)) return filePaths
+  try {
+    const parsed = JSON.parse(filePaths)
+    return Array.isArray(parsed) ? parsed : [parsed]
+  } catch {
+    return [filePaths]
+  }
+}
+
+const handleFileUpload = (event) => {
+  formData.value.files = Array.from(event.target.files || [])
+}
+
+const deleteTermFile = async (fileUrl) => {
+  if (!formData.value.id) return
+
+  const result = await swalConfirm('ยืนยันการลบไฟล์', `ต้องการลบไฟล์ ${getFileName(fileUrl)} หรือไม่?`)
+  if (!result.isConfirmed) return
+
+  try {
+    await api.delete(`/working-terms/${formData.value.id}/files`, { data: { file_url: fileUrl } })
+    formData.value.existing_file_paths = formData.value.existing_file_paths.filter(path => path !== fileUrl)
+    swalSuccess('ลบไฟล์สำเร็จ', 'ลบไฟล์แนบเรียบร้อยแล้ว')
+  } catch (error) {
+    swalError('ลบไฟล์ไม่สำเร็จ', error.response?.data?.message || 'ไม่สามารถลบไฟล์แนบได้')
+  }
+}
+
 // === 4. ฟังก์ชัน API ===
 const fetchData = async () => {
   isLoading.value = true
@@ -262,17 +348,19 @@ const saveData = async () => {
   }
 
   try {
-    const payload = {
-      id: formData.value.id,
-      generation_name: formData.value.generation_name,
-      start_date: startDate,
-      end_date: endDate,
-      status: formData.value.status,
-      note: formData.value.note
-    };
+    const payload = new FormData()
+    if (formData.value.id) payload.append('id', formData.value.id)
+    payload.append('generation_name', formData.value.generation_name)
+    payload.append('start_date', startDate)
+    payload.append('end_date', endDate)
+    payload.append('status', formData.value.status)
+    payload.append('note', formData.value.note || '')
+    formData.value.files.forEach(file => payload.append('term_files', file))
+
+    const config = { headers: { 'Content-Type': 'multipart/form-data' } }
     
     if (isEditing.value) {
-      await api.put(`/working-terms/${payload.id}`, payload)
+      await api.put(`/working-terms/${formData.value.id}`, payload, config)
       swalSuccess('บันทึกสำเร็จ', 'อัปเดตข้อมูลวาระเรียบร้อย')
     } else {
       await api.post('/working-terms', payload)
@@ -305,7 +393,7 @@ const openAddModal = () => {
     id: null, generation_name: '',
     start_day: '', start_month: '', start_year: '',
     end_day: '', end_month: '', end_year: '',
-    status: 'กำลังดำรงตำแหน่ง', note: '' 
+    status: 'กำลังดำรงตำแหน่ง', note: '', files: [], existing_file_paths: []
   }
   isModalOpen.value = true
 }
@@ -330,7 +418,9 @@ const openEditModal = (item) => {
     end_month: endDate.month,
     end_year: endDate.year,
     status: item.status || 'กำลังดำรงตำแหน่ง',
-    note: item.note || '' 
+    note: item.note || '',
+    files: [],
+    existing_file_paths: normalizeFilePaths(item.file_paths)
   }
   isModalOpen.value = true
 }
@@ -345,6 +435,29 @@ onMounted(() => {
 <style scoped>
 .justify-center {
   justify-content: center;
+}
+.term-file-links {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 140px;
+}
+.term-file-link {
+  color: #2563EB;
+  font-size: 13px;
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+}
+.existing-file-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.existing-file-row .btn-icon {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  font-size: 12px;
 }
 /* ดีไซน์อื่นๆ ดึงมาจาก Global Styles (manage-layout, btn-primary, status-badge, ฯลฯ) ที่มีอยู่แล้ว */
 </style>

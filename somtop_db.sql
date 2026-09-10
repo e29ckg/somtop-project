@@ -373,3 +373,7 @@ CREATE TABLE somtop_decorations (
     -- ป้องกันการเพิ่มประวัติชั้นตราเดียวกันซ้ำให้กับบุคคลเดิม
     UNIQUE KEY unique_somtop_decoration (somtop_id, decoration_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+---------------------------------------------------
+ALTER TABLE working_terms ADD file_paths TEXT NULL COMMENT 'เก็บ path ไฟล์แนบแบบ Array JSON เช่น ["order1.pdf", "announce.jpg"]';
