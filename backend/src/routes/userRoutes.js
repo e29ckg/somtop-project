@@ -5,6 +5,8 @@ const { verifyToken, verifyAdmin } = require('../middlewares/authMiddleware');
 
 // นำ Middleware verifyToken และ verifyAdmin มาดักจับทุกๆ Route ในไฟล์นี้
 router.use(verifyToken);
+router.put('/profile', userController.updateProfile);
+
 router.use(verifyAdmin);
 
 // Endpoints: /api/users

@@ -94,15 +94,24 @@
           </div>
         </div>
         
-        <div class="topbar-right">
+        <div class="topbar-right" style="display: flex; gap: 16px; align-items: center;">
           <!-- แสดงชื่อและสิทธิ์ของผู้ใช้งานที่ล็อกอินเข้ามา -->
           <div style="font-size: 14px; text-align: right;">
             <div style="font-weight: 600; color: #111827;">{{ userName }}</div>
             <div style="font-size: 12px; color: #6B7280; text-transform: capitalize;">{{ userRole }}</div>
           </div>
-          <button @click="handleLogout" class="btn-secondary" style="color: #DC2626; border-color: #FCA5A5;">
-            ออกจากระบบ
-          </button>
+          
+          <div style="display: flex; gap: 8px;">
+            <!-- ⭐️ เพิ่มปุ่มจัดการโปรไฟล์ -->
+            <button @click="goToProfile" class="btn-secondary" style="color: #4B5563; border-color: #D1D5DB; display: flex; align-items: center; gap: 6px;">
+              <span>👤</span> โปรไฟล์
+            </button>
+
+            <!-- ปุ่มออกจากระบบเดิม -->
+            <button @click="handleLogout" class="btn-secondary" style="color: #DC2626; border-color: #FCA5A5;">
+              ออกจากระบบ
+            </button>
+          </div>
         </div>
       </header>
 
@@ -144,6 +153,7 @@ const toggleSidebar = () => {
 
 const currentRouteName = computed(() => {
   if (route.path === '/dashboard') return 'ภาพรวมระบบ'
+  if (route.path === '/profile') return 'โปรไฟล์ผู้ใช้งาน'
   if (route.path === '/manage-somtop') return 'จัดการข้อมูล พ.สมทบ'
   if (route.path === '/leave-history') return 'ประวัติการลา'
   if (route.path === '/manage-events') return 'จัดการกิจกรรม'
@@ -160,6 +170,10 @@ const currentRouteName = computed(() => {
   if (route.path === '/manage-terms') return 'จัดการวาระการทำงาน'
   return 'รายละเอียด'
 })
+
+const goToProfile = () => {
+  router.push('/profile')
+}
 
 // ⭐️ ฟังก์ชันออกจากระบบแบบมียืนยัน
 const handleLogout = async () => {

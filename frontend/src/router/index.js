@@ -17,6 +17,7 @@ import ManageLeaveTypeView from '../views/ManageLeaveTypeView.vue'
 import ManageTemplateView from '../views/ManageTemplateView.vue'
 import ManageGoogleCalendarView from '../views/ManageGoogleCalendarView.vue'
 import ManageTermView from '../views/ManageTermView.vue'
+import ProfileView from '../views/ProfileView.vue'
 
 // 1. สร้าง router ขึ้นมาก่อน
 const router = createRouter({
@@ -35,6 +36,11 @@ const router = createRouter({
           path: 'dashboard',
           name: 'dashboard',
           component: DashboardView
+        },
+        {
+          path: 'profile',
+          name: 'profile',
+          component: ProfileView
         },
         {
           path: 'manage-somtop',

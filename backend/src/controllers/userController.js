@@ -152,3 +152,63 @@ exports.unlockUser = async (req, res) => {
         res.status(500).json({ message: 'ไม่สามารถปลดล็อกบัญชีได้' });
     }
 };
+
+// ==========================================
+// 5. อัปเดตโปรไฟล์ส่วนตัวและรหัสผ่าน (PUT /api/users/profile)
+// ==========================================
+exports.updateProfile = async (req, res) => {
+    try {
+        const { id, full_name, old_password, new_password } = req.body;
+
+        // 1. ตรวจสอบความครบถ้วนของข้อมูลพื้นฐาน
+        if (!id || !full_name) {
+            return res.status(400).json({ message: 'ข้อมูลไม่ครบถ้วน (ต้องการ ID และ ชื่อ-สกุล)' });
+        }
+
+        // 2. ป้องกันการแอบแก้ไขโปรไฟล์ของคนอื่น (ตรวจสอบกับ Token)
+        if (req.user.id !== id) {
+            return res.status(403).json({ message: 'ไม่มีสิทธิ์แก้ไขข้อมูลโปรไฟล์ของผู้อื่น' });
+        }
+
+        // 3. กรณีที่มีการขอเปลี่ยนรหัสผ่านด้วย
+        if (old_password || new_password) {
+            if (!old_password || !new_password) {
+                return res.status(400).json({ message: 'กรุณากรอกรหัสผ่านเดิมและรหัสผ่านใหม่ให้ครบถ้วน' });
+            }
+
+            // ดึงรหัสผ่านเดิม (Hash) จากฐานข้อมูลมาเปรียบเทียบ
+            const [users] = await pool.query('SELECT password_hash FROM users WHERE id = ?', [id]);
+            if (users.length === 0) {
+                return res.status(404).json({ message: 'ไม่พบข้อมูลผู้ใช้งานในระบบ' });
+            }
+
+            // ใช้ bcrypt ตรวจสอบรหัสผ่านเดิม
+            const isValidPassword = await bcrypt.compare(old_password, users[0].password_hash);
+            if (!isValidPassword) {
+                return res.status(401).json({ message: 'รหัสผ่านเดิมไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง' });
+            }
+
+            // ถ้ารหัสผ่านเดิมถูก ให้เข้ารหัสรหัสผ่านใหม่
+            const hashedNewPassword = await bcrypt.hash(new_password, 10);
+
+            // อัปเดตทั้งชื่อและรหัสผ่านใหม่
+            await pool.query(
+                'UPDATE users SET full_name = ?, password_hash = ? WHERE id = ?',
+                [full_name, hashedNewPassword, id]
+            );
+
+        } else {
+            // 4. กรณีเปลี่ยนแค่ชื่อ-สกุล (ไม่เปลี่ยนรหัสผ่าน)
+            await pool.query(
+                'UPDATE users SET full_name = ? WHERE id = ?',
+                [full_name, id]
+            );
+        }
+
+        res.status(200).json({ message: 'อัปเดตข้อมูลโปรไฟล์เรียบร้อยแล้ว' });
+
+    } catch (error) {
+        console.error('Error in updateProfile:', error);
+        res.status(500).json({ message: 'เกิดข้อผิดพลาดในการอัปเดตข้อมูลโปรไฟล์' });
+    }
+};
