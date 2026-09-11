@@ -363,12 +363,15 @@
           <h4 style="font-size: 16px; font-weight: 600; color: #111827; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
                 <div style="display: flex; align-items: center; gap: 8px;">
                   <span>⏳</span> ประวัติการดำรงตำแหน่ง (วาระ)
+                  <!-- ⭐️ ป้ายแสดงจำนวนวาระต่อเนื่อง (แสดงเฉพาะเมื่อ > 1) -->
+                  <span v-if="consecutiveTermsCount > 1" class="status-badge active" style="font-size: 12px; font-weight: 600; padding: 4px 10px;">
+                    ต่อเนื่อง {{ consecutiveTermsCount }} วาระ
+                  </span>
                 </div>
                 
-                <!-- ⭐️ ป้ายแสดงจำนวนวาระต่อเนื่อง (แสดงเฉพาะเมื่อ > 1) -->
-                <span v-if="consecutiveTermsCount > 1" class="status-badge active" style="font-size: 12px; font-weight: 600; padding: 4px 10px;">
-                  ต่อเนื่อง {{ consecutiveTermsCount }} วาระ
-                </span>
+                <button class="btn-primary" style="padding: 4px 10px; font-size: 12px;" @click="openAddTermModal(selectedSomtopToView)">
+                  + เพิ่มประวัติ
+                </button>
               </h4>
           <div v-if="personTermHistory.length === 0" style="color: #6B7280; font-size: 14px; background: #F9FAFB; padding: 12px; border-radius: 8px; text-align: center;">ไม่มีประวัติวาระการทำงาน</div>
           <div v-else class="table-responsive" style="max-height: 200px; overflow-y: auto; border: 1px solid #E5E7EB; border-radius: 8px;">
@@ -413,7 +416,9 @@
         <div class="history-section mb-4">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <h4 style="font-size: 16px; font-weight: 600; color: #111827; display: flex; align-items: center; gap: 8px;">
-              <span>🎖️</span> ประวัติเครื่องราชอิสริยาภรณ์
+              <span>🎖️</span> ประวัติเครื่องราชอิสริยาภรณ์ 
+              {{ personDecorationHistory.length > 0 ? `(${personDecorationHistory.length} รายการ)` : '' }}
+              <span v-for="d in personDecorationHistory" :key="d.id">⭐️</span>
             </h4>
             <button class="btn-primary" style="padding: 4px 10px; font-size: 12px;" @click="openAddDecorationModal(selectedSomtopToView.id)">
               + เพิ่มประวัติเครื่องราชฯ
@@ -505,15 +510,19 @@
               <table class="data-table small-table">
                 <thead>
                   <tr>
-                    <th>ชื่องาน / กิจกรรม</th>
                     <th>วันที่จัดงาน</th>
-                    <th>สถานะตอบรับ</th>
+                    <th>ประเภทกิจกรรม</th>
+                    <th>ชื่องาน / กิจกรรม</th>
+                    <th style="text-wrap: nowrap;">สถานะตอบรับ</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr v-for="(event, i) in personEventHistory" :key="i">
+                    <td style="font-size: 13px; text-wrap: nowrap;">{{ formatThaiDateShort(event.start_date) }}</td>
+                    <td style="font-size: 13px;  color: #4B5563; text-wrap: nowrap;">
+                        {{ event.event_type_name || 'ไม่ระบุ' }}
+                      </td>
                     <td style="font-weight: 500;">{{ event.title }}</td>
-                    <td style="font-size: 13px;">{{ formatThaiDateShort(event.start_date) }}</td>
                     <td>
                       <!-- ใช้ Badge สีตามสถานะตอบรับ -->
                       <span class="status-badge" :class="event.status === 'ยืนยันเข้าร่วม' ? 'active' : (event.status === 'ไม่เข้าร่วม' ? 'inactive' : 'warning')" style="font-size: 11px; padding: 2px 8px;">
@@ -604,6 +613,49 @@
       </div>
     </div>
 
+    <!-- ⏳ Modal: ฟอร์มเพิ่มประวัติวาระการทำงาน -->
+    <div v-if="isTermModalOpen" class="modal-overlay no-print">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2>เพิ่มประวัติการดำรงตำแหน่ง</h2>
+          <button class="close-btn" @click="closeTermModal">✕</button>
+        </div>
+        
+        <form @submit.prevent="saveTermHistoryData" class="form-grid">
+          
+          <div class="input-group full-width">
+            <label>รุ่นวาระการทำงาน <span class="text-danger">*</span></label>
+            <select v-model="termForm.term_id" required>
+              <option value="" disabled>-- เลือกรุ่นวาระการทำงาน --</option>
+              <!-- ดึงข้อมูลจาก termList ที่โหลดไว้แล้วมาแสดง -->
+              <option v-for="term in termList" :key="term.id" :value="term.id">
+                {{ term.generation_name }} 
+              </option>
+            </select>
+          </div>
+
+          <div class="input-group full-width">
+            <label>สถานะในวาระนี้ <span class="text-danger">*</span></label>
+            <select v-model="termForm.status" required>
+              <option value="กำลังดำรงตำแหน่ง">กำลังดำรงตำแหน่ง</option>
+              <option value="หมดวาระ">หมดวาระ</option>
+              <option value="พ้นจากตำแหน่ง">พ้นจากตำแหน่ง</option>
+            </select>
+          </div>
+
+          <div class="input-group full-width">
+            <label>หมายเหตุ</label>
+            <textarea v-model="termForm.note" rows="2" placeholder="เช่น ลาออกก่อนกำหนด, ต่อวาระ..."></textarea>
+          </div>
+
+          <div class="modal-actions full-width">
+            <button type="button" class="btn-secondary" @click="closeTermModal">ยกเลิก</button>
+            <button type="submit" class="btn-primary">บันทึกข้อมูล</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
   </div>
 </template>
 
@@ -686,6 +738,17 @@ const searchQuery = ref('')
 const statusFilter = ref('ใช้งาน')
 const currentPage = ref(1)
 const itemsPerPage = ref(50)
+
+// === State สำหรับ Modal เพิ่มประวัติวาระ ===
+const isTermModalOpen = ref(false)
+const termForm = ref({
+  somtop_id: null,
+  term_id: '',
+  start_date: '',
+  end_date: '',
+  status: 'กำลังดำรงตำแหน่ง',
+  note: ''
+})
 
 // ฟังก์ชันต่างๆ
 // แปลงวันที่เป็นรูปแบบย่อ (เช่น 1 ก.ค. 2569)
@@ -964,7 +1027,7 @@ const consecutiveTermsCount = computed(() => {
     const gapDays = gapTime / (1000 * 3600 * 24);
     
     // ถ้าระยะห่างไม่เกิน 180 วัน (ประมาณ 6 เดือน) ถือว่าดำรงตำแหน่งต่อเนื่อง
-    if (gapDays <= 180) {
+    if (gapDays <=( 180 * 3)) { // 180 วัน * 3 = 540 วัน (ประมาณ 1.5 ปี) เพื่อให้ยืดหยุ่นมากขึ้น
       count++;
     } else {
       break; // หากเว้นช่วงนานกว่านั้น ถือว่าขาดตอน ให้หยุดนับทันที
@@ -1180,6 +1243,55 @@ const saveDecorationData = async () => {
     if (selectedSomtopToView.value) {
        openViewModal(selectedSomtopToView.value) 
     }
+    
+  } catch (error) {
+    swalError('เกิดข้อผิดพลาด', error.response?.data?.message || 'ไม่สามารถบันทึกข้อมูลได้')
+  }
+}
+
+// === ฟังก์ชันเมื่อกดปุ่ม + เพิ่มประวัติ ===
+const openAddTermModal = (person) => {
+  // นำ ID ของสมทบคนนี้ไปใส่รอไว้ในฟอร์ม
+  termForm.value.somtop_id = person.id
+  termForm.value.term_id = ''
+  termForm.value.status = 'กำลังดำรงตำแหน่ง'
+  termForm.value.note = ''
+  
+  isTermModalOpen.value = true
+}
+
+const closeTermModal = () => {
+  isTermModalOpen.value = false
+}
+
+// === ฟังก์ชันบันทึกประวัติวาระการทำงานไปยัง Backend ===
+const saveTermHistoryData = async () => {
+  if (!termForm.value.term_id) {
+    swalError('ข้อมูลไม่ครบถ้วน', 'กรุณาเลือกรุ่นวาระการทำงาน')
+    return
+  }
+
+  try {
+    const payload = {
+      somtop_id: termForm.value.somtop_id,
+      term_id: termForm.value.term_id,
+      status: termForm.value.status,
+      note: termForm.value.note
+    }
+    
+    // เรียก API เพื่อบันทึกข้อมูลลงตาราง somtop_term_history
+    await api.post('/term-history', payload)
+    
+    swalSuccess('บันทึกสำเร็จ', 'เพิ่มประวัติการดำรงตำแหน่งเรียบร้อยแล้ว')
+    closeTermModal()
+    
+    // ⭐️ โหลดข้อมูล View Modal ใหม่ เพื่อให้อัปเดตตารางประวัติทันที
+    if (selectedSomtopToView.value) {
+       openViewModal(selectedSomtopToView.value) 
+    }
+    
+    // รีเฟรชตารางหลักเผื่อวาระปัจจุบันมีการเปลี่ยนแปลง
+    fetchSomtopList()
     
   } catch (error) {
     swalError('เกิดข้อผิดพลาด', error.response?.data?.message || 'ไม่สามารถบันทึกข้อมูลได้')

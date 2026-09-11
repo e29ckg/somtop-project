@@ -276,9 +276,12 @@ exports.getSomtopHistory = async (req, res) => {
 
         // 2. ดึงประวัติกิจกรรม
         const queryEvents = `
-            SELECT e.title, e.start_date, e.end_date, ep.status 
+            SELECT 
+                e.title, e.start_date, e.end_date, ep.status, 
+                et.name AS event_type_name 
             FROM event_participants ep 
             JOIN events e ON ep.event_id = e.id 
+            LEFT JOIN event_types et ON e.event_type_id = et.id 
             WHERE ep.somtop_id = ? 
             ORDER BY e.start_date DESC
         `;
