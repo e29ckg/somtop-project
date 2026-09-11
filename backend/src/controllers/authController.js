@@ -63,7 +63,10 @@ exports.login = async (req, res) => {
         // --- (โค้ดสร้าง Token และ Cookie เหมือนเดิม) ---
         const payload = {
             data: {
-                id: user.id, username: user.username, full_name: user.full_name, role: user.role, court_code: user.court_code
+                id: user.id, username: user.username, 
+                full_name: user.full_name, 
+                role: user.role, 
+                court_code: user.court_code,
             }
         };
 

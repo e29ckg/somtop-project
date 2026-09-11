@@ -317,7 +317,9 @@
               <span class="detail-icon">🎂</span>
               <div class="detail-content">
                 <label>อายุ</label>
-                <p>{{ calculateAge(selectedSomtopToView.dob) }} ปี</p>
+                <p> 
+                  <span class="age-badge" :class="getAgeColorClass(calculateAge(selectedSomtopToView.dob))">{{ calculateAge(selectedSomtopToView.dob) }} ปี</span>
+                </p>
               </div>
             </div>
 

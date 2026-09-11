@@ -209,6 +209,25 @@
               <label>รายละเอียดเพิ่มเติม:</label>
               <p>{{ selectedEventDetail.rawData.description || '-' }}</p>
             </div>
+            <div class="detail-group mt-3">
+              <label class="section-label">👥 ผู้เข้าร่วมกิจกรรม:  {{ selectedEventDetail.rawData.participant_count | '-' }} ท่าน</label>
+              
+              <ul class="participant-view-list">
+                <li v-for="participant in eventParticipants" :key="participant.id" class="participant-view-item">
+                  <div class="person-info">
+                    <span class="avatar-mini">👤</span>
+                    <span class="person-name">{{ participant.full_name }}</span>
+                  </div>
+                  <span class="badge-status badge-success">
+                    {{ participant.status || 'ไม่ระบุตำแหน่ง' }}
+                  </span>
+                </li>
+                
+                <li v-if="eventParticipants.length === 0" class="empty-participant">
+                  ยังไม่มีผู้เข้าร่วม
+                </li>
+              </ul>
+            </div>
           </template>
 
           <!-- กรณีเป็นข้อมูล: การลา -->
@@ -263,9 +282,11 @@ const isLoading = ref(true)
 const somtopList = ref([])
 const leaveList = ref([])
 const eventList = ref([]) // เก็บข้อมูลกิจกรรม
+const eventParticipants = ref([]) // เก็บข้อมูลผู้เข้าร่วมกิจกรรม
 
 const isEventModalOpen = ref(false)
 const selectedEventDetail = ref(null)
+
 
 // ==========================================
 // 1. ดึงข้อมูลจาก API (สมทบ, การลา, กิจกรรม)
@@ -286,6 +307,16 @@ const fetchData = async () => {
     console.error("Error fetching dashboard data:", error)
   } finally {
     isLoading.value = false
+  }
+}
+
+const fetchEventParticipants = async (eventId) => {
+  try {
+    const res = await api.get(`/events/${eventId}/participants`)
+    eventParticipants.value = res.data.records || []
+  } catch (error) {
+    console.error(`Error fetching participants for event ${eventId}:`, error)
+    eventParticipants.value = []
   }
 }
 
@@ -434,11 +465,17 @@ const createCellObject = (date, isCurrentMonth) => {
 // ⭐️ เพิ่มฟังก์ชันสำหรับเปิด/ปิด Modal และการเปลี่ยนหน้าไปแก้ไข
 const openEventDetail = (eventItem) => {
   selectedEventDetail.value = eventItem
+  if(eventItem.type ==='event') {
+    fetchEventParticipants(eventItem.rawData.id)
+  } else {
+    eventParticipants.value = [] // ล้างข้อมูลผู้เข้าร่วมถ้าไม่ใช่กิจกรรม
+  }
   isEventModalOpen.value = true
 }
 
 const closeEventModal = () => {
   isEventModalOpen.value = false
+  eventParticipants.value = []
   selectedEventDetail.value = null
 }
 
@@ -500,6 +537,7 @@ const formatThaiDate = (dateStr) => {
   const monthNames = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
   return `${parseInt(day)} ${monthNames[parseInt(month) - 1]} ${parseInt(year) + 543}`;
 }
+
 
 onMounted(() => {
   fetchData()
@@ -675,5 +713,107 @@ onMounted(() => {
   .view-history {
     align-self: flex-start;
   }
+}
+/* =========================================
+   สไตล์สำหรับแสดงรายชื่อผู้เข้าร่วม (View Detail)
+========================================= */
+.mt-3 {
+  margin-top: 16px;
+}
+
+.section-label {
+  font-size: 14px;
+  color: #374151;
+  font-weight: 600;
+  margin-bottom: 8px;
+  display: block;
+}
+
+/* กล่องครอบรายการ (รองรับการเลื่อนเมื่อรายชื่อเยอะ) */
+.participant-view-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 250px;
+  overflow-y: auto;
+  padding-right: 4px; /* เว้นที่ให้ Scrollbar */
+}
+
+/* ปรับแต่ง Scrollbar ให้ดูสะอาดตา */
+.participant-view-list::-webkit-scrollbar {
+  width: 6px;
+}
+.participant-view-list::-webkit-scrollbar-thumb {
+  background-color: #D1D5DB;
+  border-radius: 10px;
+}
+
+/* สไตล์ของแต่ละรายชื่อ (ทำเป็นรูปแบบกล่อง) */
+.participant-view-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  background-color: #F9FAFB;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.participant-view-item:hover {
+  background-color: #F3F4F6;
+  border-color: #D1D5DB;
+}
+
+.person-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.avatar-mini {
+  font-size: 14px;
+  background-color: #E5E7EB;
+  padding: 4px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+.person-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #111827;
+}
+
+/* ป้ายสถานะ / ตำแหน่ง */
+.badge-status {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.badge-success {
+  background-color: #D1FAE5;
+  color: #065F46;
+}
+
+/* กรณีไม่มีรายชื่อ */
+.empty-participant {
+  text-align: center;
+  padding: 20px;
+  background-color: #F9FAFB;
+  border: 1px dashed #D1D5DB;
+  border-radius: 8px;
+  color: #9CA3AF;
+  font-size: 14px;
 }
 </style>

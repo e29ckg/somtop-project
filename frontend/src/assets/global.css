@@ -170,6 +170,11 @@ body {
   background-color: #FEF3C7;
 }
 
+.status-badge.pending {
+  color: #78350F;
+  background-color: #FEF3C7;  
+}
+
 .action-buttons {
   display: flex;
   gap: 8px;
@@ -780,4 +785,39 @@ body {
   cursor: pointer;
 }
 .delete-inline:hover { background-color: #FCA5A5; }
+}
+
+/* === Footer === */
+.app-footer {
+  background-color: #FFFFFF;
+  border-top: 1px solid #E5E7EB;
+  padding: 16px 24px;
+  flex-shrink: 0;
+  margin-top: auto; /* ดัน Footer ไปอยู่ล่างสุดเสมอ */
+}
+
+.footer-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: #6B7280;
+}
+
+.version-text {
+  font-weight: 500;
+  color: #9CA3AF;
+}
+
+/* รองรับหน้าจอโทรศัพท์มือถือ */
+@media (max-width: 768px) {
+  .app-footer {
+    padding: 16px;
+  }
+  
+  .footer-content {
+    flex-direction: column;
+    gap: 8px;
+    text-align: center;
+  }
 }

@@ -119,6 +119,13 @@
       <main class="content-area">
         <router-view />
       </main>
+
+      <footer class="app-footer no-print">
+        <div class="footer-content">
+          <span>&copy; {{ new Date().getFullYear() }} โปรแกรมบริหารจัดการ พ.สมทบ. ({{ userCourtCode}})</span>
+          <span class="version-text">เวอร์ชัน 1.0.0</span>
+        </div>
+      </footer>
       
     </div>
   </div>
@@ -129,6 +136,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { swalConfirm } from '../utils/swal' // ⭐️ นำเข้า SweetAlert สำหรับยืนยันการลบ
 import api from '../services/api' // ⭐️ นำเข้า Axios instance สำหรับเรียก API
+import { useCounterStore } from '@/stores/counter'
 
 const router = useRouter()
 const route = useRoute()
@@ -136,6 +144,7 @@ const route = useRoute()
 const isCollapsed = ref(false)
 const userRole = ref('viewer') // ค่าเริ่มต้น
 const userName = ref('ผู้ใช้งาน')
+const userCourtCode = ref('')
 
 // ⭐️ ดึงข้อมูล User จาก LocalStorage เมื่อโหลดหน้าจอ
 onMounted(() => {
@@ -144,6 +153,7 @@ onMounted(() => {
     const user = JSON.parse(userData)
     userRole.value = user.role || 'viewer'
     userName.value = user.full_name || 'ผู้ใช้งาน'
+    userCourtCode.value = user.court_code
   }
 })
 

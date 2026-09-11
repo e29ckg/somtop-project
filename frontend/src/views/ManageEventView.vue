@@ -14,6 +14,8 @@
     <!-- Table Section -->
     <div class="card table-card">
       <div class="table-header-actions no-print">
+        
+        <!-- ซ้าย: เลือกจำนวนรายการ -->
         <div class="items-per-page-selector">
           <label>แสดง</label>
           <select v-model="itemsPerPage" @change="currentPage = 1" class="per-page-select">
@@ -24,23 +26,36 @@
           <label>รายการ</label>
         </div>
 
-        <div class="search-box">
-          <input 
-            type="text" 
-            v-model="searchQuery" 
-            placeholder="🔍 ค้นหาชื่องาน หรือสถานที่..." 
-            class="search-input"
-          />
-        </div>
+        <!-- ⭐️ ขวา: กลุ่มค้นหาและตัวกรองรอบปี -->
+        <div class="header-filters">
+          <div class="filter-group">
+            <label class="filter-label">📅 รอบปี:</label>
+            <select v-model="selectedAnnualYear" class="search-input annual-select">
+              <option value="">-- ดูกิจกรรมทั้งหมด --</option>
+              <option v-for="y in annualYears" :key="y.value" :value="y.value">
+                {{ y.label }}
+              </option>
+            </select>
+          </div>
+
+          <div class="search-box">
+            <input
+              type="text"
+              v-model="searchQuery"
+              placeholder="🔍 ค้นหาชื่องาน หรือสถานที่..."
+              class="search-input"
+            />
+          </div>
+        </div> 
+
       </div>
 
       <div class="table-responsive">
         <table class="data-table">
           <thead>
             <tr>
-              <th>ชื่องาน / กิจกรรม</th>
               <th>วัน-เวลา เริ่มต้น</th>
-              <th>วัน-เวลา สิ้นสุด</th>
+              <th>ชื่องาน / กิจกรรม</th>
               <th>สถานที่</th>
               <th class="text-center">ผู้เข้าร่วม</th>
               <th>สถานะ</th>
@@ -49,7 +64,7 @@
           </thead>
           <tbody>
             <tr v-if="isLoading">
-              <td colspan="7" class="text-center py-8">
+              <td colspan="6" class="text-center py-8">
                 <div class="loading-spinner"></div>
                 <div class="text-muted mt-2">กำลังดึงข้อมูล...</div>
               </td>
@@ -57,9 +72,13 @@
             
             <template v-else>
               <tr v-for="event in paginatedList" :key="event.id" class="data-row" :class="{ 'upcoming-row': isUpcomingEvent(event.start_date) }">
-                <td class="font-bold">{{ event.title }}</td>
-                <td>{{ formatDateTime(event.start_date) }}</td>
-                <td>{{ formatDateTime(event.end_date) }}</td>
+                <td >{{ formatDateTime(event.start_date) }}</td>
+                <td class="font-bold">
+                  {{ event.title }} 
+                  <span class="status-badge" :class="getStatusClass(event.status)" >
+                    {{ event.event_type_name ? '(' + event.event_type_name + ')' : '' }}
+                  </span>
+                </td>
                 <td>{{ event.location || '-' }}</td>
                 <td class="text-center">
                   <span class="badge-count">{{ event.participant_count || 0 }} คน</span>
@@ -451,8 +470,8 @@
         </div>
       </div>
     </div>
-
   </div>
+
 </template>
 
 <script setup>
@@ -497,6 +516,30 @@ const eventYears = Array.from({length: 15}, (_, i) => {
   const y = currentYear - 5 + i
   return { value: String(y), label: String(y + 543) }
 })
+
+// === 1. ฟังก์ชันคำนวณรอบปีปัจจุบัน (ค่าเริ่มต้น) ===
+const getInitialAnnualYear = () => {
+  const today = new Date();
+  // เดือนใน JavaScript เริ่มจาก 0 (0=ม.ค., 1=ก.พ., 2=มี.ค., 3=เม.ย.)
+  // ถ้าเป็น ม.ค. - มี.ค. ให้นับเป็นรอบปีของปีที่แล้ว
+  if (today.getMonth() < 3) {
+    return today.getFullYear() - 1;
+  }
+  return today.getFullYear();
+};
+
+const selectedAnnualYear = ref(getInitialAnnualYear());
+
+// === 2. สร้างตัวเลือกสำหรับ Dropdown ===
+const annualYears = Array.from({ length: 5 }, (_, i) => {
+  const y = getInitialAnnualYear() - 2 + i; // ย้อนหลัง 2 ปี และล่วงหน้า 2 ปี
+  const thaiYear = y + 543;
+  return {
+    value: y,
+    label: `ปี ${thaiYear} (1 เม.ย. ${thaiYear} - 31 มี.ค. ${thaiYear + 1})`
+  };
+});
+
 
 const formData = ref({
   id: null, event_type_id: '', title: '', description: '', location: '', status: 'รอดำเนินการ',
@@ -554,17 +597,45 @@ const getFileIcon = (url) => {
 // === ฟังก์ชันตรวจสอบกิจกรรมที่ยังไม่ถึง (อนาคต หรือ วันนี้) ===
 const isUpcomingEvent = (startDateStr) => {
   if (!startDateStr) return false;
-  const eventDate = new Date(startDateStr);
+  // แปลง YYYY-MM-DD HH:MM:SS ให้เป็น YYYY-MM-DDTHH:MM:SS ป้องกัน Safari Error
+  const safeDateStr = startDateStr.replace(' ', 'T'); 
+  const eventDate = new Date(safeDateStr);
   const today = new Date();
-  today.setHours(0, 0, 0, 0); // รีเซ็ตเวลาของวันนี้เป็น 00:00:00 เพื่อเทียบเฉพาะวันที่
+  today.setHours(0, 0, 0, 0); 
   return eventDate >= today;
 }
 
 // === กรองและเรียงลำดับกิจกรรม ===
-const filteredList = computed(() => {
-  let result = [...eventList.value]; // คัดลอก Array เพื่อไม่ให้กระทบข้อมูลต้นทาง
+// const filteredList = computed(() => {
+//   let result = [...eventList.value]; // คัดลอก Array เพื่อไม่ให้กระทบข้อมูลต้นทาง
 
-  // 1. ค้นหา (Search)
+//   // 1. ค้นหา (Search)
+//   if (searchQuery.value) {
+//     const q = searchQuery.value.toLowerCase()
+//     result = result.filter(item => 
+//       item.title.toLowerCase().includes(q) || (item.location && item.location.toLowerCase().includes(q))
+//     );
+//   }
+
+//   // 2. เรียงลำดับวันที่จากมากไปน้อย (ใหม่สุดอยู่บน)
+//   return result.sort((a, b) => new Date(b.start_date) - new Date(a.start_date));
+// })
+// === 3. อัปเดตตัวกรองข้อมูล (แทนที่ filteredList เดิม) ===
+const filteredList = computed(() => {
+  let result = [...eventList.value]; // คัดลอก Array[cite: 3]
+
+  // ⭐️ กรองตามรอบปี (1 เม.ย. - 31 มี.ค. ปีถัดไป)
+  if (selectedAnnualYear.value !== '') {
+    const startDate = new Date(selectedAnnualYear.value, 3, 1, 0, 0, 0); // 1 เมษายน
+    const endDate = new Date(selectedAnnualYear.value + 1, 2, 31, 23, 59, 59); // 31 มีนาคม (ปีหน้า)
+
+    result = result.filter(item => {
+      const eventDate = new Date(item.start_date);
+      return eventDate >= startDate && eventDate <= endDate;
+    });
+  }
+
+  // ⭐️ กรองตามการค้นหาข้อความ (ของเดิม)[cite: 3]
   if (searchQuery.value) {
     const q = searchQuery.value.toLowerCase()
     result = result.filter(item => 
@@ -572,9 +643,9 @@ const filteredList = computed(() => {
     );
   }
 
-  // 2. เรียงลำดับวันที่จากมากไปน้อย (ใหม่สุดอยู่บน)
+  // ⭐️ เรียงลำดับวันที่จากมากไปน้อย (ล่าสุดอยู่บน)[cite: 3]
   return result.sort((a, b) => new Date(b.start_date) - new Date(a.start_date));
-})
+});
 
 // กรองรายชื่อ
 const filteredSomtopList = computed(() => {
@@ -617,7 +688,8 @@ const paginatedList = computed(() => {
 })
 
 const changePage = (page) => { if (page >= 1 && page <= totalPages.value) currentPage.value = page; }
-watch(searchQuery, () => currentPage.value = 1);
+
+watch([searchQuery, selectedAnnualYear], () => currentPage.value = 1)
 
 const formatDateTime = (dateStr) => {
   if (!dateStr) return '-';
@@ -629,6 +701,7 @@ const getStatusClass = (status) => {
   if (status === 'เสร็จสิ้น') return 'active';
   if (status === 'กำลังดำเนินการ') return 'warning';
   if (status === 'ยกเลิก') return 'inactive';
+  if (status === 'รอดำเนินการ') return 'pending';
   return '';
 }
 
@@ -641,6 +714,7 @@ const parseDateToParts = (dateStr) => {
   const [hour, minute] = timeOnly.split(':');
   return { year, month, day, hour, minute };
 }
+
 
 // ==========================================
 // 3. API Actions
@@ -976,10 +1050,15 @@ const printMeetingLeave = async (somtopId) => {
   }
 };
 
-onMounted(() => {
-  fetchEvents();
-  fetchEventTypes();
-  fetchSomtopList();
+onMounted(async () => {
+  isLoading.value = true;
+  // โหลดทั้ง 3 อย่างพร้อมกันแบบ Parallel
+  await Promise.all([
+    fetchEvents(),
+    fetchEventTypes(),
+    fetchSomtopList()
+  ]);
+  isLoading.value = false;
 })
 </script>
 
@@ -1398,5 +1477,81 @@ onMounted(() => {
 .btn-print-leave:hover { 
   background-color: #FEE2E2; 
   border-color: #F87171; 
+}
+/* =========================================
+   Header Actions & Filters (ส่วนหัวตาราง)
+========================================= */
+.table-header-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+/* กลุ่มตัวกรองฝั่งขวา */
+.header-filters {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  flex: 1;
+  justify-content: flex-end; /* ดันกล่องไปชิดขวาเสมอ */
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #4B5563;
+  white-space: nowrap; /* ป้องกันข้อความตกบรรทัด */
+}
+
+.annual-select {
+  width: 220px;
+  padding: 8px 12px; /* ขยายความสูงให้เท่ากับกล่องค้นหา */
+}
+
+.search-box {
+  width: 100%;
+  max-width: 280px; /* จำกัดความกว้างไม่ให้กินพื้นที่มากไป */
+}
+
+/* =========================================
+   📱 Mobile Responsiveness (รองรับหน้าจอโทรศัพท์)
+========================================= */
+@media (max-width: 768px) {
+  .table-header-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .header-filters {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .filter-group {
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+    gap: 4px;
+  }
+
+  /* ขยายกล่องกรอกข้อมูลให้กว้างเต็มจอเพื่อให้จิ้มง่ายขึ้น */
+  .annual-select,
+  .search-box,
+  .search-box input {
+    width: 100%;
+    max-width: 100%; 
+  }
 }
 </style>
