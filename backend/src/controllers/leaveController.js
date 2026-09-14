@@ -141,7 +141,10 @@ exports.updateLeave = async (req, res) => {
         if (!id) return res.status(400).json({ message: 'ข้อมูลไม่ครบถ้วน (ไม่พบ ID)' });
 
         // ดึงไฟล์เดิมมาก่อนเพื่อตรวจสอบ
-        const [existing] = await pool.query('SELECT file_path FROM leave_requests WHERE id = ?', [id]);
+        const courtCode = req.user.court_code;
+        const scopeSql = courtCode ? ' AND court_code = ?' : '';
+        const scopeParams = courtCode ? [id, courtCode] : [id];
+        const [existing] = await pool.query(`SELECT file_path FROM leave_requests WHERE id = ?${scopeSql}`, scopeParams);
         if (existing.length === 0) return res.status(404).json({ message: 'ไม่พบข้อมูลใบลา' });
         
         let filePathDb = existing[0].file_path;
@@ -162,12 +165,12 @@ exports.updateLeave = async (req, res) => {
             UPDATE leave_requests SET 
                 somtop_id = ?, leave_type_id = ?, start_date = ?, end_date = ?, 
                 total_days = ?, note = ?, status = ?, file_path = ?
-            WHERE id = ?
+            WHERE id = ?${scopeSql}
         `;
 
         await pool.query(query, [
             somtop_id, leave_type_id, start_date, end_date, total_days, 
-            note || null, status || 'รอตรวจสอบ', filePathDb, id
+            note || null, status || 'รอตรวจสอบ', filePathDb, ...scopeParams
         ]);
 
         if (typeof logActivity === 'function') {
@@ -189,14 +192,18 @@ exports.deleteLeave = async (req, res) => {
 
         if (!id) return res.status(400).json({ message: 'ไม่ได้ระบุ ID ที่ต้องการลบ' });
 
-        const [existing] = await pool.query('SELECT file_path FROM leave_requests WHERE id = ?', [id]);
+        const courtCode = req.user.court_code;
+        const scopeSql = courtCode ? ' AND court_code = ?' : '';
+        const scopeParams = courtCode ? [id, courtCode] : [id];
+        const [existing] = await pool.query(`SELECT file_path FROM leave_requests WHERE id = ?${scopeSql}`, scopeParams);
+        if (existing.length === 0) return res.status(404).json({ message: 'ไม่พบข้อมูลใบลา' });
         
         // ลบไฟล์แนบทั้งหมดก่อนลบข้อมูลในฐานข้อมูล
         if (existing.length > 0 && existing[0].file_path) {
             deletePhysicalFiles(existing[0].file_path);
         }
 
-        await pool.query('DELETE FROM leave_requests WHERE id = ?', [id]);
+        await pool.query(`DELETE FROM leave_requests WHERE id = ?${scopeSql}`, scopeParams);
         
         if (typeof logActivity === 'function') {
             logActivity(req, 'ลบข้อมูล', 'จัดการการลา', `ลบใบลา ID: ${id}`);
@@ -226,9 +233,9 @@ exports.exportToWord = async (req, res) => {
             FROM leave_requests lr
             LEFT JOIN somtop s ON lr.somtop_id = s.id
             LEFT JOIN leave_types lt ON lr.leave_type_id = lt.id
-            WHERE lr.id = ?
+            WHERE lr.id = ? AND (? IS NULL OR lr.court_code = ?)
         `;
-        const [rows] = await pool.query(query, [id]);
+        const [rows] = await pool.query(query, [id, req.user.court_code, req.user.court_code]);
 
         if (rows.length === 0) {
             return res.status(404).json({ message: 'ไม่พบข้อมูลใบลา' });
@@ -318,7 +325,10 @@ exports.deleteSingleFile = async (req, res) => {
             return res.status(400).json({ message: 'ข้อมูลไม่ครบถ้วน' });
         }
 
-        const [existing] = await pool.query('SELECT file_path FROM leave_requests WHERE id = ?', [id]);
+        const courtCode = req.user.court_code;
+        const scopeSql = courtCode ? ' AND court_code = ?' : '';
+        const scopeParams = courtCode ? [id, courtCode] : [id];
+        const [existing] = await pool.query(`SELECT file_path FROM leave_requests WHERE id = ?${scopeSql}`, scopeParams);
         if (existing.length === 0 || !existing[0].file_path) {
             return res.status(404).json({ message: 'ไม่พบข้อมูลไฟล์' });
         }
@@ -334,8 +344,8 @@ exports.deleteSingleFile = async (req, res) => {
             return currentFilename !== targetFilename;
         });
 
-        await pool.query('UPDATE leave_requests SET file_path = ? WHERE id = ?', [
-            JSON.stringify(updatedPaths), id
+        await pool.query(`UPDATE leave_requests SET file_path = ? WHERE id = ?${scopeSql}`, [
+            JSON.stringify(updatedPaths), ...scopeParams
         ]);
 
         // ส่งเฉพาะชื่อไฟล์หรือ URL ไปให้ Helper ลบไฟล์ตามที่คุณออกแบบไว้

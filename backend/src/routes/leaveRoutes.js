@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const leaveController = require('../controllers/leaveController');
-const { verifyToken } = require('../middlewares/authMiddleware');
+const { verifyToken, verifyAdmin } = require('../middlewares/authMiddleware');
 const uploadPdf = require('../middlewares/uploadPdfMiddleware');
 
 // ทุก Route ต้องผ่านการเช็ก Token
@@ -10,8 +10,8 @@ router.use(verifyToken);
 router.get('/', leaveController.getAllLeaves);
 
 // เปลี่ยน .single เป็น .array และกำหนดรับสูงสุด 10 ไฟล์
-router.post('/', uploadPdf.array('leave_files', 10), leaveController.createLeave);
-router.put('/', uploadPdf.array('leave_files', 10), leaveController.updateLeave);
+router.post('/', verifyAdmin, uploadPdf.array('leave_files', 10), leaveController.createLeave);
+router.put('/', verifyAdmin, uploadPdf.array('leave_files', 10), leaveController.updateLeave);
 
 // อัปโหลดไฟล์จาก Field ที่ชื่อ 'leave_file' ตามที่ Frontend เคยส่งมา
 // router.post('/', uploadPdf.single('leave_file'), leaveController.createLeave);
@@ -20,8 +20,8 @@ router.put('/', uploadPdf.array('leave_files', 10), leaveController.updateLeave)
 // ใน Node.js เราสามารถใช้ POST รับการอัปเดตหาก Frontend ยึดการส่งผ่าน _method=PUT 
 // router.post('/update', uploadPdf.single('leave_file'), leaveController.updateLeave);
 
-router.delete('/:id', leaveController.deleteLeave);
-router.post('/delete-file', leaveController.deleteSingleFile);         // ลบไฟล์แนบทีละไฟล์
+router.delete('/:id', verifyAdmin, leaveController.deleteLeave);
+router.post('/delete-file', verifyAdmin, leaveController.deleteSingleFile);         // ลบไฟล์แนบทีละไฟล์
 router.get('/:id/export-word', leaveController.exportToWord);
 
 module.exports = router;

@@ -75,6 +75,7 @@
 import { ref, onMounted } from 'vue'
 import api from '../services/api'
 import { swalSuccess, swalError } from '../utils/swal'
+import { currentUser, setSessionUser } from '../services/session'
 
 const isLoading = ref(false)
 const userInfo = ref({
@@ -93,9 +94,8 @@ const formData = ref({
 
 // === โหลดข้อมูลตั้งต้นจาก LocalStorage ===
 onMounted(() => {
-  const storedUser = localStorage.getItem('user')
-  if (storedUser) {
-    const user = JSON.parse(storedUser)
+  const user = currentUser.value
+  if (user) {
     userInfo.value = user
     formData.value.full_name = user.full_name || ''
   }
@@ -130,7 +130,7 @@ const saveProfile = async () => {
 
     // ⭐️ อัปเดตชื่อใหม่ลงใน LocalStorage ทันที เพื่อให้ Topbar เปลี่ยนชื่อตาม
     const updatedUser = { ...userInfo.value, full_name: formData.value.full_name }
-    localStorage.setItem('user', JSON.stringify(updatedUser))
+    setSessionUser(updatedUser)
 
     swalSuccess('บันทึกสำเร็จ', 'อัปเดตข้อมูลโปรไฟล์ของคุณเรียบร้อยแล้ว')
     

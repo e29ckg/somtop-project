@@ -5,7 +5,7 @@
         <h1 class="page-title">จัดการข้อมูลผู้พิพากษาสมทบ</h1>
         <p class="page-subtitle">เพิ่ม ลบ แก้ไข ข้อมูลพื้นฐานและรูปถ่ายของผู้พิพากษาสมทบ</p>
       </div>
-      <button class="btn-primary" @click="openAddModal">
+      <button v-if="isAdmin" class="btn-primary" @click="openAddModal">
         + เพิ่มข้อมูลใหม่
       </button>
     </div>
@@ -84,8 +84,8 @@
               <td class="no-print">
                 <div class="action-buttons">
                   <button class="btn-icon view" @click="openViewModal(person)" title="ดูรายละเอียด">👁️</button>
-                  <button class="btn-icon edit" @click="openEditModal(person)" title="แก้ไข">✏️</button>
-                  <button class="btn-icon delete" @click="deleteData(person.id)" title="ลบ">🗑️</button>
+                  <button v-if="isAdmin" class="btn-icon edit" @click="openEditModal(person)" title="แก้ไข">✏️</button>
+                  <button v-if="isAdmin" class="btn-icon delete" @click="deleteData(person.id)" title="ลบ">🗑️</button>
                 </div>
               </td>
             </tr>
@@ -122,7 +122,7 @@
     </div>
 
     <!-- Modal Form สำหรับเพิ่ม/แก้ไข -->
-    <div v-if="isModalOpen" class="modal-overlay no-print">
+    <div v-if="isAdmin && isModalOpen" class="modal-overlay no-print">
       <div class="modal-card">
         <div class="modal-header">
           <h2>{{ isEditing ? 'แก้ไขข้อมูล พ.สมทบ' : 'เพิ่มข้อมูล พ.สมทบ ใหม่' }}</h2>
@@ -371,7 +371,7 @@
                   </span>
                 </div>
                 
-                <button class="btn-primary" style="padding: 4px 10px; font-size: 12px;" @click="openAddTermModal(selectedSomtopToView)">
+                <button v-if="isAdmin" class="btn-primary" style="padding: 4px 10px; font-size: 12px;" @click="openAddTermModal(selectedSomtopToView)">
                   + เพิ่มประวัติ
                 </button>
               </h4>
@@ -406,7 +406,7 @@
                   </td>
                   <td class="text-center">
                         <!-- ⭐️ เพิ่มปุ่มลบประวัติ -->
-                        <button class="btn-icon delete" @click="deleteTermHistoryRecord(term.id)" title="ลบประวัตินี้" style="padding: 2px 6px; font-size: 12px;">🗑️</button>
+                        <button v-if="isAdmin" class="btn-icon delete" @click="deleteTermHistoryRecord(term.id)" title="ลบประวัตินี้" style="padding: 2px 6px; font-size: 12px;">🗑️</button>
                       </td>
                 </tr>
               </tbody>
@@ -422,7 +422,7 @@
               {{ personDecorationHistory.length > 0 ? `(${personDecorationHistory.length} รายการ)` : '' }}
               <span v-for="d in personDecorationHistory" :key="d.id">⭐️</span>
             </h4>
-            <button class="btn-primary" style="padding: 4px 10px; font-size: 12px;" @click="openAddDecorationModal(selectedSomtopToView.id)">
+            <button v-if="isAdmin" class="btn-primary" style="padding: 4px 10px; font-size: 12px;" @click="openAddDecorationModal(selectedSomtopToView.id)">
               + เพิ่มประวัติเครื่องราชฯ
             </button>
           </div>
@@ -452,7 +452,7 @@
                     <span v-else class="text-muted text-sm">-</span>
                   </td>
                   <td class="text-center">
-                    <div class="decoration-actions">
+                    <div v-if="isAdmin" class="decoration-actions">
                       <button class="btn-icon edit" @click="openEditDecorationModal(dec)" title="แก้ไข" style="padding: 2px 6px; font-size: 12px;">✏️</button>
                       <button class="btn-icon delete" @click="deleteDecorationData(dec.id)" title="ลบ" style="padding: 2px 6px; font-size: 12px;">🗑️</button>
                     </div>
@@ -545,7 +545,7 @@
     </div>
 
     <!-- 🎖️ Modal: ฟอร์มเพิ่มประวัติเครื่องราชอิสริยาภรณ์ -->
-    <div v-if="isDecorationModalOpen" class="modal-overlay no-print">
+    <div v-if="isAdmin && isDecorationModalOpen" class="modal-overlay no-print">
       <div class="modal-card">
         <div class="modal-header">
           <h2>{{ decorationForm.id ? 'แก้ไขประวัติเครื่องราชอิสริยาภรณ์' : 'เพิ่มประวัติเครื่องราชอิสริยาภรณ์' }}</h2>
@@ -616,7 +616,7 @@
     </div>
 
     <!-- ⏳ Modal: ฟอร์มเพิ่มประวัติวาระการทำงาน -->
-    <div v-if="isTermModalOpen" class="modal-overlay no-print">
+    <div v-if="isAdmin && isTermModalOpen" class="modal-overlay no-print">
       <div class="modal-card">
         <div class="modal-header">
           <h2>เพิ่มประวัติการดำรงตำแหน่ง</h2>
@@ -664,6 +664,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import api from '../services/api' 
+import { isAdmin } from '../services/session'
 import { swalSuccess, swalError, swalConfirm } from '../utils/swal'
 
 const isSaving = ref(false)

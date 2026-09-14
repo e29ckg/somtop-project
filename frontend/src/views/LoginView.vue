@@ -49,6 +49,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../services/api'
 import swal from 'sweetalert2' // นำเข้า SweetAlert2 สำหรับแสดง Alert
+import { setSessionUser } from '../services/session'
 
 const router = useRouter()
 const username = ref('')
@@ -72,7 +73,7 @@ const handleLogin = async () => {
     
     // หาก API มีการส่งข้อมูลผู้ใช้กลับมาด้วย สามารถเก็บไว้ใช้แสดงชื่อมุมขวาบนได้
     if (response.data.user) {
-      localStorage.setItem('user', JSON.stringify(response.data.user))
+      setSessionUser(response.data.user)
     }
 
     swal.fire({

@@ -70,10 +70,19 @@ exports.login = async (req, res) => {
             }
         };
 
-        const token = jwt.sign(payload, process.env.JWT_SECRET || 'your_super_secret_jwt_key', { expiresIn: '1d' });
+        const token = jwt.sign(payload, process.env.JWT_SECRET, {
+            expiresIn: '8h',
+            algorithm: 'HS256',
+            issuer: 'somtop-api',
+            audience: 'somtop-web'
+        });
 
         res.cookie('jwt', token, {
-            httpOnly: true, secure: process.env.NODE_ENV === 'production', maxAge: 24 * 60 * 60 * 1000, path: '/' 
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 8 * 60 * 60 * 1000,
+            path: '/'
         });
 
         req.user = payload.data; 
@@ -92,6 +101,15 @@ exports.login = async (req, res) => {
 // ==========================================
 exports.logout = (req, res) => {
     // ⭐️ สั่งลบ Cookie ชื่อ 'jwt'
-    res.clearCookie('jwt', { path: '/' });
+    res.clearCookie('jwt', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        path: '/'
+    });
     res.status(200).json({ message: 'ออกจากระบบสำเร็จ' });
+};
+
+exports.me = (req, res) => {
+    res.status(200).json({ user: req.user });
 };

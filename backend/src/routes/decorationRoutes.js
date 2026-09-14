@@ -19,8 +19,8 @@ router.delete('/admin', verifyAdmin, decorationController.deleteMasterDecoration
 
 // Endpoints สำหรับประวัติรายบุคคล
 router.get('/:somtop_id', decorationController.getSomtopDecorations);
-router.post('/', uploadDecoration.single('file'), decorationController.addDecoration);
-router.put('/:id', uploadDecoration.single('file'), decorationController.updateDecoration);
-router.delete('/:id', decorationController.deleteDecoration);
+router.post('/', verifyAdmin, uploadDecoration.single('file'), decorationController.addDecoration);
+router.put('/:id', verifyAdmin, uploadDecoration.single('file'), decorationController.updateDecoration);
+router.delete('/:id', verifyAdmin, decorationController.deleteDecoration);
 
 module.exports = router;

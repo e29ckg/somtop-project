@@ -283,7 +283,7 @@ const deleteData = async (id) => {
   if(result.isConfirmed) {
     try {
       // ⭐️ ปรับให้ส่งผ่าน URL Params ตรงตามมาตรฐาน REST API
-      await api.delete(`/users/${id}`)
+      await api.delete('/users', { data: { id } })
       swalSuccess('ลบสำเร็จ', 'ข้อมูลผู้ใช้งานถูกลบทิ้งแล้ว')
       fetchData()
     } catch (error) {

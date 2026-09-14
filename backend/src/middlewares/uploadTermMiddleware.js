@@ -1,6 +1,7 @@
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 
 // กำหนดโฟลเดอร์ปลายทางสำหรับเก็บไฟล์วาระการทำงาน (ถอยหลัง 2 ชั้นเพื่อชี้ไปที่ uploads/terms/)
 const uploadDir = path.join(__dirname, '../../uploads/terms/');
@@ -16,16 +17,8 @@ const storage = multer.diskStorage({
     },
     filename: function (req, file, cb) {
         // 1. แปลง Encoding ให้รองรับชื่อไฟล์ภาษาไทยที่ส่งมาจาก Frontend[cite: 1]
-        const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
-        
-        // 2. แทนที่ช่องว่างด้วยเครื่องหมาย _ เพื่อป้องกันปัญหา URL พังเวลาเรียกใช้งาน[cite: 1]
-        const safeName = originalName.replace(/\s+/g, '_');
-        
-        // 3. ใช้ Timestamp นำหน้า ตามด้วย _ และชื่อไฟล์ดั้งเดิม[cite: 1]
-        // ผลลัพธ์จะได้ชื่อไฟล์เช่น: 1718822920633_คำสั่งแต่งตั้ง.pdf[cite: 1]
-        const uniqueName = Date.now() + '_' + safeName;
-        
-        cb(null, uniqueName);
+        const ext = path.extname(file.originalname).toLowerCase();
+        cb(null, `${crypto.randomUUID()}${ext}`);
     }
 });
 
@@ -40,11 +33,16 @@ const fileFilter = (req, file, cb) => {
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' // .xlsx[cite: 3]
     ];
 
-    if (allowedMimeTypes.includes(file.mimetype)) {
+    const allowedExtensions = ['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx', '.xls', '.xlsx'];
+    if (allowedMimeTypes.includes(file.mimetype) && allowedExtensions.includes(path.extname(file.originalname).toLowerCase())) {
         cb(null, true);
     } else {
         cb(new Error('รองรับเฉพาะไฟล์ PDF, ภาพ, Word และ Excel เท่านั้น'), false);
     }
 };
 
-module.exports = multer({ storage: storage, fileFilter: fileFilter });
+module.exports = multer({
+    storage,
+    fileFilter,
+    limits: { fileSize: 10 * 1024 * 1024, files: 10, fields: 30 }
+});

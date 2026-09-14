@@ -26,8 +26,9 @@ const storage = multer.diskStorage({
 
 const fileFilter = (req, file, cb) => {
     const allowedExt = ['.jpg', '.jpeg', '.png'];
+    const allowedMimeTypes = ['image/jpeg', 'image/png'];
     const ext = path.extname(file.originalname).toLowerCase();
-    if (allowedExt.includes(ext)) {
+    if (allowedExt.includes(ext) && allowedMimeTypes.includes(file.mimetype)) {
         cb(null, true);
     } else {
         cb(new Error('รองรับเฉพาะไฟล์ .jpg และ .png เท่านั้น'), false);

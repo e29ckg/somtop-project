@@ -4,12 +4,12 @@ services:
     container_name: somtop_db
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: somtop_db
       MYSQL_USER: devuser
-      MYSQL_PASSWORD: devpassword
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
     ports:
-      - "3307:3306"
+      - "127.0.0.1:3307:3306"
     volumes:
       - ./mysql-data:/var/lib/mysql
 
@@ -19,9 +19,9 @@ services:
     restart: always
     environment:
       PMA_HOST: db 
-      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD}
     ports:
-      - "8087:80" 
+      - "127.0.0.1:8087:80"
     depends_on:
       - db
 
@@ -39,10 +39,10 @@ services:
       DB_HOST: db
       DB_PORT: 3306
       DB_USER: devuser
-      DB_PASSWORD: devpassword
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
       DB_NAME: somtop_db
-      JWT_SECRET: your_super_secret_jwt_key
-      CLIENT_URL: http://localhost:5173
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
     # ------------------------
     volumes:
       - ./backend:/app   

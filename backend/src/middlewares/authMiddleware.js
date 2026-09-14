@@ -15,8 +15,11 @@ const verifyToken = (req, res, next) => {
 
     try {
         // ตรวจสอบความถูกต้องของ Token ด้วย Secret Key
-        const secretKey = process.env.JWT_SECRET || 'your_super_secret_jwt_key';
-        const decoded = jwt.verify(token, secretKey);
+        const decoded = jwt.verify(token, process.env.JWT_SECRET, {
+            algorithms: ['HS256'],
+            issuer: 'somtop-api',
+            audience: 'somtop-web'
+        });
         
         // นำข้อมูล Payload (id, username, full_name, role, court_code) ไปแปะไว้ที่ req.user
         req.user = decoded.data;

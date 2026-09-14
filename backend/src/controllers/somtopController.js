@@ -153,12 +153,15 @@ exports.updateSomtop = async (req, res) => {
 
     try {
         const id = req.params.id || req.body.id;
+        const courtCode = req.user.court_code;
+        const scopeSql = courtCode ? ' AND court_code = ?' : '';
+        const scopeParams = courtCode ? [id, courtCode] : [id];
         const { title, first_name, last_name, id_card, dob, occupation, join_date, position_id, address, phone, status, note, term_id } = req.body;
 
         if (!id) return res.status(400).json({ message: 'ไม่พบ ID ที่ต้องการแก้ไข' });
 
         // ดึงรูปภาพเดิมมาตรวจสอบ
-        const [existing] = await connection.query('SELECT photo_path FROM somtop WHERE id = ?', [id]);
+        const [existing] = await connection.query(`SELECT photo_path FROM somtop WHERE id = ?${scopeSql}`, scopeParams);
         if (existing.length === 0) {
             if (req.file) deletePhysicalFile(req.file.path);
             return res.status(404).json({ message: 'ไม่พบข้อมูลผู้พิพากษาสมทบ' });
@@ -179,13 +182,13 @@ exports.updateSomtop = async (req, res) => {
                 title = ?, first_name = ?, last_name = ?, id_card = ?, 
                 dob = ?, occupation = ?, join_date = ?, position_id = ?, 
                 address = ?, phone = ?, status = ?, note = ?, photo_path = ?
-            WHERE id = ?
+            WHERE id = ?${scopeSql}
         `;
 
         await connection.query(updateQuery, [
             title, first_name, last_name, id_card || null, dob || null, occupation || null, 
             join_date || null, position_id || null, address || null, 
-            phone || null, status || 'ใช้งาน', note || null, finalPhotoPath, id
+            phone || null, status || 'ใช้งาน', note || null, finalPhotoPath, ...scopeParams
         ]);
 
         // ⭐️ 2. จัดการประวัติการต่อวาระ (Term History)
@@ -242,13 +245,17 @@ exports.deleteSomtop = async (req, res) => {
 
         if (!id) return res.status(400).json({ message: `ไม่ได้ระบุ ID ที่ต้องการลบ` });
 
-        const [existing] = await pool.query('SELECT photo_path FROM somtop WHERE id = ?', [id]);
+        const courtCode = req.user.court_code;
+        const scopeSql = courtCode ? ' AND court_code = ?' : '';
+        const scopeParams = courtCode ? [id, courtCode] : [id];
+        const [existing] = await pool.query(`SELECT photo_path FROM somtop WHERE id = ?${scopeSql}`, scopeParams);
         
         if (existing.length > 0) {
             deletePhysicalFile(existing[0].photo_path);
         }
 
-        await pool.query('DELETE FROM somtop WHERE id = ?', [id]);
+        if (existing.length === 0) return res.status(404).json({ message: 'ไม่พบข้อมูลผู้พิพากษาสมทบ' });
+        await pool.query(`DELETE FROM somtop WHERE id = ?${scopeSql}`, scopeParams);
         logActivity(req, 'ลบข้อมูล', 'จัดการ พ.สมทบ', `ลบข้อมูล ID: ${id}`);
         res.status(200).json({ message: 'ลบข้อมูลสำเร็จ' });
     } catch (error) {
@@ -263,6 +270,12 @@ exports.deleteSomtop = async (req, res) => {
 exports.getSomtopHistory = async (req, res) => {
     try {
         const { id } = req.params;
+
+        const [allowed] = await pool.query(
+            'SELECT id FROM somtop WHERE id = ? AND (? IS NULL OR court_code = ?)',
+            [id, req.user.court_code, req.user.court_code]
+        );
+        if (allowed.length === 0) return res.status(404).json({ message: 'ไม่พบข้อมูลผู้พิพากษาสมทบ' });
 
         // 1. ดึงประวัติการลา
         const queryLeaves = `

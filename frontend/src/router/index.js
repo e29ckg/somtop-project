@@ -18,6 +18,8 @@ import ManageTemplateView from '../views/ManageTemplateView.vue'
 import ManageGoogleCalendarView from '../views/ManageGoogleCalendarView.vue'
 import ManageTermView from '../views/ManageTermView.vue'
 import ProfileView from '../views/ProfileView.vue'
+import api from '../services/api'
+import { currentUser, isSessionVerified, setSessionUser, clearSession } from '../services/session'
 
 // 1. สร้าง router ขึ้นมาก่อน
 const router = createRouter({
@@ -31,6 +33,7 @@ const router = createRouter({
     {
       path: '/',
       component: MainLayout, 
+      meta: { requiresAuth: true },
       children: [
         {
           path: 'dashboard',
@@ -55,22 +58,26 @@ const router = createRouter({
         {
           path: 'manage-users', 
           name: 'manage-users',
-          component: ManageUserView
+          component: ManageUserView,
+          meta: { requiresAdmin: true }
         },
         {
           path: 'manage-courts',
           name: 'manage-courts',
-          component: ManageCourtView
+          component: ManageCourtView,
+          meta: { requiresAdmin: true }
         },
         {
           path: 'activity-logs',
           name: 'activity-logs',
-          component: ActivityLogsView
+          component: ActivityLogsView,
+          meta: { requiresAdmin: true }
         },
         {
           path: 'manage-titles',
           name: 'manage-titles',
-          component: ManageTitleView
+          component: ManageTitleView,
+          meta: { requiresAdmin: true }
         },
         {
           path: 'manage-events',
@@ -80,37 +87,44 @@ const router = createRouter({
         {
           path: 'manage-event-types',
           name: 'manage-event-types',
-          component: ManageEventTypeView
+          component: ManageEventTypeView,
+          meta: { requiresAdmin: true }
         },
         {
           path: 'manage-positions',
           name: 'manage-positions',
-          component: ManagePositionView
+          component: ManagePositionView,
+          meta: { requiresAdmin: true }
         },
         {
           path: 'manage-decorations',
           name: 'manage-decorations',
-          component: ManageDecorationView
+          component: ManageDecorationView,
+          meta: { requiresAdmin: true }
         },
         {
           path: 'manage-leave-types',
           name: 'manage-leave-types',
-          component: ManageLeaveTypeView
+          component: ManageLeaveTypeView,
+          meta: { requiresAdmin: true }
         },
         {
           path: 'manage-templates',
           name: 'manage-templates',
-          component: ManageTemplateView
+          component: ManageTemplateView,
+          meta: { requiresAdmin: true }
         },
         {
           path: 'manage-calendar-sync',
           name: 'manage-calendar-sync',
-          component: ManageGoogleCalendarView
+          component: ManageGoogleCalendarView,
+          meta: { requiresAdmin: true }
         },
         {
           path: 'manage-terms',
           name: 'manage-terms',
-          component: ManageTermView
+          component: ManageTermView,
+          meta: { requiresAdmin: true }
         }
       ]
     },
@@ -123,19 +137,21 @@ const router = createRouter({
 })
 
 // 2. ตรวจสอบสิทธิ์การเข้าถึง (Navigation Guard) วางไว้หลังสร้าง router เสร็จแล้ว
-router.beforeEach((to, from) => {
-  const isAuthenticated = localStorage.getItem('user');
-
-  // เปลี่ยนจาก '/login' เป็น '/' ให้ตรงกับ path ด้านบน
-  if (to.path !== '/' && !isAuthenticated) {
-    return '/'; 
+router.beforeEach(async (to) => {
+  if (!isSessionVerified()) {
+    try {
+      const response = await api.get('/auth/me')
+      setSessionUser(response.data.user)
+    } catch {
+      clearSession()
+    }
   }
 
-  if (to.path === '/' && isAuthenticated) {
-    return '/dashboard';
-  }
-  
-  return true; 
+  if (to.meta.requiresAuth && !currentUser.value) return '/'
+  if (to.meta.requiresAdmin && currentUser.value?.role !== 'admin') return '/dashboard'
+  if (to.path === '/' && currentUser.value) return '/dashboard'
+
+  return true
 })
 
 // 3. ส่งออก (Export) ไปใช้งาน

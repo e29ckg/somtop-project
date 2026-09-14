@@ -40,10 +40,12 @@ exports.getSomtopDecorations = async (req, res) => {
             SELECT sd.*, md.name AS decoration_name, md.short_name 
             FROM somtop_decorations sd
             JOIN master_decorations md ON sd.decoration_id = md.id
-            WHERE sd.somtop_id = ?
+            WHERE sd.somtop_id = ? AND (? IS NULL OR EXISTS (
+                SELECT 1 FROM somtop s WHERE s.id = sd.somtop_id AND s.court_code = ?
+            ))
             ORDER BY sd.received_date DESC
         `;
-        const [rows] = await pool.query(query, [somtop_id]);
+        const [rows] = await pool.query(query, [somtop_id, req.user.court_code, req.user.court_code]);
         res.status(200).json({
             records: rows.map(row => ({ ...row, file_path: toFileUrl(row.file_path) }))
         });
@@ -63,6 +65,15 @@ exports.addDecoration = async (req, res) => {
         if (!somtop_id || !decoration_id || !received_date) {
             if (req.file) deletePhysicalFile(`uploads/decorations/${req.file.filename}`);
             return res.status(400).json({ message: 'กรุณากรอกข้อมูลสำคัญให้ครบถ้วน' });
+        }
+
+        const [allowed] = await pool.query(
+            'SELECT id FROM somtop WHERE id = ? AND (? IS NULL OR court_code = ?)',
+            [somtop_id, req.user.court_code, req.user.court_code]
+        );
+        if (allowed.length === 0) {
+            if (req.file) deletePhysicalFile(`uploads/decorations/${req.file.filename}`);
+            return res.status(404).json({ message: 'ไม่พบข้อมูลผู้พิพากษาสมทบ' });
         }
 
         if (req.file) filePath = `uploads/decorations/${req.file.filename}`;
@@ -104,8 +115,10 @@ exports.updateDecoration = async (req, res) => {
         }
 
         const [existing] = await pool.query(
-            'SELECT file_path FROM somtop_decorations WHERE id = ?',
-            [id]
+            `SELECT sd.file_path FROM somtop_decorations sd
+             JOIN somtop s ON sd.somtop_id = s.id
+             WHERE sd.id = ? AND (? IS NULL OR s.court_code = ?)`,
+            [id, req.user.court_code, req.user.court_code]
         );
         if (existing.length === 0) {
             if (req.file) deletePhysicalFile(`uploads/decorations/${req.file.filename}`);
@@ -146,7 +159,12 @@ exports.deleteDecoration = async (req, res) => {
         const { id } = req.params;
         
         // ค้นหาไฟล์ที่ต้องลบก่อน
-        const [existing] = await pool.query('SELECT file_path FROM somtop_decorations WHERE id = ?', [id]);
+        const [existing] = await pool.query(
+            `SELECT sd.file_path FROM somtop_decorations sd
+             JOIN somtop s ON sd.somtop_id = s.id
+             WHERE sd.id = ? AND (? IS NULL OR s.court_code = ?)`,
+            [id, req.user.court_code, req.user.court_code]
+        );
         if (existing.length === 0) {
             return res.status(404).json({ message: 'ไม่พบประวัติเครื่องราชฯ' });
         }

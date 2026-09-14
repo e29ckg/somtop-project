@@ -6,7 +6,7 @@
         <h1 class="page-title">ปฏิทินกิจกรรม</h1>
         <p class="page-subtitle">จัดการข้อมูลกิจกรรม และรายชื่อผู้พิพากษาสมทบที่เข้าร่วม</p>
       </div>
-      <button class="btn-primary" @click="openAddModal">
+      <button v-if="isAdmin" class="btn-primary" @click="openAddModal">
         + สร้างกิจกรรมใหม่
       </button>
     </div>
@@ -90,10 +90,10 @@
                 </td>
                 <td class="no-print">
                   <div class="action-buttons">
-                    <button class="btn-icon manage-users" @click="openParticipantModal(event)" title="จัดการผู้เข้าร่วม">👥</button>
+                    <button v-if="isAdmin" class="btn-icon manage-users" @click="openParticipantModal(event)" title="จัดการผู้เข้าร่วม">👥</button>
                     <button class="btn-icon view" @click="openViewModal(event)" title="ดูรายละเอียดกิจกรรม">👁️</button>
-                    <button class="btn-icon edit" @click="openEditModal(event)" title="แก้ไขกิจกรรม">✏️</button>
-                    <button class="btn-icon delete" @click="deleteData(event.id)" title="ลบกิจกรรม">🗑️</button>
+                    <button v-if="isAdmin" class="btn-icon edit" @click="openEditModal(event)" title="แก้ไขกิจกรรม">✏️</button>
+                    <button v-if="isAdmin" class="btn-icon delete" @click="deleteData(event.id)" title="ลบกิจกรรม">🗑️</button>
                   </div>
                 </td>
               </tr>
@@ -122,7 +122,7 @@
     </div>
 
     <!-- ⭐️ Modal 1: จัดการข้อมูลกิจกรรม -->
-    <div v-if="isModalOpen" class="modal-overlay no-print">
+    <div v-if="isAdmin && isModalOpen" class="modal-overlay no-print">
       <div class="modal-card">
         <div class="modal-header">
           <h2>{{ isEditing ? 'แก้ไขกิจกรรม' : 'สร้างกิจกรรมใหม่' }}</h2>
@@ -307,7 +307,7 @@
     </div>
 
     <!-- ⭐️ Modal 2: จัดการผู้เข้าร่วมกิจกรรม -->
-    <div v-if="isParticipantModalOpen" class="modal-overlay no-print">
+    <div v-if="isAdmin && isParticipantModalOpen" class="modal-overlay no-print">
       <div class="modal-card participant-modal">
         <div class="modal-header">
           <h2>รายชื่อผู้เข้าร่วม: <span class="text-emerald-600">{{ selectedEvent?.title }}</span></h2>
@@ -477,6 +477,8 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import api from '../services/api' 
+import { isAdmin } from '../services/session'
+import { createProtectedFileUrl, revokeProtectedFileUrl } from '../services/protectedFiles'
 import { swalSuccess, swalError, swalConfirm } from '../utils/swal'
 
 // ==========================================
@@ -499,6 +501,7 @@ const isPreviewOpen = ref(false)
 const selectedEvent = ref(null)
 const selectedEventToView = ref(null)
 const previewUrl = ref('')
+const previewSourceUrl = ref('')
 
 const days = Array.from({length: 31}, (_, i) => String(i + 1).padStart(2, '0'))
 const hours = Array.from({length: 24}, (_, i) => String(i).padStart(2, '0'))
@@ -862,8 +865,8 @@ const deleteCurrentFile = async () => {
   const result = await swalConfirm('ยืนยันการลบไฟล์', 'คุณแน่ใจหรือไม่ว่าต้องการลบเอกสารนี้?');
   if (result.isConfirmed) {
     try {
-      await api.post('/events/delete-file', { id: formData.value.id, file_url: previewUrl.value });
-      formData.value.existing_file_paths = formData.value.existing_file_paths.filter(url => url !== previewUrl.value);
+      await api.post('/events/delete-file', { id: formData.value.id, file_url: previewSourceUrl.value });
+      formData.value.existing_file_paths = formData.value.existing_file_paths.filter(url => url !== previewSourceUrl.value);
       closeFilePreview();
       swalSuccess('ลบไฟล์สำเร็จ', 'เอกสารถูกลบเรียบร้อยแล้ว');
       fetchEvents();
@@ -988,15 +991,26 @@ const openViewModal = async (eventItem) => {
   }
 }
 
-const openFilePreview = (url, eventId) => {
-  previewUrl.value = url;
-  if (eventId) formData.value.id = eventId;
-  isPreviewOpen.value = true;
+const openFilePreview = async (url, eventId) => {
+  try {
+    revokeProtectedFileUrl(previewUrl.value)
+    previewSourceUrl.value = url
+    previewUrl.value = await createProtectedFileUrl(url)
+    if (eventId) formData.value.id = eventId
+    isPreviewOpen.value = true
+  } catch (error) {
+    swalError('เปิดไฟล์ไม่สำเร็จ', error.response?.data?.message || 'ไม่สามารถดาวน์โหลดไฟล์แนบได้')
+  }
 }
 
 const closeModal = () => isModalOpen.value = false;
 const closeViewModal = () => { isViewModalOpen.value = false; selectedEventToView.value = null; };
-const closeFilePreview = () => { isPreviewOpen.value = false; previewUrl.value = ''; };
+const closeFilePreview = () => {
+  isPreviewOpen.value = false
+  revokeProtectedFileUrl(previewUrl.value)
+  previewUrl.value = ''
+  previewSourceUrl.value = ''
+};
 
 // ฟังก์ชันดึงสถานะของคนๆ นั้น (ต้องอัปเดต fetchParticipants ให้ส่ง status กลับมาด้วย)
 const getParticipantStatus = (somtopId) => {

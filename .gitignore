@@ -6,6 +6,7 @@ frontend/node_modules/
 # ไฟล์ความลับ (รหัสผ่านฐานข้อมูล / JWT Secret)
 .env
 .env.*
+!/.env.example
 backend/.env
 frontend/.env
 frontend/.env.*
@@ -21,4 +22,5 @@ frontend/vite.config.js
 backend/src/config/google-service-account.json
 backup/*
 mysql-data/*
+somtop-project-source.zip
 

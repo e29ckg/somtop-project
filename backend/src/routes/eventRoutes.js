@@ -18,20 +18,20 @@ router.get('/:id/participants', eventController.getEventParticipants); // ดึ
 const uploadEvent = require('../middlewares/uploadEventMiddleware');
 
 // เปลี่ยนการรับข้อมูลให้รองรับ form-data
-router.post('/', uploadEvent.array('event_files', 10), eventController.createEvent);
-router.put('/:id', uploadEvent.array('event_files', 10), eventController.updateEvent);
+router.post('/', verifyAdmin, uploadEvent.array('event_files', 10), eventController.createEvent);
+router.put('/:id', verifyAdmin, uploadEvent.array('event_files', 10), eventController.updateEvent);
 
 // router.post('/', eventController.createEvent);                         // สร้างกิจกรรม
 // router.put('/:id', eventController.updateEvent);                       // แก้ไขกิจกรรม
-router.delete('/:id', eventController.deleteEvent);                    // ลบกิจกรรม
-router.post('/delete-file', eventController.deleteSingleFile);         // ลบไฟล์แนบทีละไฟล์
+router.delete('/:id', verifyAdmin, eventController.deleteEvent);                    // ลบกิจกรรม
+router.post('/delete-file', verifyAdmin, eventController.deleteSingleFile);         // ลบไฟล์แนบทีละไฟล์
 
-router.put('/participants/status', eventController.updateParticipantStatus);
+router.put('/participants/status', verifyAdmin, eventController.updateParticipantStatus);
 router.get('/:event_id/participants/:somtop_id/export-leave', eventController.exportMeetingLeaveToWord);
 
 // ==========================================
 // Endpoints สำหรับจัดการคนเข้าร่วมหลังสร้างกิจกรรมไปแล้ว
 // ==========================================
-router.post('/participants', eventController.manageParticipant);       // เพิ่มหรือเตะคนออกจากกิจกรรม
+router.post('/participants', verifyAdmin, eventController.manageParticipant);       // เพิ่มหรือเตะคนออกจากกิจกรรม
 
 module.exports = router;

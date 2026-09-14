@@ -86,11 +86,12 @@ exports.getEventParticipants = async (req, res) => {
             SELECT ep.id AS participant_record_id, ep.status, s.id AS somtop_id, 
                    CONCAT(s.title, s.first_name, ' ', s.last_name) AS full_name
             FROM event_participants ep
+            JOIN events e ON ep.event_id = e.id
             JOIN somtop s ON ep.somtop_id = s.id
-            WHERE ep.event_id = ? 
+            WHERE ep.event_id = ? AND (? IS NULL OR e.court_code = ?)
         `;
         
-        const [participants] = await pool.query(query, [id]);
+        const [participants] = await pool.query(query, [id, req.user.court_code, req.user.court_code]);
         res.status(200).json({ records: participants });
     } catch (error) {
         console.error('Error fetching participants:', error);
@@ -223,6 +224,9 @@ exports.updateEvent = async (req, res) => {
 
     try {
         const { id } = req.params;
+        const courtCode = req.user.court_code;
+        const scopeSql = courtCode ? ' AND court_code = ?' : '';
+        const scopeParams = courtCode ? [id, courtCode] : [id];
         const { event_type_id, title, description, start_date, end_date, location, status, participants } = req.body;
 
         if (!title || !start_date || !end_date || !event_type_id) {
@@ -230,7 +234,7 @@ exports.updateEvent = async (req, res) => {
         }
 
         // 1. ดึงข้อมูลเดิมมาตรวจสอบหาไฟล์เก่า ⭐️ และดึง google_event_id เพื่อใช้ซิงค์ปฏิทิน[cite: 2]
-        const [existing] = await connection.query('SELECT file_paths, google_event_id FROM events WHERE id = ?', [id]);
+        const [existing] = await connection.query(`SELECT file_paths, google_event_id FROM events WHERE id = ?${scopeSql}`, scopeParams);
         if (existing.length === 0) {
             return res.status(404).json({ message: 'ไม่พบข้อมูลกิจกรรม' });
         }
@@ -262,11 +266,11 @@ exports.updateEvent = async (req, res) => {
             UPDATE events SET 
                 event_type_id = ?, title = ?, description = ?, start_date = ?, 
                 end_date = ?, location = ?, status = ?, file_paths = ?
-            WHERE id = ?
+            WHERE id = ?${scopeSql}
         `;
         await connection.query(query, [
             event_type_id, title, description || '', start_date, end_date, 
-            location || '', status || 'รอดำเนินการ', filePathsDb, id
+            location || '', status || 'รอดำเนินการ', filePathsDb, ...scopeParams
         ]);
 
         // 5. แปลง String เป็น Array และอัปเดตผู้เข้าร่วม
@@ -361,9 +365,12 @@ exports.updateEvent = async (req, res) => {
 exports.deleteEvent = async (req, res) => {
     try {
         const { id } = req.params;
+        const courtCode = req.user.court_code;
+        const scopeSql = courtCode ? ' AND court_code = ?' : '';
+        const scopeParams = courtCode ? [id, courtCode] : [id];
 
         // 1. ⭐️ ดึงข้อมูลเพื่อตรวจสอบหาไฟล์แนบ และดึง google_event_id
-        const [existing] = await pool.query('SELECT file_paths, google_event_id FROM events WHERE id = ?', [id]);
+        const [existing] = await pool.query(`SELECT file_paths, google_event_id FROM events WHERE id = ?${scopeSql}`, scopeParams);
         
         if (existing.length === 0) {
             return res.status(404).json({ message: 'ไม่พบข้อมูลกิจกรรม' });
@@ -387,7 +394,7 @@ exports.deleteEvent = async (req, res) => {
         }
 
         // 4. ลบข้อมูลกิจกรรมออกจากฐานข้อมูล
-        await pool.query('DELETE FROM events WHERE id = ?', [id]);
+        await pool.query(`DELETE FROM events WHERE id = ?${scopeSql}`, scopeParams);
         logActivity(req, 'ลบข้อมูล', 'จัดการกิจกรรม', `ลบกิจกรรม ID: ${id}`);
         res.status(200).json({ message: 'ลบกิจกรรมและไฟล์แนบสำเร็จ' });
     } catch (error) {
@@ -407,7 +414,10 @@ exports.deleteSingleFile = async (req, res) => {
             return res.status(400).json({ message: 'ข้อมูลไม่ครบถ้วน' });
         }
 
-        const [existing] = await pool.query('SELECT file_paths FROM events WHERE id = ?', [id]);
+        const courtCode = req.user.court_code;
+        const scopeSql = courtCode ? ' AND court_code = ?' : '';
+        const scopeParams = courtCode ? [id, courtCode] : [id];
+        const [existing] = await pool.query(`SELECT file_paths FROM events WHERE id = ?${scopeSql}`, scopeParams);
         if (existing.length === 0 || !existing[0].file_paths) {
             return res.status(404).json({ message: 'ไม่พบข้อมูลไฟล์' });
         }
@@ -423,8 +433,8 @@ exports.deleteSingleFile = async (req, res) => {
             return currentFilename !== targetFilename;
         });
 
-        await pool.query('UPDATE events SET file_paths = ? WHERE id = ?', [
-            JSON.stringify(updatedPaths), id
+        await pool.query(`UPDATE events SET file_paths = ? WHERE id = ?${scopeSql}`, [
+            JSON.stringify(updatedPaths), ...scopeParams
         ]);
 
         // ส่งเฉพาะชื่อไฟล์หรือ URL ไปให้ Helper ลบไฟล์ตามที่คุณออกแบบไว้
@@ -450,7 +460,10 @@ exports.manageParticipant = async (req, res) => {
         }
 
         // 1. ตรวจสอบก่อนว่ามีกิจกรรมนี้อยู่ในระบบหรือไม่
-        const [eventRows] = await pool.query('SELECT * FROM events WHERE id = ?', [event_id]);
+        const [eventRows] = await pool.query(
+            'SELECT * FROM events WHERE id = ? AND (? IS NULL OR court_code = ?)',
+            [event_id, req.user.court_code, req.user.court_code]
+        );
         if (eventRows.length === 0) {
             return res.status(404).json({ message: 'ไม่พบข้อมูลกิจกรรมนี้ในระบบ' });
         }
@@ -539,9 +552,15 @@ exports.manageParticipant = async (req, res) => {
 exports.updateParticipantStatus = async (req, res) => {
     try {
         const { event_id, somtop_id, status } = req.body;
+        if (!['เข้าร่วม', 'ลา', 'ไม่เข้าร่วม'].includes(status)) {
+            return res.status(400).json({ message: 'สถานะผู้เข้าร่วมไม่ถูกต้อง' });
+        }
         await pool.query(
-            'UPDATE event_participants SET status = ? WHERE event_id = ? AND somtop_id = ?', 
-            [status, event_id, somtop_id]
+            `UPDATE event_participants ep
+             JOIN events e ON ep.event_id = e.id
+             SET ep.status = ?
+             WHERE ep.event_id = ? AND ep.somtop_id = ? AND (? IS NULL OR e.court_code = ?)`,
+            [status, event_id, somtop_id, req.user.court_code, req.user.court_code]
         );
         logActivity(req, 'อัปเดตข้อมูล', 'ผู้เข้าร่วมกิจกรรม', `อัปเดตสถานะผู้เข้าร่วม กิจกรรม ID: ${event_id}, พ.สมทบ ID: ${somtop_id}`);
         res.status(200).json({ message: 'อัปเดตสถานะสำเร็จ' });
@@ -564,8 +583,9 @@ exports.exportMeetingLeaveToWord = async (req, res) => {
             JOIN events e ON ep.event_id = e.id
             JOIN somtop s ON ep.somtop_id = s.id
             WHERE ep.event_id = ? AND ep.somtop_id = ?
+              AND (? IS NULL OR e.court_code = ?)
         `;
-        const [rows] = await pool.query(query, [event_id, somtop_id]);
+        const [rows] = await pool.query(query, [event_id, somtop_id, req.user.court_code, req.user.court_code]);
 
         if (rows.length === 0) return res.status(404).json({ message: 'ไม่พบข้อมูล' });
         

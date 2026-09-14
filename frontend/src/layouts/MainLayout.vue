@@ -132,11 +132,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, watch, watchEffect } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { swalConfirm } from '../utils/swal' // ⭐️ นำเข้า SweetAlert สำหรับยืนยันการลบ
 import api from '../services/api' // ⭐️ นำเข้า Axios instance สำหรับเรียก API
 import { useCounterStore } from '@/stores/counter'
+import { currentUser, clearSession } from '../services/session'
 
 const router = useRouter()
 const route = useRoute()
@@ -146,15 +147,11 @@ const userRole = ref('viewer') // ค่าเริ่มต้น
 const userName = ref('ผู้ใช้งาน')
 const userCourtCode = ref('')
 
-// ⭐️ ดึงข้อมูล User จาก LocalStorage เมื่อโหลดหน้าจอ
-onMounted(() => {
-  const userData = localStorage.getItem('user')
-  if (userData) {
-    const user = JSON.parse(userData)
-    userRole.value = user.role || 'viewer'
-    userName.value = user.full_name || 'ผู้ใช้งาน'
-    userCourtCode.value = user.court_code
-  }
+watchEffect(() => {
+  const user = currentUser.value
+  userRole.value = user?.role || 'viewer'
+  userName.value = user?.full_name || 'ผู้ใช้งาน'
+  userCourtCode.value = user?.court_code || ''
 })
 
 const toggleSidebar = () => {
@@ -195,7 +192,7 @@ const handleLogout = async () => {
       await api.post('/auth/logout')
       
       // ลบข้อมูล user ใน localStorage
-      localStorage.removeItem('user') 
+      clearSession()
       
       // กลับหน้า Login
       router.push('/')
@@ -203,7 +200,7 @@ const handleLogout = async () => {
     } catch (error) {
       console.error("เกิดข้อผิดพลาดในการออกจากระบบ:", error)
       // แม้ API จะพัง ก็ควรบังคับลบ user และเด้งออกอยู่ดี
-      localStorage.removeItem('user')
+      clearSession()
       router.push('/')
     }
   }

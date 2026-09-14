@@ -6,7 +6,7 @@
         <h1 class="page-title">ประวัติการลา</h1>
         <p class="page-subtitle">ข้อมูลการขอลาพักปฏิบัติหน้าที่ของผู้พิพากษาสมทบ</p>
       </div>
-      <button class="btn-primary" @click="openAddModal">
+      <button v-if="isAdmin" class="btn-primary" @click="openAddModal">
         + ยื่นเรื่องขอลา
       </button>
     </div>
@@ -130,8 +130,8 @@
                           </a>
                         </template>
                         
-                        <button class="btn-icon edit" @click="openEditModal(leave)" title="แก้ไข">✏️</button>
-                        <button class="btn-icon delete" @click="deleteData(leave.id)" title="ลบ">🗑️</button>
+                        <button v-if="isAdmin" class="btn-icon edit" @click="openEditModal(leave)" title="แก้ไข">✏️</button>
+                        <button v-if="isAdmin" class="btn-icon delete" @click="deleteData(leave.id)" title="ลบ">🗑️</button>
                       </div>
                     </td>
               </tr>
@@ -169,7 +169,7 @@
     </div>
 
     <!-- Modal Form (สำหรับยื่นเรื่อง/ดูข้อมูล) -->
-    <div v-if="isModalOpen" class="modal-overlay no-print">
+    <div v-if="isAdmin && isModalOpen" class="modal-overlay no-print">
       <div class="modal-card">
         <div class="modal-header">
           <h2>{{ isEditing ? 'รายละเอียดการลา' : 'แบบฟอร์มยื่นเรื่องขอลา' }}</h2>
@@ -333,6 +333,8 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import api from '../services/api'
+import { isAdmin } from '../services/session'
+import { createProtectedFileUrl, revokeProtectedFileUrl } from '../services/protectedFiles'
 import { swalSuccess, swalError, swalConfirm } from '../utils/swal'
 
 const isSaving = ref(false)
@@ -375,6 +377,7 @@ const formData = ref({
 
 const isPreviewOpen = ref(false)
 const previewUrl = ref('')
+const previewSourceUrl = ref('')
 
 const currentPage = ref(1)
 const itemsPerPage = ref(10)
@@ -691,14 +694,22 @@ const deleteData = async (id) => {
 }
 
 
-const openPdfPreview = (url) => {
-  previewUrl.value = url
-  isPreviewOpen.value = true
+const openPdfPreview = async (url) => {
+  try {
+    revokeProtectedFileUrl(previewUrl.value)
+    previewSourceUrl.value = url
+    previewUrl.value = await createProtectedFileUrl(url)
+    isPreviewOpen.value = true
+  } catch (error) {
+    swalError('เปิดไฟล์ไม่สำเร็จ', error.response?.data?.message || 'ไม่สามารถดาวน์โหลดไฟล์แนบได้')
+  }
 }
 
 const closePdfPreview = () => {
   isPreviewOpen.value = false
+  revokeProtectedFileUrl(previewUrl.value)
   previewUrl.value = ''
+  previewSourceUrl.value = ''
 }
 
 const getStatusClass = (status) => {
@@ -794,9 +805,9 @@ const deleteCurrentFile = async () => {
   const result = await swalConfirm('ยืนยันการลบไฟล์', 'คุณแน่ใจหรือไม่ว่าต้องการลบเอกสารนี้?');
   if (result.isConfirmed) {
     try {
-      await api.post('/leaves/delete-file', { id: formData.value.id, file_url: previewUrl.value });
-      formData.value.existing_file_paths = formData.value.existing_file_paths.filter(url => url !== previewUrl.value);
-      closeFilePreview();
+      await api.post('/leaves/delete-file', { id: formData.value.id, file_url: previewSourceUrl.value });
+      formData.value.existing_file_paths = formData.value.existing_file_paths.filter(url => url !== previewSourceUrl.value);
+      closePdfPreview();
       swalSuccess('ลบไฟล์สำเร็จ', 'เอกสารถูกลบเรียบร้อยแล้ว');
       fetchLeaves();
     } catch (error) {
@@ -844,10 +855,9 @@ const exportToWord = async (id) => {
   }
 }
 
-const openFilePreview = (url, eventId) => {
-  previewUrl.value = url;
+const openFilePreview = async (url, eventId) => {
   if (eventId) formData.value.id = eventId;
-  isPreviewOpen.value = true;
+  await openPdfPreview(url)
 }
 
 
