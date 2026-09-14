@@ -13,13 +13,13 @@ html, body {
   margin: 0;
   padding: 0;
   min-height: 100%;
-  background-color: #121212;
-  color: #FFFFFF;
-  font-family: 'Google Sans', 'Noto Sans Thai', sans-serif;
+  background-color: var(--color-page);
+  color: var(--color-text-body);
+  font-family: var(--font-family-base);
 }
 
 body {
-  background-color: #121212;
+  background-color: var(--color-page);
 }
 
 #app {

@@ -38,7 +38,6 @@ exports.getAllSomtop = async (req, res) => {
                 CONCAT(s.title, s.first_name, ' ', s.last_name) AS full_name 
             FROM somtop s
             LEFT JOIN somtop_positions sp ON s.position_id = sp.id
-            -- ⭐️ JOIN ประวัติวาระ โดยดึงเฉพาะวาระที่ "กำลังดำรงตำแหน่ง"
             LEFT JOIN somtop_term_history sth ON s.id = sth.somtop_id AND sth.status = 'กำลังดำรงตำแหน่ง'
             LEFT JOIN working_terms wt ON sth.term_id = wt.id
         `;
@@ -285,7 +284,11 @@ exports.getSomtopHistory = async (req, res) => {
             WHERE lr.somtop_id = ? 
             ORDER BY lr.start_date DESC
         `;
-        const [leaves] = await pool.query(queryLeaves, [id]);
+        const [leaveRows] = await pool.query(queryLeaves, [id]);
+        const leaves = leaveRows.map(row => ({
+            ...row,
+            total_days: Number.isFinite(Number(row.total_days)) ? Number(row.total_days) : 0
+        }));
 
         // 2. ดึงประวัติกิจกรรม
         const queryEvents = `

@@ -1,5 +1,6 @@
 const PizZip = require('pizzip');
 const Docxtemplater = require('docxtemplater');
+const ExcelJS = require('exceljs');
 const pool = require('../config/db');
 const fs = require('fs');
 const path = require('path');
@@ -88,7 +89,9 @@ exports.getEventParticipants = async (req, res) => {
             FROM event_participants ep
             JOIN events e ON ep.event_id = e.id
             JOIN somtop s ON ep.somtop_id = s.id
+            LEFT JOIN somtop_positions sp ON s.position_id = sp.id
             WHERE ep.event_id = ? AND (? IS NULL OR e.court_code = ?)
+            ORDER BY sp.level ASC, s.join_date ASC, s.first_name ASC, s.last_name ASC
         `;
         
         const [participants] = await pool.query(query, [id, req.user.court_code, req.user.court_code]);
@@ -696,8 +699,8 @@ exports.getParticipationReport = async (req, res) => {
             params.push(courtCode);
         }
         if (year) {
-            filters.push('YEAR(e.start_date) = ?');
-            params.push(Number(year));
+            filters.push('e.start_date >= ? AND e.start_date < ?');
+            params.push(`${year}-04-01`, `${Number(year) + 1}-04-01`);
         }
         if (eventTypeId) {
             filters.push('e.event_type_id = ?');
@@ -728,7 +731,7 @@ exports.getParticipationReport = async (req, res) => {
         `, params);
 
         const [yearRows] = await pool.query(`
-            SELECT DISTINCT YEAR(start_date) AS year
+            SELECT DISTINCT YEAR(DATE_SUB(start_date, INTERVAL 3 MONTH)) AS year
             FROM events
             WHERE status <> 'ยกเลิก' AND (? IS NULL OR court_code = ?)
             ORDER BY year DESC
@@ -741,10 +744,11 @@ exports.getParticipationReport = async (req, res) => {
             ORDER BY et.name ASC
         `, [courtCode, courtCode]);
         const [personRows] = await pool.query(`
-            SELECT id, CONCAT(title, first_name, ' ', last_name) AS full_name
-            FROM somtop
-            WHERE (? IS NULL OR court_code = ?)
-            ORDER BY first_name ASC, last_name ASC
+            SELECT s.id, CONCAT(s.title, s.first_name, ' ', s.last_name) AS full_name
+            FROM somtop s
+            LEFT JOIN somtop_positions sp ON s.position_id = sp.id
+            WHERE (? IS NULL OR s.court_code = ?)
+            ORDER BY COALESCE(sp.level, 999999) ASC, s.first_name ASC, s.last_name ASC
         `, [courtCode, courtCode]);
 
         const [matrixEventRows] = await pool.query(`
@@ -763,8 +767,9 @@ exports.getParticipationReport = async (req, res) => {
             FROM event_participants ep
             JOIN events e ON ep.event_id = e.id
             JOIN somtop s ON ep.somtop_id = s.id
+            LEFT JOIN somtop_positions sp ON s.position_id = sp.id
             ${whereSql}
-            ORDER BY s.first_name ASC, s.last_name ASC
+            ORDER BY COALESCE(sp.level, 999999) ASC, s.first_name ASC, s.last_name ASC
         `, params);
 
         const records = rows.map(row => {
@@ -825,5 +830,151 @@ exports.getParticipationReport = async (req, res) => {
     } catch (error) {
         console.error('Error generating participation report:', error);
         res.status(500).json({ message: 'ไม่สามารถสร้างรายงานการเข้าร่วมกิจกรรมได้' });
+    }
+};
+
+exports.exportParticipationExcel = async (req, res) => {
+    try {
+        const courtCode = req.user.court_code;
+        const { year, event_type_id: eventTypeId, somtop_id: somtopId } = req.query;
+        if (year && !/^\d{4}$/.test(String(year))) return res.status(400).json({ message: 'รูปแบบปีไม่ถูกต้อง' });
+        if (eventTypeId && (!/^\d+$/.test(String(eventTypeId)) || Number(eventTypeId) < 1)) return res.status(400).json({ message: 'ประเภทกิจกรรมไม่ถูกต้อง' });
+        if (somtopId && (!/^\d+$/.test(String(somtopId)) || Number(somtopId) < 1)) return res.status(400).json({ message: 'รายชื่อบุคคลไม่ถูกต้อง' });
+
+        const filters = ["e.status <> 'ยกเลิก'"];
+        const params = [];
+        if (courtCode) { filters.push('e.court_code = ?'); params.push(courtCode); }
+        if (year) {
+            filters.push('e.start_date >= ? AND e.start_date < ?');
+            params.push(`${year}-04-01`, `${Number(year) + 1}-04-01`);
+        }
+        if (eventTypeId) { filters.push('e.event_type_id = ?'); params.push(Number(eventTypeId)); }
+        if (somtopId) { filters.push('ep.somtop_id = ?'); params.push(Number(somtopId)); }
+        const whereSql = `WHERE ${filters.join(' AND ')}`;
+
+        const [events] = await pool.query(`
+            SELECT DISTINCT e.id, e.title, DATE_FORMAT(e.start_date, '%Y-%m-%d') AS event_date,
+                COALESCE(et.name, 'ไม่ระบุประเภท') AS event_type_name
+            FROM events e
+            LEFT JOIN event_types et ON e.event_type_id = et.id
+            LEFT JOIN event_participants ep ON ep.event_id = e.id
+            ${whereSql}
+            ORDER BY e.start_date, e.id
+        `, params);
+        const [participants] = await pool.query(`
+            SELECT ep.event_id, ep.somtop_id, ep.status,
+                CONCAT(s.title, s.first_name, ' ', s.last_name) AS full_name
+            FROM event_participants ep
+            JOIN events e ON ep.event_id = e.id
+            JOIN somtop s ON ep.somtop_id = s.id
+            LEFT JOIN somtop_positions sp ON s.position_id = sp.id
+            ${whereSql}
+            ORDER BY COALESCE(sp.level, 999999) ASC, s.first_name ASC, s.last_name ASC
+        `, params);
+
+        const people = new Map();
+        participants.forEach((item) => {
+            if (!people.has(item.somtop_id)) people.set(item.somtop_id, { full_name: item.full_name, statuses: {} });
+            people.get(item.somtop_id).statuses[item.event_id] = item.status;
+        });
+
+        let typeLabel = 'ทุกประเภทกิจกรรม';
+        if (eventTypeId) {
+            const [[type]] = await pool.query('SELECT name FROM event_types WHERE id = ?', [eventTypeId]);
+            typeLabel = type?.name || 'ไม่ระบุประเภท';
+        }
+        let personLabel = 'ทุกคน';
+        if (somtopId) {
+            const [[person]] = await pool.query(
+                "SELECT CONCAT(title, first_name, ' ', last_name) AS full_name FROM somtop WHERE id = ? AND (? IS NULL OR court_code = ?)",
+                [somtopId, courtCode, courtCode]
+            );
+            personLabel = person?.full_name || 'ไม่พบรายชื่อ';
+        }
+
+        const workbook = new ExcelJS.Workbook();
+        workbook.creator = 'ระบบบริหารข้อมูลผู้พิพากษาสมทบ';
+        workbook.created = new Date();
+        const sheet = workbook.addWorksheet('รายละเอียดรายบุคคล', {
+            views: [{ state: 'frozen', xSplit: 1, ySplit: 5 }],
+            properties: { defaultRowHeight: 22 }
+        });
+        const lastColumn = Math.max(events.length + 2, 3);
+        sheet.mergeCells(1, 1, 1, lastColumn);
+        sheet.getCell(1, 1).value = 'รายละเอียดการเข้าร่วมกิจกรรมรายบุคคล';
+        sheet.getCell(1, 1).font = { name: 'Aptos', size: 16, bold: true, color: { argb: 'FF1F2937' } };
+        sheet.getCell(1, 1).alignment = { horizontal: 'left', vertical: 'middle' };
+        sheet.getRow(1).height = 28;
+        sheet.mergeCells(2, 1, 2, lastColumn);
+        sheet.getCell(2, 1).value = `${year ? `รอบปี ${Number(year) + 543} (1 เม.ย. ${Number(year) + 543} - 31 มี.ค. ${Number(year) + 544})` : 'ทุกรอบปี'} | ${typeLabel} | ${personLabel}`;
+        sheet.getCell(2, 1).font = { name: 'Aptos', size: 10, italic: true, color: { argb: 'FF64748B' } };
+        sheet.mergeCells(3, 1, 3, lastColumn);
+        sheet.getCell(3, 1).value = `จัดทำเมื่อ ${new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}`;
+        sheet.getCell(3, 1).font = { name: 'Aptos', size: 9, color: { argb: 'FF64748B' } };
+
+        const formatThaiShortDate = (dateValue) => {
+            if (!dateValue) return '-';
+            const [yearPart, monthPart, dayPart] = String(dateValue).slice(0, 10).split('-').map(Number);
+            const shortMonths = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+            if (!yearPart || !monthPart || !dayPart || !shortMonths[monthPart - 1]) return String(dateValue);
+            return `${dayPart} ${shortMonths[monthPart - 1]} ${yearPart + 543}`;
+        };
+
+        const headerRow = sheet.getRow(5);
+        headerRow.values = ['รายชื่อ', ...events.map(event => `${event.title}\n${formatThaiShortDate(event.event_date)}\n${event.event_type_name}`), 'รวมเข้าร่วม'];
+        headerRow.height = 58;
+        headerRow.eachCell((cell) => {
+            cell.font = { name: 'Aptos', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E78' } };
+            cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+            cell.border = { bottom: { style: 'thin', color: { argb: 'FFD9E2F3' } } };
+        });
+        sheet.getColumn(1).width = 32;
+        events.forEach((_, index) => { sheet.getColumn(index + 2).width = 24; });
+        sheet.getColumn(lastColumn).width = 14;
+
+        const statusStyles = {
+            'เข้าร่วม': { fill: 'FFDCFCE7', font: 'FF166534' },
+            'ลาประชุม': { fill: 'FFFEF3C7', font: 'FF92400E' },
+            'ไม่เข้าร่วม': { fill: 'FFFEE2E2', font: 'FF991B1B' },
+            'รอตอบรับ': { fill: 'FFE2E8F0', font: 'FF475569' }
+        };
+        Array.from(people.values()).forEach((person, personIndex) => {
+            const attendedTotal = events.reduce((total, event) => total + (person.statuses[event.id] === 'เข้าร่วม' ? 1 : 0), 0);
+            const row = sheet.addRow([person.full_name, ...events.map(event => person.statuses[event.id] || '—'), attendedTotal]);
+            row.height = 24;
+            row.getCell(1).font = { name: 'Aptos', size: 10, bold: true, color: { argb: 'FF1F2937' } };
+            row.getCell(1).alignment = { vertical: 'middle' };
+            row.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: personIndex % 2 ? 'FFF8FAFC' : 'FFFFFFFF' } };
+            for (let column = 2; column <= lastColumn; column += 1) {
+                const cell = row.getCell(column);
+                const style = statusStyles[cell.value];
+                cell.font = { name: 'Aptos', size: 10, bold: Boolean(style), color: { argb: style?.font || 'FFCBD5E1' } };
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: style?.fill || (personIndex % 2 ? 'FFF8FAFC' : 'FFFFFFFF') } };
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            }
+            row.getCell(lastColumn).font = { name: 'Aptos', size: 10, bold: true, color: { argb: 'FF166534' } };
+            row.getCell(lastColumn).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCFCE7' } };
+            row.eachCell(cell => {
+                cell.border = { bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } } };
+            });
+        });
+        if (!people.size) {
+            sheet.mergeCells(6, 1, 6, lastColumn);
+            sheet.getCell(6, 1).value = 'ไม่พบรายละเอียดการเข้าร่วมตามเงื่อนไขที่เลือก';
+            sheet.getCell(6, 1).alignment = { horizontal: 'center' };
+            sheet.getCell(6, 1).font = { name: 'Aptos', size: 10, italic: true, color: { argb: 'FF64748B' } };
+        }
+        sheet.autoFilter = { from: { row: 5, column: 1 }, to: { row: 5, column: lastColumn } };
+        sheet.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9 };
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        const filename = `รายงานการเข้าร่วมรายบุคคล_รอบปี_${year ? Number(year) + 543 : 'ทั้งหมด'}.xlsx`;
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
+        res.send(Buffer.from(buffer));
+    } catch (error) {
+        console.error('Error exporting participation Excel:', error);
+        res.status(500).json({ message: 'ไม่สามารถสร้างรายงาน Excel ได้' });
     }
 };

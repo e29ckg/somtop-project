@@ -8,6 +8,14 @@ const { logActivity } = require('../utils/logger');
 
 const BASE_URL = process.env.APP_URL || 'http://localhost:8088';
 
+// MySQL ส่งค่า DECIMAL เป็น string (เช่น "7.0") จึงแปลงเป็น number
+// เพื่อให้ JSON แสดงจำนวนเต็มเป็น 7 แต่ยังคงค่าทศนิยมจริง เช่น 7.5
+const normalizeLeaveDays = (value) => {
+    if (value === null || value === undefined || value === '') return 0;
+    const days = Number(value);
+    return Number.isFinite(days) ? days : 0;
+};
+
 const deletePhysicalFiles = (filePathsData) => {
     if (!filePathsData) return;
     try {
@@ -69,6 +77,7 @@ exports.getAllLeaves = async (req, res) => {
 
         // ⭐️ แปลงข้อความ JSON ให้เป็น Array ก่อนส่งไป Frontend
         const records = rows.map(row => {
+            row.total_days = normalizeLeaveDays(row.total_days);
             if (row.file_path) {
                 try {
                     // ลองแปลง JSON String เป็น Array
@@ -183,6 +192,53 @@ exports.updateLeave = async (req, res) => {
     }
 };
 
+// แนบใบลาที่ลงนามแล้วและอนุมัติรายการในขั้นตอนเดียว
+exports.uploadApprovedLeavePdf = async (req, res) => {
+    const uploadedPath = req.file ? path.join(__dirname, '../../uploads/leaves/', req.file.filename) : null;
+    try {
+        const { id } = req.params;
+        if (!req.file) return res.status(400).json({ message: 'กรุณาเลือกไฟล์ PDF' });
+
+        const isPdf = req.file.mimetype === 'application/pdf' && path.extname(req.file.originalname).toLowerCase() === '.pdf';
+        if (!isPdf) {
+            if (fs.existsSync(uploadedPath)) fs.unlinkSync(uploadedPath);
+            return res.status(400).json({ message: 'รองรับเฉพาะไฟล์ PDF เท่านั้น' });
+        }
+
+        const courtCode = req.user.court_code;
+        const scopeSql = courtCode ? ' AND court_code = ?' : '';
+        const scopeParams = courtCode ? [id, courtCode] : [id];
+        const [existing] = await pool.query(`SELECT file_path FROM leave_requests WHERE id = ?${scopeSql}`, scopeParams);
+        if (existing.length === 0) {
+            if (fs.existsSync(uploadedPath)) fs.unlinkSync(uploadedPath);
+            return res.status(404).json({ message: 'ไม่พบข้อมูลใบลา' });
+        }
+
+        let filePaths = [];
+        if (existing[0].file_path) {
+            try {
+                const parsed = JSON.parse(existing[0].file_path);
+                filePaths = Array.isArray(parsed) ? parsed : [existing[0].file_path];
+            } catch (_error) {
+                filePaths = [existing[0].file_path];
+            }
+        }
+        const protocol = req.secure ? 'https' : 'http';
+        filePaths.push(`${protocol}://${req.headers.host}/uploads/leaves/${req.file.filename}`);
+
+        await pool.query(
+            `UPDATE leave_requests SET file_path = ?, status = 'อนุมัติแล้ว' WHERE id = ?${scopeSql}`,
+            [JSON.stringify(filePaths), ...scopeParams]
+        );
+        logActivity(req, 'อนุมัติข้อมูล', 'จัดการการลา', `แนบใบลา PDF และอนุมัติรายการ ID: ${id}`);
+        res.status(200).json({ message: 'แนบใบลา PDF และอนุมัติรายการเรียบร้อยแล้ว', status: 'อนุมัติแล้ว', file_path: filePaths });
+    } catch (error) {
+        if (uploadedPath && fs.existsSync(uploadedPath)) fs.unlinkSync(uploadedPath);
+        console.error('Error uploading approved leave PDF:', error);
+        res.status(500).json({ message: 'ไม่สามารถแนบและอนุมัติใบลาได้' });
+    }
+};
+
 // ==========================================
 // 4. ลบประวัติการลา
 // ==========================================
@@ -291,7 +347,7 @@ exports.exportToWord = async (req, res) => {
             leave_type_name: leaveData.leave_type_name || '-',
             start_date: formatThaiDate(leaveData.start_date),
             end_date: formatThaiDate(leaveData.end_date),
-            total_days: leaveData.total_days ? (leaveData.total_days % 1 === 0 ? parseInt(leaveData.total_days) : parseFloat(leaveData.total_days)) : '0',
+            total_days: normalizeLeaveDays(leaveData.total_days),
             note: leaveData.note || '-',
             dob: formatThaiDate(leaveData.dob),
             join_date: formatThaiDate(leaveData.join_date),
@@ -341,7 +397,13 @@ exports.deleteSingleFile = async (req, res) => {
             return res.status(404).json({ message: 'ไม่พบข้อมูลไฟล์' });
         }
 
-        let pathsArray = JSON.parse(existing[0].file_path);
+        let pathsArray;
+        try {
+            const parsed = JSON.parse(existing[0].file_path);
+            pathsArray = Array.isArray(parsed) ? parsed : [existing[0].file_path];
+        } catch (_error) {
+            pathsArray = [existing[0].file_path];
+        }
 
         // ⭐️ 1. ดึงเฉพาะชื่อไฟล์เป้าหมายออกมา (เช่น event_1234.pdf)
         const targetFilename = file_url.split('/').pop();
@@ -352,14 +414,16 @@ exports.deleteSingleFile = async (req, res) => {
             return currentFilename !== targetFilename;
         });
 
-        await pool.query(`UPDATE leave_requests SET file_path = ? WHERE id = ?${scopeSql}`, [
-            JSON.stringify(updatedPaths), ...scopeParams
-        ]);
+        const hasApprovedPdf = updatedPaths.some(url => String(url).toLowerCase().split('?')[0].endsWith('.pdf'));
+        await pool.query(
+            `UPDATE leave_requests SET file_path = ?, status = CASE WHEN status = 'อนุมัติแล้ว' AND ? = 0 THEN 'รอตรวจสอบ' ELSE status END WHERE id = ?${scopeSql}`,
+            [JSON.stringify(updatedPaths), hasApprovedPdf ? 1 : 0, ...scopeParams]
+        );
 
         // ส่งเฉพาะชื่อไฟล์หรือ URL ไปให้ Helper ลบไฟล์ตามที่คุณออกแบบไว้
         deletePhysicalFiles(JSON.stringify([file_url]));
 
-        logActivity(req, 'ลบไฟล์', 'จัดการกิจกรรม', `ลบไฟล์แนบจากกิจกรรม ID: ${id}`);
+        logActivity(req, 'ลบไฟล์', 'จัดการการลา', `ลบไฟล์แนบจากใบลา ID: ${id}`);
         res.status(200).json({ message: 'ลบไฟล์สำเร็จ' });
     } catch (error) {
         console.error('Error deleting single file:', error);

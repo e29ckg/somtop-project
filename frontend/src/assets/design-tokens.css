@@ -1,0 +1,55 @@
+:root {
+  /* Typography */
+  --font-family-base: 'Sarabun', 'Noto Sans Thai', sans-serif;
+  --font-size-xs: 12px;
+  --font-size-sm: 13px;
+  --font-size-base: 14px;
+  --font-size-lg: 16px;
+  --font-size-page-title: 24px;
+
+  /* Brand and semantic colors */
+  --color-primary: #10B981;
+  --color-primary-hover: #059669;
+  --color-primary-soft: #D1FAE5;
+  --color-danger: #DC2626;
+  --color-danger-soft: #FEE2E2;
+  --color-warning: #F59E0B;
+  --color-warning-soft: #FEF3C7;
+  --color-info: #2563EB;
+  --color-info-soft: #DBEAFE;
+
+  /* Surfaces and text */
+  --color-page: #F4F6F9;
+  --color-surface: #FFFFFF;
+  --color-surface-muted: #F9FAFB;
+  --color-surface-hover: #F3F4F6;
+  --color-border: #E5E7EB;
+  --color-border-strong: #D1D5DB;
+  --color-text: #111827;
+  --color-text-body: #374151;
+  --color-text-muted: #6B7280;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* Shape, controls and elevation */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --control-height: 42px;
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.05);
+  --shadow-focus: 0 0 0 3px rgba(16, 185, 129, 0.1);
+  --transition-fast: 0.2s ease;
+
+  /* Layout */
+  --content-gap: 24px;
+  --modal-width: 600px;
+  --modal-width-large: 900px;
+  --breakpoint-mobile: 768px;
+}

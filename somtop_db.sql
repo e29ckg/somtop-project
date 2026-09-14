@@ -281,6 +281,7 @@ CREATE TABLE duty_orders (
     order_month DATE NOT NULL COMMENT 'เดือนของคำสั่ง โดยเก็บเป็นวันแรกของเดือน',
     court_code VARCHAR(50) NOT NULL COMMENT 'รหัสศาลเจ้าของคำสั่ง',
     note TEXT NULL,
+    signed_order_file_path VARCHAR(500) NULL COMMENT 'ที่อยู่ไฟล์ PDF คำสั่งที่ลงนามแล้ว',
     status ENUM('ใช้งาน', 'ยกเลิก') DEFAULT 'ใช้งาน',
     created_by INT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -292,11 +293,30 @@ CREATE TABLE duty_orders (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ==========================================
--- 3. ตารางผู้ปฏิบัติหน้าที่รายวัน (duty_schedules)
+-- 3. ตารางคณะปฏิบัติหน้าที่ คณะละ 2 คน
+-- ==========================================
+CREATE TABLE duty_teams (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    court_code VARCHAR(50) NOT NULL COMMENT 'รหัสศาล',
+    team_name VARCHAR(100) NOT NULL COMMENT 'ชื่อหรือหมายเลขคณะ',
+    member_one_somtop_id INT NOT NULL,
+    member_two_somtop_id INT NOT NULL,
+    status ENUM('ใช้งาน', 'ระงับ') DEFAULT 'ใช้งาน',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_duty_team_name (court_code, team_name),
+    FOREIGN KEY (member_one_somtop_id) REFERENCES somtop(id) ON DELETE RESTRICT,
+    FOREIGN KEY (member_two_somtop_id) REFERENCES somtop(id) ON DELETE RESTRICT,
+    INDEX idx_duty_team_court_status (court_code, status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ==========================================
+-- 4. ตารางผู้ปฏิบัติหน้าที่รายวัน (duty_schedules)
 -- ==========================================
 CREATE TABLE duty_schedules (
     id INT AUTO_INCREMENT PRIMARY KEY,
     order_id INT NOT NULL COMMENT 'คำสั่งเวรประจำเดือน',
+    team_id INT NULL COMMENT 'คณะที่ใช้จัดเวร โดยเปลี่ยนเวรเป็นรายบุคคล',
     somtop_id INT NOT NULL COMMENT 'ผู้ปฏิบัติหน้าที่',
     duty_type_id INT NOT NULL COMMENT 'ประเภทเวร',
     court_code VARCHAR(50) NOT NULL COMMENT 'รหัสศาล',
@@ -307,10 +327,12 @@ CREATE TABLE duty_schedules (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
     FOREIGN KEY (order_id) REFERENCES duty_orders(id) ON DELETE CASCADE,
+    FOREIGN KEY (team_id) REFERENCES duty_teams(id) ON DELETE SET NULL,
     FOREIGN KEY (somtop_id) REFERENCES somtop(id) ON DELETE CASCADE,
     FOREIGN KEY (duty_type_id) REFERENCES duty_types(id) ON DELETE RESTRICT,
     UNIQUE KEY unique_order_duty_person (order_id, duty_date, somtop_id),
     INDEX idx_duty_court_date (court_code, duty_date),
+    INDEX idx_duty_schedule_team (team_id),
     INDEX idx_duty_order_date (order_id, duty_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

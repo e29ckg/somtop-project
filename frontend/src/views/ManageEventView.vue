@@ -6,9 +6,10 @@
         <h1 class="page-title">ปฏิทินกิจกรรม</h1>
         <p class="page-subtitle">จัดการข้อมูลกิจกรรม และรายชื่อผู้พิพากษาสมทบที่เข้าร่วม</p>
       </div>
-      <button v-if="isAdmin" class="btn-primary" @click="openAddModal">
-        + สร้างกิจกรรมใหม่
-      </button>
+      <div v-if="isAdmin" class="header-actions">
+        <button class="btn-secondary" @click="openEventTypeManager">⚙️ จัดการประเภทกิจกรรม</button>
+        <button class="btn-primary" @click="openAddModal">+ สร้างกิจกรรมใหม่</button>
+      </div>
     </div>
 
     <!-- Table Section -->
@@ -16,21 +17,24 @@
       <div class="table-header-actions no-print">
         
         <!-- ซ้าย: เลือกจำนวนรายการ -->
-        <div class="items-per-page-selector">
-          <label>แสดง</label>
-          <select v-model="itemsPerPage" @change="currentPage = 1" class="per-page-select">
-            <option :value="10">10</option>
-            <option :value="20">20</option>
-            <option :value="50">50</option>
-          </select>
-          <label>รายการ</label>
+        <div class="filter-group page-size-field">
+          <label for="event-page-size">จำนวนรายการ</label>
+          <div class="items-per-page-selector">
+            <span>แสดง</span>
+            <select id="event-page-size" v-model="itemsPerPage" @change="currentPage = 1" class="per-page-select">
+              <option :value="10">10</option>
+              <option :value="20">20</option>
+              <option :value="50">50</option>
+            </select>
+            <span>รายการ</span>
+          </div>
         </div>
 
         <!-- ⭐️ ขวา: กลุ่มค้นหาและตัวกรองรอบปี -->
         <div class="header-filters">
-          <div class="filter-group">
-            <label class="filter-label">📅 รอบปี:</label>
-            <select v-model="selectedAnnualYear" class="search-input annual-select">
+          <div class="filter-group event-filter-group annual-field">
+            <label for="event-annual-year">รอบปี</label>
+            <select id="event-annual-year" v-model="selectedAnnualYear" class="annual-select">
               <option value="">-- ดูกิจกรรมทั้งหมด --</option>
               <option v-for="y in annualYears" :key="y.value" :value="y.value">
                 {{ y.label }}
@@ -38,8 +42,10 @@
             </select>
           </div>
 
-          <div class="search-box">
+          <div class="filter-group event-filter-group search-box">
+            <label for="event-search">ค้นหากิจกรรม</label>
             <input
+              id="event-search"
               type="text"
               v-model="searchQuery"
               placeholder="🔍 ค้นหาชื่องาน หรือสถานที่..."
@@ -261,7 +267,7 @@
           </div>
 
           <div class="input-group full-width upload-section">
-            <label>แนบไฟล์เอกสาร (PDF, ภาพ, Word, Excel)</label>
+            <label>📤 อัปโหลดไฟล์เอกสาร (PDF, ภาพ, Word, Excel)</label>
             <input 
               type="file" 
               multiple 
@@ -435,16 +441,18 @@
           <div class="detail-section" v-if="selectedEventToView.file_paths && selectedEventToView.file_paths.length > 0">
             <label class="section-label">ไฟล์แนบเอกสาร:</label>
             <div class="file-grid mt-2">
-              <button 
+              <div
                 v-for="(file, index) in selectedEventToView.file_paths" 
                 :key="index"
-                @click="openFilePreview(file, selectedEventToView.id)" 
-                class="file-attachment-btn"
+                class="view-file-row"
               >
-                <span class="file-icon">{{ getFileIcon(file) }}</span>
-                <span class="file-name">{{ getFileName(file) }}</span>
-                <span class="file-action">เปิดดูไฟล์ ↗</span>
-              </button>
+                <button @click="openFilePreview(file, selectedEventToView.id)" class="file-attachment-btn">
+                  <span class="file-icon">{{ getFileIcon(file) }}</span>
+                  <span class="file-name">{{ getFileName(file) }}</span>
+                  <span class="file-action">เปิดดูไฟล์ ↗</span>
+                </button>
+                <button v-if="isAdmin" class="view-file-delete" @click="deleteFileFromView(file)" title="ลบไฟล์แนบ">🗑️</button>
+              </div>
             </div>
           </div>
 
@@ -470,6 +478,46 @@
         </div>
       </div>
     </div>
+
+    <!-- Modal จัดการประเภทกิจกรรม -->
+    <div v-if="isAdmin && isEventTypeManagerOpen" class="modal-overlay no-print">
+      <div class="modal-card event-type-manager-modal">
+        <div class="modal-header">
+          <div><h2>จัดการประเภทกิจกรรม</h2><small>เพิ่ม แก้ไข ระงับ หรือลบประเภทกิจกรรม</small></div>
+          <button class="close-btn" @click="closeEventTypeManager">✕</button>
+        </div>
+        <div class="event-type-toolbar">
+          <input v-model.trim="eventTypeSearch" type="search" placeholder="ค้นหาประเภทกิจกรรม..." />
+          <button class="btn-primary" @click="openAddEventTypeModal">+ เพิ่มประเภทกิจกรรม</button>
+        </div>
+        <div class="table-responsive event-type-table-wrap">
+          <table class="data-table">
+            <thead><tr><th>ชื่อประเภทกิจกรรม</th><th width="120">สถานะ</th><th width="110">จัดการ</th></tr></thead>
+            <tbody>
+              <tr v-if="isEventTypeLoading"><td colspan="3" class="text-center">กำลังโหลดข้อมูล...</td></tr>
+              <tr v-for="type in filteredAdminEventTypes" :key="type.id">
+                <td class="font-bold">{{ type.name }}</td>
+                <td><span class="status-badge" :class="type.status === 'ใช้งาน' ? 'active' : 'inactive'">{{ type.status }}</span></td>
+                <td><div class="action-buttons"><button class="btn-icon edit" @click="editEventType(type)" title="แก้ไข">✏️</button><button class="btn-icon delete" @click="deleteEventType(type)" title="ลบ">🗑️</button></div></td>
+              </tr>
+              <tr v-if="!isEventTypeLoading && filteredAdminEventTypes.length === 0"><td colspan="3" class="text-center text-muted">ไม่พบข้อมูล</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal เพิ่ม/แก้ไขประเภทกิจกรรม -->
+    <div v-if="isAdmin && isEventTypeFormOpen" class="modal-overlay nested-modal no-print">
+      <div class="modal-card event-type-form-modal">
+        <div class="modal-header"><h2>{{ eventTypeForm.id ? 'แก้ไขประเภทกิจกรรม' : 'เพิ่มประเภทกิจกรรม' }}</h2><button class="close-btn" @click="closeEventTypeFormModal">✕</button></div>
+        <form class="form-grid" @submit.prevent="saveEventType">
+          <div class="input-group full-width"><label>ชื่อประเภทกิจกรรม *</label><input v-model.trim="eventTypeForm.name" required autofocus placeholder="เช่น การประชุม, งานพิธี" /></div>
+          <div class="input-group full-width"><label>สถานะ</label><select v-model="eventTypeForm.status"><option value="ใช้งาน">ใช้งาน</option><option value="ระงับ">ระงับ (ซ่อนจากฟอร์มกิจกรรม)</option></select></div>
+          <div class="modal-actions full-width"><button type="button" class="btn-secondary" @click="closeEventTypeFormModal">ยกเลิก</button><button type="submit" class="btn-primary">บันทึกข้อมูล</button></div>
+        </form>
+      </div>
+    </div>
   </div>
 
 </template>
@@ -488,6 +536,12 @@ const isSaving = ref(false)
 
 const eventList = ref([])
 const eventTypes = ref([])
+const adminEventTypes = ref([])
+const isEventTypeManagerOpen = ref(false)
+const isEventTypeFormOpen = ref(false)
+const isEventTypeLoading = ref(false)
+const eventTypeSearch = ref('')
+const eventTypeForm = ref({ id: null, name: '', status: 'ใช้งาน' })
 const somtopList = ref([])
 const currentParticipants = ref([])
 
@@ -502,6 +556,11 @@ const selectedEvent = ref(null)
 const selectedEventToView = ref(null)
 const previewUrl = ref('')
 const previewSourceUrl = ref('')
+
+const filteredAdminEventTypes = computed(() => {
+  const query = eventTypeSearch.value.toLowerCase()
+  return query ? adminEventTypes.value.filter(type => type.name.toLowerCase().includes(query)) : adminEventTypes.value
+})
 
 const days = Array.from({length: 31}, (_, i) => String(i + 1).padStart(2, '0'))
 const hours = Array.from({length: 24}, (_, i) => String(i).padStart(2, '0'))
@@ -1003,6 +1062,71 @@ const openFilePreview = async (url, eventId) => {
   }
 }
 
+const deleteFileFromView = async (fileUrl) => {
+  if (!selectedEventToView.value?.id) return
+  const result = await swalConfirm('ยืนยันการลบไฟล์', `ต้องการลบไฟล์ “${getFileName(fileUrl)}” หรือไม่?`)
+  if (!result.isConfirmed) return
+  try {
+    const eventId = selectedEventToView.value.id
+    await api.post('/events/delete-file', { id: eventId, file_url: fileUrl })
+    selectedEventToView.value = {
+      ...selectedEventToView.value,
+      file_paths: selectedEventToView.value.file_paths.filter(url => url !== fileUrl)
+    }
+    swalSuccess('ลบไฟล์สำเร็จ', 'ลบไฟล์แนบเรียบร้อยแล้ว')
+    await fetchEvents()
+  } catch (error) {
+    swalError('ลบไฟล์ไม่สำเร็จ', error.response?.data?.message || 'ไม่สามารถลบไฟล์แนบได้')
+  }
+}
+
+const fetchAdminEventTypes = async () => {
+  isEventTypeLoading.value = true
+  try {
+    const response = await api.get('/event-types/admin')
+    adminEventTypes.value = response.data.records || []
+  } catch (error) {
+    swalError('โหลดข้อมูลไม่สำเร็จ', error.response?.data?.message || 'ไม่สามารถโหลดประเภทกิจกรรมได้')
+  } finally {
+    isEventTypeLoading.value = false
+  }
+}
+
+const resetEventTypeForm = () => { eventTypeForm.value = { id: null, name: '', status: 'ใช้งาน' } }
+const openEventTypeManager = () => { eventTypeSearch.value = ''; isEventTypeManagerOpen.value = true; fetchAdminEventTypes() }
+const closeEventTypeManager = () => { isEventTypeFormOpen.value = false; isEventTypeManagerOpen.value = false; resetEventTypeForm() }
+const openAddEventTypeModal = () => { resetEventTypeForm(); isEventTypeFormOpen.value = true }
+const editEventType = type => { eventTypeForm.value = { id: type.id, name: type.name, status: type.status }; isEventTypeFormOpen.value = true }
+const closeEventTypeFormModal = () => { isEventTypeFormOpen.value = false; resetEventTypeForm() }
+
+const saveEventType = async () => {
+  try {
+    if (eventTypeForm.value.id) {
+      await api.put('/event-types/admin', eventTypeForm.value)
+      swalSuccess('บันทึกสำเร็จ', 'แก้ไขประเภทกิจกรรมเรียบร้อยแล้ว')
+    } else {
+      await api.post('/event-types/admin', eventTypeForm.value)
+      swalSuccess('บันทึกสำเร็จ', 'เพิ่มประเภทกิจกรรมเรียบร้อยแล้ว')
+    }
+    closeEventTypeFormModal()
+    await Promise.all([fetchAdminEventTypes(), fetchEventTypes()])
+  } catch (error) {
+    swalError('บันทึกไม่สำเร็จ', error.response?.data?.message || 'ไม่สามารถบันทึกประเภทกิจกรรมได้')
+  }
+}
+
+const deleteEventType = async type => {
+  const result = await swalConfirm('ยืนยันการลบ', `ต้องการลบประเภทกิจกรรม “${type.name}” หรือไม่?`)
+  if (!result.isConfirmed) return
+  try {
+    await api.delete(`/event-types/admin/${type.id}`)
+    swalSuccess('ลบสำเร็จ', 'ลบประเภทกิจกรรมเรียบร้อยแล้ว')
+    await Promise.all([fetchAdminEventTypes(), fetchEventTypes()])
+  } catch (error) {
+    swalError('ลบไม่สำเร็จ', error.response?.data?.message || 'ประเภทนี้อาจถูกใช้งานในกิจกรรมแล้ว')
+  }
+}
+
 const closeModal = () => isModalOpen.value = false;
 const closeViewModal = () => { isViewModalOpen.value = false; selectedEventToView.value = null; };
 const closeFilePreview = () => {
@@ -1077,6 +1201,18 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.header-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.event-type-manager-modal { width: min(760px, calc(100vw - 32px)); max-width: 760px; max-height: 90vh; overflow: auto; }
+.event-type-toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 14px; }
+.event-type-toolbar input { flex: 1; min-width: 0; padding: 10px 14px; border: 1px solid #d1d5db; border-radius: 8px; }
+.event-type-table-wrap { max-height: 390px; overflow: auto; }
+.event-type-form-modal { width: min(460px, calc(100vw - 32px)); max-width: 460px; }
+.nested-modal { z-index: 1100; background: rgba(15, 23, 42, 0.62); }
+.view-file-row { display: flex; align-items: stretch; gap: 8px; }
+.view-file-row .file-attachment-btn { flex: 1; min-width: 0; }
+.view-file-delete { width: 44px; border: 1px solid #fecaca; border-radius: 8px; background: #fef2f2; color: #dc2626; cursor: pointer; transition: background .2s, border-color .2s; }
+.view-file-delete:hover { border-color: #f87171; background: #fee2e2; }
+@media (max-width: 600px) { .event-type-toolbar { align-items: stretch; flex-direction: column; } }
 /* =========================================
    General Elements & Utilities
 ========================================= */
@@ -1496,76 +1632,36 @@ onMounted(async () => {
    Header Actions & Filters (ส่วนหัวตาราง)
 ========================================= */
 .table-header-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-  gap: 16px;
+  display: grid;
+  grid-template-columns: minmax(160px, auto) minmax(480px, 1fr);
+  align-items: end;
+  gap: 20px;
+  margin-bottom: 20px;
 }
 
-/* กลุ่มตัวกรองฝั่งขวา */
 .header-filters {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  flex-wrap: wrap;
-  flex: 1;
-  justify-content: flex-end; /* ดันกล่องไปชิดขวาเสมอ */
+  display: grid;
+  grid-template-columns: minmax(300px, 1.35fr) minmax(240px, 1fr);
+  gap: 16px;
+  align-items: end;
+  min-width: 0;
 }
 
-.filter-group {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.filter-label {
-  font-size: 14px;
-  font-weight: 600;
-  color: #4B5563;
-  white-space: nowrap; /* ป้องกันข้อความตกบรรทัด */
-}
-
-.annual-select {
-  width: 220px;
-  padding: 8px 12px; /* ขยายความสูงให้เท่ากับกล่องค้นหา */
-}
-
-.search-box {
-  width: 100%;
-  max-width: 280px; /* จำกัดความกว้างไม่ให้กินพื้นที่มากไป */
-}
+.page-size-field{min-width:160px;flex:none}.items-per-page-selector{height:42px;display:flex;align-items:center;gap:8px;white-space:nowrap}.items-per-page-selector span{color:#6b7280;font-size:13px}.page-size-field select{width:68px;height:42px;padding:0 8px}
+.event-filter-group{min-width:0}.event-filter-group select,.event-filter-group input{width:100%;height:42px;box-sizing:border-box}.search-box{max-width:none}
 
 /* =========================================
    📱 Mobile Responsiveness (รองรับหน้าจอโทรศัพท์)
 ========================================= */
 @media (max-width: 768px) {
   .table-header-actions {
-    flex-direction: column;
+    grid-template-columns: 1fr;
     align-items: stretch;
   }
   
   .header-filters {
-    flex-direction: column;
-    align-items: stretch;
-    justify-content: flex-start;
+    grid-template-columns: 1fr;
     width: 100%;
-  }
-
-  .filter-group {
-    flex-direction: column;
-    align-items: flex-start;
-    width: 100%;
-    gap: 4px;
-  }
-
-  /* ขยายกล่องกรอกข้อมูลให้กว้างเต็มจอเพื่อให้จิ้มง่ายขึ้น */
-  .annual-select,
-  .search-box,
-  .search-box input {
-    width: 100%;
-    max-width: 100%; 
   }
 }
 </style>

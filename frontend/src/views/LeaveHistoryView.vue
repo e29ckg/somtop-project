@@ -6,9 +6,10 @@
         <h1 class="page-title">ประวัติการลา</h1>
         <p class="page-subtitle">ข้อมูลการขอลาพักปฏิบัติหน้าที่ของผู้พิพากษาสมทบ</p>
       </div>
-      <button v-if="isAdmin" class="btn-primary" @click="openAddModal">
-        + ยื่นเรื่องขอลา
-      </button>
+      <div v-if="isAdmin" class="header-actions">
+        <button class="btn-secondary" @click="openLeaveTypeManager">⚙️ จัดการประเภทการลา</button>
+        <button class="btn-primary" @click="openAddModal">+ ยื่นเรื่องขอลา</button>
+      </div>
     </div>
 
     <!-- แถบเครื่องมือค้นหาและพิมพ์รายงาน -->
@@ -19,40 +20,12 @@
           <input type="text" v-model="filters.name" placeholder="ระบุชื่อ พ.สมทบ..." />
         </div>
         
-        <div class="filter-group date-filter-group">
-          <label>ตั้งแต่</label>
-          <div class="date-inputs">
-            <select v-model="filters.start_day">
-              <option value="">วัน</option>
-              <option v-for="d in days" :key="d" :value="d">{{ parseInt(d) }}</option>
-            </select>
-            <select v-model="filters.start_month">
-              <option value="">เดือน</option>
-              <option v-for="m in thaiMonths" :key="m.value" :value="m.value">{{ m.label }}</option>
-            </select>
-            <select v-model="filters.start_year">
-              <option value="">ปี</option>
-              <option v-for="y in thaiYears" :key="y.value" :value="y.value">{{ y.label }}</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="filter-group date-filter-group">
-          <label>ถึง</label>
-          <div class="date-inputs">
-            <select v-model="filters.end_day">
-              <option value="">วัน</option>
-              <option v-for="d in days" :key="d" :value="d">{{ parseInt(d) }}</option>
-            </select>
-            <select v-model="filters.end_month">
-              <option value="">เดือน</option>
-              <option v-for="m in thaiMonths" :key="m.value" :value="m.value">{{ m.label }}</option>
-            </select>
-            <select v-model="filters.end_year">
-              <option value="">ปี</option>
-              <option v-for="y in thaiYears" :key="y.value" :value="y.value">{{ y.label }}</option>
-            </select>
-          </div>
+        <div class="filter-group annual-filter-group">
+          <label>รอบปี</label>
+          <select v-model="filters.annual_year">
+            <option value="">-- ดูประวัติทั้งหมด --</option>
+            <option v-for="year in annualYears" :key="year.value" :value="year.value">{{ year.label }}</option>
+          </select>
         </div>
 
         <div class="filter-actions">
@@ -117,19 +90,16 @@
                   <span class="status-badge" :class="getStatusClass(leave.status)">
                     {{ leave.status }}
                   </span>
+                  <span v-if="leave.file_path?.length" class="file-count">📎 {{ leave.file_path.length }}</span>
                 </td>
                 <td class="no-print">
                       <div class="action-buttons">
-                        <button class="btn-icon" @click="exportToWord(leave.id)" title="พิมพ์แบบฟอร์มใบลา (Word)">🖨️</button>
-                        <!-- วนลูปแสดงปุ่มไฟล์ทั้งหมด -->
-                        <template v-if="leave.file_path && leave.file_path.length > 0">
-                          <a v-for="(file, fIndex) in leave.file_path" :key="fIndex" @click="openPdfPreview(file)"
-                            target="_blank" 
-                            class="btn-icon" :title="'ดูไฟล์ที่ ' + (fIndex + 1)">
-                            📎
-                          </a>
+                        <button class="btn-icon view" @click="openLeaveDetail(leave)" title="ดูรายละเอียด">👁️</button>
+                        <button v-if="leave.status !== 'อนุมัติแล้ว'" class="btn-icon" @click="exportToWord(leave.id)" title="พิมพ์แบบฟอร์มใบลา (Word)">🖨️</button>
+                        <template v-if="isAdmin">
+                          <button class="btn-icon upload-pdf" :disabled="uploadingLeaveId === leave.id" @click="$event.currentTarget.nextElementSibling.click()" :title="leave.status === 'อนุมัติแล้ว' ? 'อัปโหลดไฟล์ PDF ใบลาเพิ่มเติม' : 'อัปโหลดไฟล์ PDF และอนุมัติ'">{{ uploadingLeaveId === leave.id ? '…' : '📤' }}</button>
+                          <input type="file" accept="application/pdf,.pdf" hidden @change="uploadLeavePdf(leave, $event)" />
                         </template>
-                        
                         <button v-if="isAdmin" class="btn-icon edit" @click="openEditModal(leave)" title="แก้ไข">✏️</button>
                         <button v-if="isAdmin" class="btn-icon delete" @click="deleteData(leave.id)" title="ลบ">🗑️</button>
                       </div>
@@ -165,6 +135,90 @@
             ถัดไป &raquo;
           </button>
         </div>
+      </div>
+    </div>
+
+    <!-- รายละเอียดการลาและการจัดการไฟล์ -->
+    <div v-if="selectedLeave" class="modal-overlay no-print">
+      <div class="modal-card leave-detail-modal">
+        <div class="modal-header">
+          <div><h2>รายละเอียดการลา</h2><small>{{ selectedLeave.full_name }}</small></div>
+          <button class="close-btn" @click="closeLeaveDetail">✕</button>
+        </div>
+        <div class="leave-detail-grid">
+          <div><span>ประเภทการลา</span><strong>{{ selectedLeave.leave_type_name || selectedLeave.leave_type }}</strong></div>
+          <div><span>สถานะ</span><strong><span class="status-badge" :class="getStatusClass(selectedLeave.status)">{{ selectedLeave.status }}</span></strong></div>
+          <div><span>วันที่ยื่นเรื่อง</span><strong>{{ formatThaiDateShort(selectedLeave.submit_date) }}</strong></div>
+          <div><span>จำนวนวันลา</span><strong>{{ formatLeaveDays(selectedLeave.total_days) }} วัน</strong></div>
+          <div class="full"><span>ช่วงเวลาที่ลา</span><strong>{{ formatThaiDateFull(selectedLeave.start_date) }} ถึง {{ formatThaiDateFull(selectedLeave.end_date) }}</strong></div>
+          <div class="full"><span>เหตุผล/หมายเหตุ</span><strong>{{ selectedLeave.note || '-' }}</strong></div>
+        </div>
+        <section class="detail-files">
+          <div class="detail-section-title"><h3>ไฟล์ใบลา</h3><span>{{ selectedLeave.file_path?.length || 0 }} ไฟล์</span></div>
+          <div v-if="selectedLeave.file_path?.length" class="detail-file-list">
+            <div v-for="(file, index) in selectedLeave.file_path" :key="file" class="detail-file-item">
+              <button class="file-open" @click="openPdfPreview(file)"><span>📄</span><span><strong>ใบลาไฟล์ที่ {{ index + 1 }}</strong><small>{{ getFileName(file) }}</small></span></button>
+              <button v-if="isAdmin" class="btn-icon delete" @click="deleteLeaveFile(selectedLeave, file)" title="ลบไฟล์ PDF">🗑️</button>
+            </div>
+          </div>
+          <div v-else class="empty-files">ยังไม่มีไฟล์ใบลาแนบในรายการนี้</div>
+        </section>
+        <div class="modal-actions">
+          <button class="btn-secondary" @click="closeLeaveDetail">ปิด</button>
+          <button v-if="isAdmin" class="btn-primary" @click="openUploadFromDetail">📤 อัปโหลดไฟล์ PDF</button>
+          <input ref="detailPdfInput" type="file" accept="application/pdf,.pdf" hidden @change="uploadLeavePdf(selectedLeave, $event)" />
+        </div>
+      </div>
+    </div>
+
+    <!-- จัดการประเภทการลาในหน้าประวัติการลา -->
+    <div v-if="isAdmin && isLeaveTypeManagerOpen" class="modal-overlay no-print">
+      <div class="modal-card leave-type-modal">
+        <div class="modal-header">
+          <div><h2>จัดการประเภทการลา</h2><small>เพิ่ม แก้ไข ระงับ หรือลบประเภทการลา</small></div>
+          <button class="close-btn" @click="closeLeaveTypeManager">✕</button>
+        </div>
+        <div class="leave-type-toolbar">
+          <div class="leave-type-search"><input v-model.trim="leaveTypeSearch" type="search" placeholder="ค้นหาประเภทการลา..." /></div>
+          <button class="btn-primary" @click="openAddLeaveTypeModal">+ เพิ่มประเภทการลา</button>
+        </div>
+        <div class="table-responsive leave-type-table-wrap">
+          <table class="data-table">
+            <thead><tr><th>ชื่อประเภทการลา</th><th width="120">สถานะ</th><th width="110">จัดการ</th></tr></thead>
+            <tbody>
+              <tr v-if="isLeaveTypeLoading"><td colspan="3" class="text-center">กำลังโหลดข้อมูล...</td></tr>
+              <tr v-for="type in filteredAdminLeaveTypes" :key="type.id">
+                <td class="font-bold">{{ type.name }}</td>
+                <td><span class="status-badge" :class="type.status === 'ใช้งาน' ? 'active' : 'inactive'">{{ type.status }}</span></td>
+                <td><div class="action-buttons"><button class="btn-icon edit" @click="editLeaveType(type)" title="แก้ไข">✏️</button><button class="btn-icon delete" @click="deleteLeaveType(type)" title="ลบ">🗑️</button></div></td>
+              </tr>
+              <tr v-if="!isLeaveTypeLoading && filteredAdminLeaveTypes.length === 0"><td colspan="3" class="text-center text-muted">ไม่พบข้อมูล</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="isAdmin && isLeaveTypeFormOpen" class="modal-overlay nested-modal no-print">
+      <div class="modal-card leave-type-form-modal">
+        <div class="modal-header">
+          <h2>{{ leaveTypeForm.id ? 'แก้ไขประเภทการลา' : 'เพิ่มประเภทการลา' }}</h2>
+          <button class="close-btn" @click="closeLeaveTypeFormModal">✕</button>
+        </div>
+        <form class="form-grid" @submit.prevent="saveLeaveType">
+          <div class="input-group full-width">
+            <label>ชื่อประเภทการลา *</label>
+            <input v-model.trim="leaveTypeForm.name" required autofocus placeholder="เช่น ลาป่วย, ลากิจ" />
+          </div>
+          <div class="input-group full-width">
+            <label>สถานะ</label>
+            <select v-model="leaveTypeForm.status"><option value="ใช้งาน">ใช้งาน</option><option value="ระงับ">ระงับ (ซ่อนจากแบบฟอร์มขอลา)</option></select>
+          </div>
+          <div class="modal-actions full-width">
+            <button type="button" class="btn-secondary" @click="closeLeaveTypeFormModal">ยกเลิก</button>
+            <button type="submit" class="btn-primary">บันทึกข้อมูล</button>
+          </div>
+        </form>
       </div>
     </div>
 
@@ -275,7 +329,7 @@
           </div>
 
           <div class="input-group full-width upload-section">
-            <label>แนบไฟล์ใบลา (PDF, ภาพ, Word, Excel) *เลือกได้หลายไฟล์</label>
+            <label>📤 อัปโหลดไฟล์ใบลา (PDF, ภาพ, Word, Excel) *เลือกได้หลายไฟล์</label>
             <input type="file" multiple accept=".pdf,image/*,.doc,.docx,.xls,.xlsx" @change="handleFileUpload" class="file-input" />
             
             <!-- ป้องกัน Error ด้วยการเช็ค formData.files ก่อน -->
@@ -339,6 +393,9 @@ import { swalSuccess, swalError, swalConfirm } from '../utils/swal'
 
 const isSaving = ref(false)
 const isLoading = ref(false)
+const uploadingLeaveId = ref(null)
+const selectedLeave = ref(null)
+const detailPdfInput = ref(null)
 
 const days = Array.from({length: 31}, (_, i) => String(i + 1).padStart(2, '0'))
 
@@ -357,15 +414,30 @@ const thaiYears = Array.from({length: 15}, (_, i) => {
   return { value: String(y), label: String(y + 543) }
 })
 
+const getCurrentAnnualYear = () => {
+  const today = new Date()
+  return today.getMonth() < 3 ? today.getFullYear() - 1 : today.getFullYear()
+}
+const annualYears = Array.from({length: 15}, (_, i) => {
+  const year = currentYear + 5 - i
+  const buddhistYear = year + 543
+  return { value: String(year), label: `ปี ${buddhistYear} (1 เม.ย. ${buddhistYear} - 31 มี.ค. ${buddhistYear + 1})` }
+})
+
 const filters = ref({
   name: '',
-  start_day: '', start_month: '', start_year: '',
-  end_day: '', end_month: '', end_year: ''
+  annual_year: String(getCurrentAnnualYear())
 })
 
 const leaveList = ref([])
 const somtopList = ref([]) 
 const leaveTypes = ref([]) // ⭐️ เปลี่ยนมารอรับค่าจาก Backend
+const adminLeaveTypes = ref([])
+const isLeaveTypeManagerOpen = ref(false)
+const isLeaveTypeFormOpen = ref(false)
+const isLeaveTypeLoading = ref(false)
+const leaveTypeSearch = ref('')
+const leaveTypeForm = ref({ id: null, name: '', status: 'ใช้งาน' })
 
 const isModalOpen = ref(false)
 const isEditing = ref(false)
@@ -390,6 +462,11 @@ const filteredSomtopList = computed(() => {
   return somtopList.value.filter(person => 
     person.full_name.toLowerCase().includes(somtopSearchQuery.value.toLowerCase())
   );
+})
+
+const filteredAdminLeaveTypes = computed(() => {
+  const query = leaveTypeSearch.value.toLowerCase()
+  return query ? adminLeaveTypes.value.filter(type => type.name.toLowerCase().includes(query)) : adminLeaveTypes.value
 })
 
 const selectSomtop = (person) => {
@@ -451,24 +528,22 @@ const formatThaiDateFull = (dateStr) => {
 const filteredLeaveList = computed(() => {
   return leaveList.value.filter(leave => {
     let matchName = true
-    let matchStartDate = true
-    let matchEndDate = true
+    let matchAnnualYear = true
 
     if (filters.value.name) {
       matchName = leave.full_name.toLowerCase().includes(filters.value.name.toLowerCase())
     }
     
-    const filterStartStr = getFilterDateStr(filters.value.start_year, filters.value.start_month, filters.value.start_day);
-    const filterEndStr = getFilterDateStr(filters.value.end_year, filters.value.end_month, filters.value.end_day);
-
-    if (filterStartStr) {
-      matchStartDate = new Date(leave.start_date) >= new Date(filterStartStr)
+    if (filters.value.annual_year) {
+      const year = Number(filters.value.annual_year)
+      const annualStart = new Date(year, 3, 1)
+      const annualEnd = new Date(year + 1, 2, 31, 23, 59, 59)
+      const leaveStart = new Date(leave.start_date)
+      const leaveEnd = new Date(leave.end_date || leave.start_date)
+      matchAnnualYear = leaveStart <= annualEnd && leaveEnd >= annualStart
     }
-    if (filterEndStr) {
-      matchEndDate = new Date(leave.start_date) <= new Date(filterEndStr)
-    }
 
-    return matchName && matchStartDate && matchEndDate
+    return matchName && matchAnnualYear
   })
 })
 
@@ -524,11 +599,7 @@ watch(filters, () => {
 }, { deep: true });
 
 const clearFilters = () => {
-  filters.value = { 
-    name: '', 
-    start_day: '', start_month: '', start_year: '',
-    end_day: '', end_month: '', end_year: '' 
-  }
+  filters.value = { name: '', annual_year: '' }
 }
 
 const printReport = () => {
@@ -536,11 +607,9 @@ const printReport = () => {
   const printWindow = window.open('', '_blank', 'height=600,width=800');
   
   let headerText = '';
-  const filterStartStr = getFilterDateStr(filters.value.start_year, filters.value.start_month, filters.value.start_day);
-  const filterEndStr = getFilterDateStr(filters.value.end_year, filters.value.end_month, filters.value.end_day);
-
-  if (filterStartStr || filterEndStr) {
-    headerText = `<p>ช่วงเวลา: ${filterStartStr ? formatThaiDate(filterStartStr) : 'เริ่มต้น'} ถึง ${filterEndStr ? formatThaiDate(filterEndStr) : 'ปัจจุบัน'}</p>`;
+  if (filters.value.annual_year) {
+    const buddhistYear = Number(filters.value.annual_year) + 543
+    headerText = `<p>รอบปี ${buddhistYear}: 1 เมษายน ${buddhistYear} ถึง 31 มีนาคม ${buddhistYear + 1}</p>`;
   }
 
   printWindow.document.write(`
@@ -585,6 +654,7 @@ const fetchLeaves = async () => {
     const records = response.data.records || []
     
     leaveList.value = records
+    if (selectedLeave.value) selectedLeave.value = records.find(item => item.id === selectedLeave.value.id) || null
   } catch (error) {
     console.error('ดึงข้อมูลประวัติการลาไม่สำเร็จ:', error)
   }
@@ -702,6 +772,60 @@ const openPdfPreview = async (url) => {
     isPreviewOpen.value = true
   } catch (error) {
     swalError('เปิดไฟล์ไม่สำเร็จ', error.response?.data?.message || 'ไม่สามารถดาวน์โหลดไฟล์แนบได้')
+  }
+}
+
+const formatLeaveDays = value => {
+  const days = Number(value)
+  if (!Number.isFinite(days)) return '-'
+  return Number.isInteger(days) ? days.toFixed(0) : String(days)
+}
+
+const fetchAdminLeaveTypes = async () => {
+  isLeaveTypeLoading.value = true
+  try {
+    const response = await api.get('/leave-types/admin')
+    adminLeaveTypes.value = response.data.records || []
+  } catch (error) {
+    swalError('โหลดข้อมูลไม่สำเร็จ', error.response?.data?.message || 'ไม่สามารถโหลดประเภทการลาได้')
+  } finally {
+    isLeaveTypeLoading.value = false
+  }
+}
+
+const resetLeaveTypeForm = () => { leaveTypeForm.value = { id: null, name: '', status: 'ใช้งาน' } }
+const openLeaveTypeManager = () => { resetLeaveTypeForm(); leaveTypeSearch.value = ''; isLeaveTypeManagerOpen.value = true; fetchAdminLeaveTypes() }
+const closeLeaveTypeManager = () => { isLeaveTypeManagerOpen.value = false; isLeaveTypeFormOpen.value = false; resetLeaveTypeForm() }
+const openAddLeaveTypeModal = () => { resetLeaveTypeForm(); isLeaveTypeFormOpen.value = true }
+const editLeaveType = type => { leaveTypeForm.value = { id: type.id, name: type.name, status: type.status }; isLeaveTypeFormOpen.value = true }
+const closeLeaveTypeFormModal = () => { isLeaveTypeFormOpen.value = false; resetLeaveTypeForm() }
+
+const saveLeaveType = async () => {
+  try {
+    if (leaveTypeForm.value.id) {
+      await api.put('/leave-types/admin', leaveTypeForm.value)
+      swalSuccess('บันทึกสำเร็จ', 'แก้ไขประเภทการลาเรียบร้อยแล้ว')
+    } else {
+      await api.post('/leave-types/admin', leaveTypeForm.value)
+      swalSuccess('บันทึกสำเร็จ', 'เพิ่มประเภทการลาเรียบร้อยแล้ว')
+    }
+    closeLeaveTypeFormModal()
+    await Promise.all([fetchAdminLeaveTypes(), fetchLeaveTypes()])
+  } catch (error) {
+    swalError('บันทึกไม่สำเร็จ', error.response?.data?.message || 'ไม่สามารถบันทึกประเภทการลาได้')
+  }
+}
+
+const deleteLeaveType = async type => {
+  const result = await swalConfirm('ยืนยันการลบ', `ต้องการลบประเภทการลา “${type.name}” หรือไม่?`)
+  if (!result.isConfirmed) return
+  try {
+    await api.delete(`/leave-types/admin/${type.id}`)
+    if (leaveTypeForm.value.id === type.id) resetLeaveTypeForm()
+    swalSuccess('ลบสำเร็จ', 'ลบประเภทการลาเรียบร้อยแล้ว')
+    await Promise.all([fetchAdminLeaveTypes(), fetchLeaveTypes()])
+  } catch (error) {
+    swalError('ลบไม่สำเร็จ', error.response?.data?.message || 'ประเภทนี้อาจถูกใช้งานในประวัติการลาแล้ว')
   }
 }
 
@@ -860,6 +984,55 @@ const openFilePreview = async (url, eventId) => {
   await openPdfPreview(url)
 }
 
+const openLeaveDetail = leave => { selectedLeave.value = leave }
+const closeLeaveDetail = () => { selectedLeave.value = null }
+const openUploadFromDetail = () => detailPdfInput.value?.click()
+
+const deleteLeaveFile = async (leave, fileUrl) => {
+  const result = await swalConfirm('ยืนยันการลบไฟล์', 'ต้องการลบไฟล์ PDF นี้ออกจากรายการหรือไม่?')
+  if (!result.isConfirmed) return
+  try {
+    await api.post('/leaves/delete-file', { id: leave.id, file_url: fileUrl })
+    swalSuccess('ลบไฟล์สำเร็จ', 'ลบไฟล์ออกจากรายการเรียบร้อยแล้ว')
+    await fetchLeaves()
+  } catch (error) {
+    swalError('ลบไฟล์ไม่สำเร็จ', error.response?.data?.message || 'ไม่สามารถลบไฟล์ได้')
+  }
+}
+
+const uploadLeavePdf = async (leave, event) => {
+  const input = event.target
+  const file = input.files?.[0]
+  if (!file) return
+  if (file.type !== 'application/pdf' || !file.name.toLowerCase().endsWith('.pdf')) {
+    swalError('ไฟล์ไม่ถูกต้อง', 'กรุณาเลือกไฟล์ PDF เท่านั้น')
+    input.value = ''
+    return
+  }
+
+  const result = await swalConfirm(
+    'ยืนยันการแนบใบลา',
+    leave.status === 'อนุมัติแล้ว'
+      ? 'ต้องการแนบไฟล์ PDF เพิ่มในรายการนี้หรือไม่?'
+      : 'เมื่อแนบไฟล์แล้ว ระบบจะเปลี่ยนสถานะเป็น “อนุมัติแล้ว” โดยอัตโนมัติ'
+  )
+  if (!result.isConfirmed) { input.value = ''; return }
+
+  uploadingLeaveId.value = leave.id
+  try {
+    const payload = new FormData()
+    payload.append('leave_pdf', file)
+    await api.post(`/leaves/${leave.id}/approve-pdf`, payload, { headers: { 'Content-Type': 'multipart/form-data' } })
+    swalSuccess('บันทึกสำเร็จ', 'แนบไฟล์ PDF และอนุมัติรายการเรียบร้อยแล้ว')
+    await fetchLeaves()
+  } catch (error) {
+    swalError('อัปโหลดไม่สำเร็จ', error.response?.data?.message || 'ไม่สามารถแนบไฟล์ PDF ได้')
+  } finally {
+    uploadingLeaveId.value = null
+    input.value = ''
+  }
+}
+
 
 onMounted(() => {
   fetchLeaves()
@@ -869,23 +1042,41 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.header-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.table-card > .table-responsive { border: 1px solid #e5e7eb; border-radius: 10px; }
+.table-card .data-table thead th { position: sticky; top: 0; z-index: 1; white-space: nowrap; background: #f8fafc; }
+.table-card .data-row:hover { background: #f8fafc; }
+.table-card .action-buttons { flex-wrap: nowrap; justify-content: flex-end; }
+.file-count { display: inline-block; margin-left: 6px; padding: 2px 7px; border-radius: 10px; background: #eff6ff; color: #1d4ed8; font-size: 11px; white-space: nowrap; }
+.leave-detail-modal { width: min(680px, calc(100vw - 32px)); max-width: 680px; max-height: 90vh; overflow: auto; }
+.leave-detail-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.leave-detail-grid > div { display: grid; gap: 5px; padding: 12px 14px; border: 1px solid #e5e7eb; border-radius: 9px; background: #f8fafc; }
+.leave-detail-grid > div.full { grid-column: 1 / -1; }
+.leave-detail-grid span { color: #64748b; font-size: 12px; }
+.leave-detail-grid strong { color: #111827; font-size: 14px; }
+.detail-files { margin-top: 20px; }
+.detail-section-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.detail-section-title h3 { margin: 0; }
+.detail-section-title span { color: #64748b; font-size: 13px; }
+.detail-file-list { display: grid; gap: 8px; }
+.detail-file-item { display: flex; gap: 10px; align-items: center; padding: 9px 10px; border: 1px solid #e5e7eb; border-radius: 9px; }
+.file-open { display: flex; flex: 1; gap: 10px; align-items: center; min-width: 0; border: 0; background: transparent; text-align: left; cursor: pointer; }
+.file-open > span:last-child { display: grid; min-width: 0; }
+.file-open strong, .file-open small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-open small { color: #64748b; }
+.empty-files { padding: 24px; border: 1px dashed #cbd5e1; border-radius: 9px; color: #64748b; text-align: center; }
+.leave-type-modal { width: min(760px, calc(100vw - 32px)); max-width: 760px; max-height: 90vh; overflow: auto; }
+.leave-type-toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 14px; }
+.leave-type-search { flex: 1; }
+.leave-type-search input { width: 100%; padding: 10px 14px; border: 1px solid #d1d5db; border-radius: 8px; }
+.leave-type-table-wrap { max-height: 390px; overflow: auto; }
+.nested-modal { z-index: 1100; background: rgba(15, 23, 42, 0.62); }
+.leave-type-form-modal { width: min(460px, calc(100vw - 32px)); max-width: 460px; }
+@media (max-width: 600px) { .leave-type-toolbar { align-items: stretch; flex-direction: column; } .leave-detail-grid { grid-template-columns: 1fr; } .leave-detail-grid > div.full { grid-column: auto; } }
 /* =========================================
    สไตล์เฉพาะสำหรับหน้าประวัติการลา (CSS เพิ่มเติม)
    (โครงสร้างหลักอื่นๆ จะถูกดึงมาจาก global.css)
 ========================================= */
-
-/* Filter Section เฉพาะหน้านี้ */
-.filter-card { margin-bottom: 24px; padding: 16px 24px; }
-.filter-controls { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end; }
-.filter-group { display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 200px; }
-.date-filter-group { min-width: 250px; }
-.filter-group label { font-size: 13px; color: #374151; font-weight: 500; }
-.filter-group input, .filter-group select {
-  background-color: #F9FAFB; border: 1px solid #D1D5DB; border-radius: 8px; padding: 10px 14px; 
-  color: #111827; font-family: inherit; outline: none; transition: all 0.2s;
-}
-.filter-group input:focus, .filter-group select:focus { background-color: #FFFFFF; border-color: #10B981; box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1); }
-.filter-actions { display: flex; gap: 12px; align-items: flex-end; }
 
 /* Upload Section */
 .upload-section { background-color: #F9FAFB; padding: 16px; border-radius: 8px; border: 1px dashed #D1D5DB; }

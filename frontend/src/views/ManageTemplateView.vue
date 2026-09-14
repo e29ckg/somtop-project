@@ -22,6 +22,7 @@
               <option value="leave_template_meeting">แบบฟอร์มลาประชุม</option>
               <option value="leave_template">แบบฟอร์มใบลา (ทั่วไป/อื่นๆ)</option>
               <option value="duty_swap_template">แบบฟอร์มการเปลี่ยนเวร</option>
+              <option value="duty_order_template">แบบฟอร์มคำสั่งเวรปฏิบัติหน้าที่</option>
             </select>
             
             <!-- ⭐️ ปุ่มสำหรับดาวน์โหลดฟอร์มเดิม -->
@@ -38,17 +39,20 @@
         </div>
 
         <div class="input-group full-width mt-3">
-          <label>อัปโหลดไฟล์เทมเพลต Word (.docx)</label>
+          <label>📤 อัปโหลดไฟล์เทมเพลต Word (.docx)</label>
           <input type="file" accept=".docx,.doc" @change="handleFileUpload" required class="file-input" />
           <small class="text-muted mt-1 block">หมายเหตุ: ไฟล์ใหม่จะเข้าไปแทนที่ไฟล์เดิมในระบบทันที และต้องใส่ตัวแปร { } ในไฟล์ให้ถูกต้องด้วย</small>
           <small class="text-muted mt-1 block">
             ตัวแปรข้อมูลศาล: {court_name}, {chief_judge_name}, {chief_judge_position}, {director_name}, {director_position}
           </small>
+          <small class="text-muted mt-1 block" v-if="formData.template_type === 'duty_order_template'">
+            ตัวแปรคำสั่งเวร: {order_number}, {order_title}, {order_month_th}, {issued_date_th} และรายการ {#schedules}...{/schedules}
+          </small>
         </div>
 
         <div class="modal-actions full-width mt-4" style="justify-content: flex-end;">
           <button type="submit" class="btn-primary" :disabled="isLoading">
-            {{ isLoading ? 'กำลังอัปโหลด...' : '💾 บันทึกเทมเพลต' }}
+            {{ isLoading ? 'กำลังอัปโหลด...' : '📤 อัปโหลดเทมเพลต' }}
           </button>
         </div>
       </form>

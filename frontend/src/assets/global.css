@@ -1,3 +1,5 @@
+@import './design-tokens.css';
+
 /* =========================================
    ไฟล์ตั้งค่ารูปแบบส่วนกลาง (Global Styles)
    สำหรับโปรแกรมบริหารจัดการ พ.สมทบ
@@ -6,9 +8,9 @@
 /* === Layout & Typography === */
 body {
   margin: 0;
-  font-family: 'Sarabun', 'Noto Sans Thai', sans-serif;
-  background-color: #F4F6F9;
-  color: #333333;
+  font-family: var(--font-family-base);
+  background-color: var(--color-page);
+  color: var(--color-text-body);
 }
 
 .manage-layout {
@@ -37,7 +39,7 @@ body {
 
 /* === Buttons === */
 .btn-primary {
-  background-color: #10B981;
+  background-color: var(--color-primary);
   color: #FFFFFF;
   border: none;
   border-radius: 8px;
@@ -50,7 +52,7 @@ body {
 }
 
 .btn-primary:hover {
-  background-color: #059669;
+  background-color: var(--color-primary-hover);
   box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3);
 }
 
@@ -785,6 +787,65 @@ body {
   cursor: pointer;
 }
 .delete-inline:hover { background-color: #FCA5A5; }
+}
+
+/* === Shared Filter Section === */
+.filter-card {
+  margin-bottom: 24px;
+  padding: 16px 24px;
+}
+
+.filter-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: flex-end;
+}
+
+.filter-group {
+  display: flex;
+  flex: 1;
+  min-width: 200px;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.date-filter-group { min-width: 250px; }
+.annual-filter-group { min-width: 390px; }
+
+.filter-group label {
+  color: #374151;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.filter-group input,
+.filter-group select {
+  padding: 10px 14px;
+  border: 1px solid #D1D5DB;
+  border-radius: 8px;
+  outline: none;
+  background-color: #F9FAFB;
+  color: #111827;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.filter-group input:focus,
+.filter-group select:focus {
+  border-color: #10B981;
+  background-color: #FFFFFF;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+.filter-actions {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+@media (max-width: 768px) {
+  .annual-filter-group { min-width: 100%; }
 }
 
 /* === Footer === */

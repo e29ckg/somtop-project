@@ -1,6 +1,8 @@
 # 🎨 Design System & Guidelines
 **โปรแกรมบริหารจัดการ ผู้พิพากษาสมทบ (ศาลเยาวชนและครอบครัว)**
 
+> เอกสารนี้เป็นแหล่งอ้างอิงหลัก (single source of truth) สำหรับงาน Frontend ใหม่ทุกหน้า
+
 เอกสารฉบับนี้รวบรวมมาตรฐานการออกแบบและแนวทางการเขียนโค้ดฝั่ง Frontend (Vue.js) เพื่อให้ระบบมีหน้าตาไปในทิศทางเดียวกัน สวยงาม และง่ายต่อการดูแลรักษา (Maintain)
 
 ---
@@ -40,8 +42,10 @@
 ระบบได้เปลี่ยนมาใช้ **Global CSS** เป็นหลัก เพื่อลดความซ้ำซ้อนของโค้ดในแต่ละไฟล์ `.vue`
 
 *   **ไฟล์หลัก:** `frontend/src/assets/global.css`
+*   **Design tokens:** `frontend/src/assets/design-tokens.css`
 *   **การอ้างอิง:** นำเข้า (Import) ไว้ที่ `frontend/src/main.js`
 *   **การใช้งาน:** ในหน้า `.vue` ต่างๆ ไม่จำเป็นต้องใส่ `<style scoped>` นอกเสียจากว่ามี CSS พิเศษที่ต้องการให้มีผลแค่หน้านั้นๆ จริงๆ (เช่น รูปแบบขนาด iframe สำหรับดู PDF)
+*   **กฎสำคัญ:** สี ระยะห่าง ขอบมน ความสูง control และเงาใหม่ให้ใช้ตัวแปร `var(--...)` จาก design tokens ก่อนเขียนค่าซ้ำ
 
 ---
 
@@ -69,6 +73,43 @@
 ### 4.5 Pagination (การแบ่งหน้า)
 *   `.pagination-container`: แถบควบคุมด้านล่างตาราง ประกอบด้วยข้อความแจ้งจำนวนรายการ และปุ่มเปลี่ยนหน้า
 *   `.page-btn`: ปุ่มเปลี่ยนหน้า หากเป็นหน้าที่กำลังแอคทีฟ (Active) จะเป็นปุ่มสีเขียว
+
+### 4.6 Filter bar (แถบค้นหาและตัวกรอง)
+*   ใช้ `.card.filter-card` เป็นกล่องครอบ
+*   ใช้ `.filter-controls` จัดกลุ่มตัวกรอง และ `.filter-group` ครอบ label กับ input/select
+*   ใช้ `.filter-actions` สำหรับปุ่มล้างค่า พิมพ์ หรือส่งออก
+*   Label ต้องอยู่เหนือ control และ control ในแถวเดียวกันควรสูงเท่ากัน
+*   รอบปีราชการใช้รูปแบบ `ปี 2569 (1 เม.ย. 2569 - 31 มี.ค. 2570)`
+
+ตัวอย่าง:
+
+```html
+<section class="card filter-card no-print">
+  <div class="filter-controls">
+    <div class="filter-group">
+      <label for="keyword">ค้นหา</label>
+      <input id="keyword" type="search" placeholder="ระบุคำค้นหา..." />
+    </div>
+    <div class="filter-actions">
+      <button class="btn-secondary">ล้างค่า</button>
+      <button class="btn-primary">🖨️ พิมพ์รายงาน</button>
+    </div>
+  </div>
+</section>
+```
+
+### 4.7 File actions (การจัดการไฟล์)
+*   อัปโหลดใช้ `📤`
+*   เปิดดูไฟล์แนบใช้ `📎` หรือไอคอนชนิดไฟล์
+*   พิมพ์ใช้ `🖨️`
+*   แก้ไขใช้ `✏️` และลบใช้ `🗑️`
+*   การลบต้องมีหน้าต่างยืนยันเสมอ
+
+### 4.8 Responsive layout
+*   Breakpoint หลักคือ `768px`
+*   Filter และ header actions ต้องเรียงเป็นคอลัมน์บนมือถือ
+*   ตารางกว้างต้องครอบด้วย `.table-responsive`
+*   ปุ่มสำคัญต้องมีพื้นที่กดไม่น้อยกว่าความสูงมาตรฐาน `--control-height`
 
 ---
 

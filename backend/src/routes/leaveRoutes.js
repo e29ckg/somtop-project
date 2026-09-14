@@ -12,6 +12,7 @@ router.get('/', leaveController.getAllLeaves);
 // เปลี่ยน .single เป็น .array และกำหนดรับสูงสุด 10 ไฟล์
 router.post('/', verifyAdmin, uploadPdf.array('leave_files', 10), leaveController.createLeave);
 router.put('/', verifyAdmin, uploadPdf.array('leave_files', 10), leaveController.updateLeave);
+router.post('/:id/approve-pdf', verifyAdmin, uploadPdf.single('leave_pdf'), leaveController.uploadApprovedLeavePdf);
 
 // อัปโหลดไฟล์จาก Field ที่ชื่อ 'leave_file' ตามที่ Frontend เคยส่งมา
 // router.post('/', uploadPdf.single('leave_file'), leaveController.createLeave);

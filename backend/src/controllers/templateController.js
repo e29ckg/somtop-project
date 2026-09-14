@@ -9,7 +9,8 @@ const ALLOWED_TEMPLATE_TYPES = new Set([
     'leave_template_abroad',
     'leave_template_meeting',
     'leave_template',
-    'duty_swap_template'
+    'duty_swap_template',
+    'duty_order_template'
 ]);
 
 const isAllowedTemplateType = (templateType) => (

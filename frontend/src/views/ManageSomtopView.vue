@@ -138,7 +138,7 @@
               <div v-else class="profile-preview placeholder">👤</div>
             </div>
             <div class="upload-controls">
-              <label>รูปถ่าย (รองรับ .jpg, .png)</label>
+              <label>📤 อัปโหลดรูปถ่าย (รองรับ .jpg, .png)</label>
               <input type="file" accept="image/*" @change="handlePhotoUpload" class="file-input" />
               <small class="text-muted">ขนาดไฟล์ไม่เกิน 2MB</small>
             </div>
@@ -588,7 +588,7 @@
           </div>
 
           <div class="input-group full-width upload-section">
-            <label>แนบไฟล์ประกาศนียบัตรกำกับเครื่องราชฯ (PDF, ภาพ)</label>
+            <label>📤 อัปโหลดไฟล์ประกาศนียบัตรกำกับเครื่องราชฯ (PDF, ภาพ)</label>
             <input 
               type="file" 
               accept=".pdf,image/*" 

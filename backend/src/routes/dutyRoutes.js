@@ -2,18 +2,28 @@ const express = require('express');
 const router = express.Router();
 const dutyController = require('../controllers/dutyController');
 const { verifyToken, verifyAdmin } = require('../middlewares/authMiddleware');
+const uploadDutyOrder = require('../middlewares/uploadDutyOrderMiddleware');
 const asyncHandler = handler => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
 
 router.use(verifyToken);
 router.get('/calendar', asyncHandler(dutyController.getCalendar));
 router.get('/people', asyncHandler(dutyController.getPeople));
+router.get('/teams', asyncHandler(dutyController.getTeams));
 router.get('/orders/:id/print-data', asyncHandler(dutyController.getOrderPrintData));
+router.get('/orders/:id/export-word', asyncHandler(dutyController.exportOrderWord));
+router.get('/orders/:id/signed-pdf', asyncHandler(dutyController.downloadSignedOrderPdf));
 router.post('/orders', verifyAdmin, asyncHandler(dutyController.createOrder));
 router.put('/orders/:id', verifyAdmin, asyncHandler(dutyController.updateOrder));
 router.delete('/orders/:id', verifyAdmin, asyncHandler(dutyController.deleteOrder));
+router.post('/orders/:id/signed-pdf', verifyAdmin, uploadDutyOrder.single('signed_order_pdf'), asyncHandler(dutyController.uploadSignedOrderPdf));
+router.delete('/orders/:id/signed-pdf', verifyAdmin, asyncHandler(dutyController.deleteSignedOrderPdf));
 router.post('/schedules', verifyAdmin, asyncHandler(dutyController.createSchedule));
+router.post('/team-schedules', verifyAdmin, asyncHandler(dutyController.createTeamSchedule));
 router.put('/schedules/:id', verifyAdmin, asyncHandler(dutyController.updateSchedule));
 router.delete('/schedules/:id', verifyAdmin, asyncHandler(dutyController.deleteSchedule));
+router.post('/teams', verifyAdmin, asyncHandler(dutyController.createTeam));
+router.put('/teams/:id', verifyAdmin, asyncHandler(dutyController.updateTeam));
+router.delete('/teams/:id', verifyAdmin, asyncHandler(dutyController.deleteTeam));
 router.post('/swaps', verifyAdmin, asyncHandler(dutyController.createSwap));
 router.get('/swaps/:id/export-word', asyncHandler(dutyController.exportSwapWord));
 

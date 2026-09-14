@@ -19,6 +19,11 @@
            <span class="nav-icon">👥</span>
            <span class="sidebar-text">ข้อมูลผู้พิพากษาสมทบ</span>
         </router-link>
+
+        <router-link to="/duty-schedule" class="nav-item">
+           <span class="nav-icon">🗓️</span>
+           <span class="sidebar-text">เวรปฏิบัติหน้าที่</span>
+        </router-link>
         
         <router-link to="/leave-history" class="nav-item">
            <span class="nav-icon">📅</span>
@@ -33,11 +38,6 @@
            <span class="nav-icon">📊</span>
            <span class="sidebar-text">รายงานการเข้าร่วมกิจกรรม</span>
         </router-link>
-        <router-link to="/duty-schedule" class="nav-item">
-           <span class="nav-icon">🗓️</span>
-           <span class="sidebar-text">เวรปฏิบัติหน้าที่</span>
-        </router-link>
-
         <!-- ⭐️ ซ่อน/แสดงเมนูตั้งค่า เฉพาะผู้ที่มี Role = admin เท่านั้น -->
         <div v-if="userRole === 'admin'">
           <div class="menu-category">ตั้งค่าระบบ</div>
@@ -62,10 +62,6 @@
              <span class="nav-icon">🏅</span>
              <span class="sidebar-text">จัดการตำแหน่ง</span>
           </router-link>
-          <router-link to="/manage-leave-types" class="nav-item">
-            <span class="nav-icon">🏷️</span>
-            <span class="sidebar-text">ประเภทการลา</span>
-          </router-link>
           <router-link to="/manage-terms" class="nav-item">
             <span class="nav-icon">⏳</span>
             <span class="sidebar-text">จัดการวาระการทำงาน</span>
@@ -78,10 +74,6 @@
             <span class="nav-icon">📄</span>
             <span class="sidebar-text">จัดการเทมเพลตเอกสาร</span>
         </router-link>
-          <router-link to="/manage-event-types" class="nav-item">
-            <span class="nav-icon">🏷️</span>
-            <span class="sidebar-text">ประเภทกิจกรรม</span>
-          </router-link>
           <router-link to="/activity-logs" class="nav-item">
              <span class="nav-icon">📋</span>
              <span class="sidebar-text">ประวัติการใช้งาน</span>
@@ -179,10 +171,8 @@ const currentRouteName = computed(() => {
   if (route.path === '/manage-titles') return 'จัดการคำนำหน้า'
   if (route.path === '/activity-logs') return 'ประวัติการใช้งาน'
   if (route.path === '/manage-positions') return 'จัดการตำแหน่ง'
-  if (route.path === '/manage-leave-types') return 'จัดการประเภทการลา'
   if (route.path === '/manage-decorations') return 'จัดการชั้นตราเครื่องราชฯ'
   if (route.path === '/manage-templates') return 'จัดการเทมเพลตเอกสาร'
-  if (route.path === '/manage-event-types') return 'จัดการประเภทกิจกรรม'
   if (route.path === '/manage-calendar-sync') return 'ตั้งค่า Google Calendar'
   if (route.path === '/manage-terms') return 'จัดการวาระการทำงาน'
   return 'รายละเอียด'
