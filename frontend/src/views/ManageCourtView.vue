@@ -41,6 +41,8 @@
               <th>รหัสศาล</th>
               <th>ชื่อศาล</th>
               <th>จังหวัด</th>
+              <th>ผู้พิพากษาหัวหน้า</th>
+              <th>ผู้อำนวยการ</th>
               <th>เบอร์โทร</th>
               <th>สถานะ</th>
               <th class="no-print">จัดการ</th>
@@ -48,7 +50,7 @@
           </thead>
           <tbody>
             <tr v-if="isLoading">
-              <td colspan="6" class="text-center py-8">
+              <td colspan="8" class="text-center py-8">
                 <div class="loading-spinner"></div>
                 <div class="text-muted mt-2">กำลังดึงข้อมูลจากเซิร์ฟเวอร์...</div>
               </td>
@@ -59,6 +61,14 @@
                 <td class="font-mono font-bold">{{ court.court_code.toUpperCase() }}</td>
                 <td class="full-name">{{ court.court_name }}</td>
                 <td>{{ court.province || '-' }}</td>
+                <td>
+                  <div>{{ court.chief_judge_name || '-' }}</div>
+                  <small class="text-muted">{{ court.chief_judge_position || '' }}</small>
+                </td>
+                <td>
+                  <div>{{ court.director_name || '-' }}</div>
+                  <small class="text-muted">{{ court.director_position || '' }}</small>
+                </td>
                 <td>{{ court.phone || '-' }}</td>
                 <td>
                   <span class="status-badge" :class="court.status === 'ใช้งาน' ? 'active' : 'inactive'">
@@ -73,7 +83,7 @@
                 </td>
               </tr>
               <tr v-if="filteredList.length === 0">
-                <td colspan="6" class="text-center text-muted">ไม่พบข้อมูลที่ค้นหา</td>
+                <td colspan="8" class="text-center text-muted">ไม่พบข้อมูลที่ค้นหา</td>
               </tr>
             </template>
           </tbody>
@@ -149,6 +159,26 @@
             <textarea v-model="formData.address" rows="2" placeholder="รายละเอียดที่อยู่..."></textarea>
           </div>
 
+          <div class="input-group">
+            <label>ชื่อผู้พิพากษาหัวหน้าศาล</label>
+            <input type="text" v-model="formData.chief_judge_name" placeholder="ชื่อและนามสกุล" />
+          </div>
+
+          <div class="input-group">
+            <label>ตำแหน่งผู้พิพากษาหัวหน้าศาล</label>
+            <input type="text" v-model="formData.chief_judge_position" placeholder="เช่น ผู้พิพากษาหัวหน้าศาล..." />
+          </div>
+
+          <div class="input-group">
+            <label>ชื่อผู้อำนวยการ</label>
+            <input type="text" v-model="formData.director_name" placeholder="ชื่อและนามสกุล" />
+          </div>
+
+          <div class="input-group">
+            <label>ตำแหน่งผู้อำนวยการ</label>
+            <input type="text" v-model="formData.director_position" placeholder="เช่น ผู้อำนวยการสำนักงานประจำศาล..." />
+          </div>
+
           <div class="modal-actions full-width">
             <button type="button" class="btn-secondary" @click="closeModal">ยกเลิก</button>
             <button type="submit" class="btn-primary">บันทึกข้อมูล</button>
@@ -180,7 +210,11 @@ const formData = ref({
   phone: '', 
   email: '', 
   province: '', 
-  status: 'ใช้งาน'
+  status: 'ใช้งาน',
+  chief_judge_name: '',
+  chief_judge_position: '',
+  director_name: '',
+  director_position: ''
 })
 
 // ==========================================
@@ -195,7 +229,9 @@ const filteredList = computed(() => {
   const q = searchQuery.value.toLowerCase()
   return dataList.value.filter(item => 
     item.court_name.toLowerCase().includes(q) ||
-    item.court_code.toLowerCase().includes(q)
+    item.court_code.toLowerCase().includes(q) ||
+    (item.chief_judge_name || '').toLowerCase().includes(q) ||
+    (item.director_name || '').toLowerCase().includes(q)
   );
 })
 
@@ -261,7 +297,8 @@ const deleteData = async (id) => {
 const openAddModal = () => {
   isEditing.value = false
   formData.value = { 
-    id: null, court_code: '', court_name: '', address: '', phone: '', email: '', province: '', status: 'ใช้งาน' 
+    id: null, court_code: '', court_name: '', address: '', phone: '', email: '', province: '', status: 'ใช้งาน',
+    chief_judge_name: '', chief_judge_position: '', director_name: '', director_position: ''
   }
   isModalOpen.value = true
 }

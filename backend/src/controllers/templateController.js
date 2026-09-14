@@ -2,6 +2,24 @@ const fs = require('fs');
 const path = require('path');
 const { logActivity } = require('../utils/logger');
 
+const ALLOWED_TEMPLATE_TYPES = new Set([
+    'leave_template_sick',
+    'leave_template_personal',
+    'leave_template_vacation',
+    'leave_template_abroad',
+    'leave_template_meeting',
+    'leave_template',
+    'duty_swap_template'
+]);
+
+const isAllowedTemplateType = (templateType) => (
+    typeof templateType === 'string' && ALLOWED_TEMPLATE_TYPES.has(templateType)
+);
+
+const removeUploadedFile = (file) => {
+    if (file?.path && fs.existsSync(file.path)) fs.unlinkSync(file.path);
+};
+
 exports.uploadTemplate = (req, res) => {
     try {
         if (!req.file) {
@@ -9,9 +27,9 @@ exports.uploadTemplate = (req, res) => {
         }
 
         const templateType = req.body.template_type; // เช่น 'leave_template'
-        if (!templateType) {
-            fs.unlinkSync(req.file.path); // ลบไฟล์ชั่วคราวทิ้งถ้าไม่มีประเภท
-            return res.status(400).json({ message: 'กรุณาระบุประเภทแบบฟอร์ม' });
+        if (!isAllowedTemplateType(templateType)) {
+            removeUploadedFile(req.file);
+            return res.status(400).json({ message: 'ประเภทแบบฟอร์มไม่ถูกต้อง' });
         }
 
         // กำหนดที่อยู่ไฟล์จริงที่ต้องการเซฟทับ (เช่น backend/templates/leave_template.docx)
@@ -23,6 +41,7 @@ exports.uploadTemplate = (req, res) => {
         logActivity(req, 'อัปโหลดไฟล์', 'จัดการเทมเพลต', `อัปเดตเทมเพลต: ${templateType}`);
         res.status(200).json({ message: 'อัปโหลดและอัปเดตเทมเพลตสำเร็จ' });
     } catch (error) {
+        removeUploadedFile(req.file);
         console.error('Error uploading template:', error);
         res.status(500).json({ message: 'เกิดข้อผิดพลาดในการอัปโหลดเทมเพลต' });
     }
@@ -35,8 +54,8 @@ exports.downloadTemplate = (req, res) => {
     try {
         const templateType = req.query.type; // รับค่าประเภท เช่น 'leave_template_sick'
         
-        if (!templateType) {
-            return res.status(400).json({ message: 'กรุณาระบุประเภทแบบฟอร์ม' });
+        if (!isAllowedTemplateType(templateType)) {
+            return res.status(400).json({ message: 'ประเภทแบบฟอร์มไม่ถูกต้อง' });
         }
 
         const fileName = templateType + '.docx';

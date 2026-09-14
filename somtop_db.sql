@@ -14,6 +14,10 @@ CREATE TABLE courts (
     phone VARCHAR(50) COMMENT 'เบอร์โทร',
     email VARCHAR(100) COMMENT 'อีเมล',
     province VARCHAR(100) NULL COMMENT 'จังหวัด',
+    chief_judge_name VARCHAR(255) NULL COMMENT 'ชื่อผู้พิพากษาหัวหน้าศาล',
+    chief_judge_position VARCHAR(255) NULL COMMENT 'ตำแหน่งผู้พิพากษาหัวหน้าศาล',
+    director_name VARCHAR(255) NULL COMMENT 'ชื่อผู้อำนวยการ',
+    director_position VARCHAR(255) NULL COMMENT 'ตำแหน่งผู้อำนวยการ',
     status ENUM('ใช้งาน', 'ระงับ') DEFAULT 'ใช้งาน' COMMENT 'สถานะการใช้งาน',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -268,31 +272,68 @@ INSERT INTO duty_types (name) VALUES
 ('เวรต่อเนื่อง');
 
 -- ==========================================
--- 2. ตารางตารางเวรปฏิบัติหน้าที่ (duty_schedules)
+-- 2. ตารางคำสั่งเวรประจำเดือน (duty_orders)
+-- ==========================================
+CREATE TABLE duty_orders (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    order_number VARCHAR(100) NOT NULL COMMENT 'เลขที่คำสั่ง',
+    title VARCHAR(255) NOT NULL COMMENT 'ชื่อหรือหัวข้อคำสั่ง',
+    order_month DATE NOT NULL COMMENT 'เดือนของคำสั่ง โดยเก็บเป็นวันแรกของเดือน',
+    court_code VARCHAR(50) NOT NULL COMMENT 'รหัสศาลเจ้าของคำสั่ง',
+    note TEXT NULL,
+    status ENUM('ใช้งาน', 'ยกเลิก') DEFAULT 'ใช้งาน',
+    created_by INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    UNIQUE KEY unique_duty_order (court_code, order_number),
+    INDEX idx_duty_order_month (court_code, order_month),
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ==========================================
+-- 3. ตารางผู้ปฏิบัติหน้าที่รายวัน (duty_schedules)
 -- ==========================================
 CREATE TABLE duty_schedules (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    somtop_id INT(11) NOT NULL COMMENT 'เชื่อมกับตาราง somtop (ผู้ที่ต้องขึ้นเวร)',
-    duty_type_id INT NOT NULL COMMENT 'เชื่อมกับตาราง duty_types (ประเภทเวร)',
-    court_code VARCHAR(50) NOT NULL COMMENT 'รหัสศาล (เพื่อแยกตารางเวรของแต่ละศาล)',
-    duty_date DATE NOT NULL COMMENT 'วันที่ขึ้นเวร',
-    
-    -- หากต้องการระบุเวลาเริ่มต้น-สิ้นสุด (ถ้ามี)
-    -- start_time TIME NULL COMMENT 'เวลาเริ่มเวร',
-    -- end_time TIME NULL COMMENT 'เวลาสิ้นสุดเวร',
-    
-    note TEXT COMMENT 'หมายเหตุเพิ่มเติม (เช่น แลกเวรกับใคร)',
-    status ENUM('รอปฏิบัติหน้าที่', 'ปฏิบัติหน้าที่เสร็จสิ้น', 'ขอเปลี่ยนเวร', 'ยกเลิก') DEFAULT 'รอปฏิบัติหน้าที่' COMMENT 'สถานะการขึ้นเวร',
-    
+    order_id INT NOT NULL COMMENT 'คำสั่งเวรประจำเดือน',
+    somtop_id INT NOT NULL COMMENT 'ผู้ปฏิบัติหน้าที่',
+    duty_type_id INT NOT NULL COMMENT 'ประเภทเวร',
+    court_code VARCHAR(50) NOT NULL COMMENT 'รหัสศาล',
+    duty_date DATE NOT NULL COMMENT 'วันที่ปฏิบัติหน้าที่',
+    note TEXT NULL,
+    status ENUM('รอปฏิบัติหน้าที่', 'ปฏิบัติหน้าที่เสร็จสิ้น', 'ขอเปลี่ยนเวร', 'ยกเลิก') DEFAULT 'รอปฏิบัติหน้าที่',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    
-    -- ตั้งค่า Foreign Key
+
+    FOREIGN KEY (order_id) REFERENCES duty_orders(id) ON DELETE CASCADE,
     FOREIGN KEY (somtop_id) REFERENCES somtop(id) ON DELETE CASCADE,
     FOREIGN KEY (duty_type_id) REFERENCES duty_types(id) ON DELETE RESTRICT,
-    
-    -- เพิ่ม Index สำหรับการค้นหาตามศาลและวันที่ให้ไวขึ้น
-    INDEX idx_duty_court_date (court_code, duty_date)
+    UNIQUE KEY unique_order_duty_person (order_id, duty_date, somtop_id),
+    INDEX idx_duty_court_date (court_code, duty_date),
+    INDEX idx_duty_order_date (order_id, duty_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ==========================================
+-- 4. ตารางประวัติการเปลี่ยนเวร (duty_swaps)
+-- ==========================================
+CREATE TABLE duty_swaps (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    schedule_id INT NOT NULL,
+    requester_somtop_id INT NOT NULL COMMENT 'ผู้ขอเปลี่ยนเวร',
+    replacement_somtop_id INT NOT NULL COMMENT 'ผู้ปฏิบัติหน้าที่แทน',
+    reason TEXT NOT NULL,
+    request_date DATE NOT NULL,
+    court_code VARCHAR(50) NOT NULL,
+    created_by INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (schedule_id) REFERENCES duty_schedules(id) ON DELETE CASCADE,
+    FOREIGN KEY (requester_somtop_id) REFERENCES somtop(id) ON DELETE RESTRICT,
+    FOREIGN KEY (replacement_somtop_id) REFERENCES somtop(id) ON DELETE RESTRICT,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_duty_swap_schedule (schedule_id),
+    INDEX idx_duty_swap_court_date (court_code, request_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE holidays (

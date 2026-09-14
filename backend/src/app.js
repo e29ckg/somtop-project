@@ -22,6 +22,7 @@ const settingRoutes = require('./routes/settingRoutes');
 const termHistoryRoutes = require('./routes/termHistoryRoutes');
 const workingTermRoutes = require('./routes/workingTermRoutes');
 const decorationRoutes = require('./routes/decorationRoutes');
+const dutyRoutes = require('./routes/dutyRoutes');
 
 
 const app = express();
@@ -74,6 +75,7 @@ app.use('/api/settings', settingRoutes);
 app.use('/api/term-history', termHistoryRoutes);
 app.use('/api/working-terms', workingTermRoutes);
 app.use('/api/decorations', decorationRoutes);
+app.use('/api/duties', dutyRoutes);
 
 app.get('/', (req, res) => {res.json({ message: 'Welcome to Somtop API' });});
 
@@ -84,7 +86,8 @@ app.use((err, req, res, next) => {
     }
     if (err.status === 404) return res.status(404).json({ message: 'ไม่พบไฟล์' });
     console.error('Request error:', err.message);
-    return res.status(400).json({ message: err.message || 'คำขอไม่ถูกต้อง' });
+    const status = err.name === 'MulterError' ? 400 : (err.status || 500);
+    return res.status(status).json({ message: status === 500 ? 'เกิดข้อผิดพลาดบนเซิร์ฟเวอร์' : (err.message || 'คำขอไม่ถูกต้อง') });
 });
 
 // 4. ดักจับ Error กรณีเรียก API ที่ไม่มีอยู่จริง (404 Not Found)

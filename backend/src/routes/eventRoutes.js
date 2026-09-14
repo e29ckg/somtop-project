@@ -9,6 +9,7 @@ router.use(verifyToken);
 // ==========================================
 // Endpoints สำหรับกิจกรรม: /api/events
 // ==========================================
+router.get('/reports/participation', eventController.getParticipationReport);
 router.get('/', eventController.getAllEvents);                         // ดึงกิจกรรมทั้งหมด
 router.get('/:id/participants', eventController.getEventParticipants); // ดึงรายชื่อคนเข้าร่วมกิจกรรมนั้นๆ
 

@@ -578,10 +578,13 @@ exports.exportMeetingLeaveToWord = async (req, res) => {
         const query = `
             SELECT 
                 e.title as event_title, e.start_date, e.end_date, e.location,
-                CONCAT(s.title, s.first_name, ' ', s.last_name) AS full_name
+                CONCAT(s.title, s.first_name, ' ', s.last_name) AS full_name,
+                c.court_name, c.chief_judge_name, c.chief_judge_position,
+                c.director_name, c.director_position
             FROM event_participants ep
             JOIN events e ON ep.event_id = e.id
             JOIN somtop s ON ep.somtop_id = s.id
+            LEFT JOIN courts c ON e.court_code = c.court_code
             WHERE ep.event_id = ? AND ep.somtop_id = ?
               AND (? IS NULL OR e.court_code = ?)
         `;
@@ -643,6 +646,11 @@ exports.exportMeetingLeaveToWord = async (req, res) => {
             event_year: eventMonthYear.split(' ')[1],
             time: eventTime,
             event_time: eventTime,
+            court_name: data.court_name || '-',
+            chief_judge_name: data.chief_judge_name || '-',
+            chief_judge_position: data.chief_judge_position || '-',
+            director_name: data.director_name || '-',
+            director_position: data.director_position || '-',
             start_time: eventTime,
             dob: '-',
             join_date: '-',
@@ -660,5 +668,162 @@ exports.exportMeetingLeaveToWord = async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'สร้างไฟล์ใบลาประชุมไม่สำเร็จ' });
+    }
+};
+
+// ==========================================
+// รายงานสรุปการเข้าร่วมกิจกรรม แยกตามปีและประเภท
+// ==========================================
+exports.getParticipationReport = async (req, res) => {
+    try {
+        const courtCode = req.user.court_code;
+        const { year, event_type_id: eventTypeId, somtop_id: somtopId } = req.query;
+
+        if (year && !/^\d{4}$/.test(String(year))) {
+            return res.status(400).json({ message: 'รูปแบบปีไม่ถูกต้อง' });
+        }
+        if (eventTypeId && (!/^\d+$/.test(String(eventTypeId)) || Number(eventTypeId) < 1)) {
+            return res.status(400).json({ message: 'ประเภทกิจกรรมไม่ถูกต้อง' });
+        }
+        if (somtopId && (!/^\d+$/.test(String(somtopId)) || Number(somtopId) < 1)) {
+            return res.status(400).json({ message: 'รายชื่อบุคคลไม่ถูกต้อง' });
+        }
+
+        const filters = ["e.status <> 'ยกเลิก'"];
+        const params = [];
+        if (courtCode) {
+            filters.push('e.court_code = ?');
+            params.push(courtCode);
+        }
+        if (year) {
+            filters.push('YEAR(e.start_date) = ?');
+            params.push(Number(year));
+        }
+        if (eventTypeId) {
+            filters.push('e.event_type_id = ?');
+            params.push(Number(eventTypeId));
+        }
+        if (somtopId) {
+            filters.push('ep.somtop_id = ?');
+            params.push(Number(somtopId));
+        }
+
+        const whereSql = `WHERE ${filters.join(' AND ')}`;
+        const [rows] = await pool.query(`
+            SELECT
+                COALESCE(et.id, 0) AS event_type_id,
+                COALESCE(et.name, 'ไม่ระบุประเภท') AS event_type_name,
+                COUNT(DISTINCT e.id) AS event_count,
+                COUNT(ep.id) AS participant_count,
+                SUM(CASE WHEN ep.status = 'เข้าร่วม' THEN 1 ELSE 0 END) AS attended_count,
+                SUM(CASE WHEN ep.status = 'ลาประชุม' THEN 1 ELSE 0 END) AS leave_count,
+                SUM(CASE WHEN ep.status = 'ไม่เข้าร่วม' THEN 1 ELSE 0 END) AS absent_count,
+                SUM(CASE WHEN ep.status = 'รอตอบรับ' THEN 1 ELSE 0 END) AS pending_count
+            FROM events e
+            LEFT JOIN event_types et ON e.event_type_id = et.id
+            LEFT JOIN event_participants ep ON ep.event_id = e.id
+            ${whereSql}
+            GROUP BY et.id, et.name
+            ORDER BY event_count DESC, event_type_name ASC
+        `, params);
+
+        const [yearRows] = await pool.query(`
+            SELECT DISTINCT YEAR(start_date) AS year
+            FROM events
+            WHERE status <> 'ยกเลิก' AND (? IS NULL OR court_code = ?)
+            ORDER BY year DESC
+        `, [courtCode, courtCode]);
+        const [typeRows] = await pool.query(`
+            SELECT DISTINCT et.id, et.name
+            FROM event_types et
+            JOIN events e ON e.event_type_id = et.id
+            WHERE e.status <> 'ยกเลิก' AND (? IS NULL OR e.court_code = ?)
+            ORDER BY et.name ASC
+        `, [courtCode, courtCode]);
+        const [personRows] = await pool.query(`
+            SELECT id, CONCAT(title, first_name, ' ', last_name) AS full_name
+            FROM somtop
+            WHERE (? IS NULL OR court_code = ?)
+            ORDER BY first_name ASC, last_name ASC
+        `, [courtCode, courtCode]);
+
+        const [matrixEventRows] = await pool.query(`
+            SELECT DISTINCT e.id, e.title,
+                DATE_FORMAT(e.start_date, '%Y-%m-%d') AS event_date,
+                COALESCE(et.name, 'ไม่ระบุประเภท') AS event_type_name
+            FROM events e
+            LEFT JOIN event_types et ON e.event_type_id = et.id
+            LEFT JOIN event_participants ep ON ep.event_id = e.id
+            ${whereSql}
+            ORDER BY e.start_date ASC, e.id ASC
+        `, params);
+        const [matrixParticipantRows] = await pool.query(`
+            SELECT ep.event_id, ep.somtop_id, ep.status,
+                CONCAT(s.title, s.first_name, ' ', s.last_name) AS full_name
+            FROM event_participants ep
+            JOIN events e ON ep.event_id = e.id
+            JOIN somtop s ON ep.somtop_id = s.id
+            ${whereSql}
+            ORDER BY s.first_name ASC, s.last_name ASC
+        `, params);
+
+        const records = rows.map(row => {
+            const participantCount = Number(row.participant_count) || 0;
+            const attendedCount = Number(row.attended_count) || 0;
+            return {
+                ...row,
+                event_count: Number(row.event_count) || 0,
+                participant_count: participantCount,
+                attended_count: attendedCount,
+                leave_count: Number(row.leave_count) || 0,
+                absent_count: Number(row.absent_count) || 0,
+                pending_count: Number(row.pending_count) || 0,
+                attendance_rate: participantCount > 0
+                    ? Number(((attendedCount / participantCount) * 100).toFixed(1))
+                    : 0
+            };
+        });
+
+        const summary = records.reduce((total, row) => {
+            total.event_count += row.event_count;
+            total.participant_count += row.participant_count;
+            total.attended_count += row.attended_count;
+            total.leave_count += row.leave_count;
+            total.absent_count += row.absent_count;
+            total.pending_count += row.pending_count;
+            return total;
+        }, { event_count: 0, participant_count: 0, attended_count: 0, leave_count: 0, absent_count: 0, pending_count: 0 });
+        summary.attendance_rate = summary.participant_count > 0
+            ? Number(((summary.attended_count / summary.participant_count) * 100).toFixed(1))
+            : 0;
+
+        const matrixPeople = new Map();
+        matrixParticipantRows.forEach(item => {
+            if (!matrixPeople.has(item.somtop_id)) {
+                matrixPeople.set(item.somtop_id, {
+                    somtop_id: item.somtop_id,
+                    full_name: item.full_name,
+                    statuses: {}
+                });
+            }
+            matrixPeople.get(item.somtop_id).statuses[item.event_id] = item.status;
+        });
+
+        res.status(200).json({
+            summary,
+            records,
+            matrix: {
+                events: matrixEventRows,
+                people: Array.from(matrixPeople.values())
+            },
+            filters: {
+                years: yearRows.map(item => item.year),
+                event_types: typeRows,
+                people: personRows
+            }
+        });
+    } catch (error) {
+        console.error('Error generating participation report:', error);
+        res.status(500).json({ message: 'ไม่สามารถสร้างรายงานการเข้าร่วมกิจกรรมได้' });
     }
 };

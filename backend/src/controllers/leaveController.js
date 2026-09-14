@@ -229,10 +229,13 @@ exports.exportToWord = async (req, res) => {
                 CONCAT(s.title, s.first_name, ' ', s.last_name) AS full_name, 
                 s.dob,          
                 s.join_date,        
-                lt.name AS leave_type_name
+                lt.name AS leave_type_name,
+                c.court_name, c.chief_judge_name, c.chief_judge_position,
+                c.director_name, c.director_position
             FROM leave_requests lr
             LEFT JOIN somtop s ON lr.somtop_id = s.id
             LEFT JOIN leave_types lt ON lr.leave_type_id = lt.id
+            LEFT JOIN courts c ON lr.court_code = c.court_code
             WHERE lr.id = ? AND (? IS NULL OR lr.court_code = ?)
         `;
         const [rows] = await pool.query(query, [id, req.user.court_code, req.user.court_code]);
@@ -294,7 +297,12 @@ exports.exportToWord = async (req, res) => {
             join_date: formatThaiDate(leaveData.join_date),
             current_day: current_day,
             current_month: current_month,
-            current_year: current_year
+            current_year: current_year,
+            court_name: leaveData.court_name || '-',
+            chief_judge_name: leaveData.chief_judge_name || '-',
+            chief_judge_position: leaveData.chief_judge_position || '-',
+            director_name: leaveData.director_name || '-',
+            director_position: leaveData.director_position || '-'
         });
 
         const buf = doc.getZip().generate({

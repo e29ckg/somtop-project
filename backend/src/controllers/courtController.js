@@ -15,20 +15,27 @@ exports.getAllCourts = async (req, res) => {
 // เพิ่มข้อมูลศาลใหม่
 exports.createCourt = async (req, res) => {
     try {
-        const { court_code, court_name, address, phone, email, province, status } = req.body;
+        const {
+            court_code, court_name, address, phone, email, province, status,
+            chief_judge_name, chief_judge_position, director_name, director_position
+        } = req.body;
 
         if (!court_code || !court_name) {
             return res.status(400).json({ message: 'กรุณาระบุรหัสศาลและชื่อศาลให้ครบถ้วน' });
         }
 
         const query = `
-            INSERT INTO courts (court_code, court_name, address, phone, email, province, status) 
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO courts (
+                court_code, court_name, address, phone, email, province,
+                chief_judge_name, chief_judge_position, director_name, director_position, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         
         await pool.query(query, [
             court_code.toLowerCase(), court_name, address || null, 
-            phone || null, email || null, province || null, status || 'ใช้งาน'
+            phone || null, email || null, province || null,
+            chief_judge_name || null, chief_judge_position || null,
+            director_name || null, director_position || null, status || 'ใช้งาน'
         ]);
 
         logActivity(req, 'เพิ่มข้อมูล', 'จัดการศาล', `เพิ่มศาล: ${court_code} - ${court_name}`);
@@ -45,7 +52,10 @@ exports.createCourt = async (req, res) => {
 // แก้ไขข้อมูลศาล
 exports.updateCourt = async (req, res) => {
     try {
-        const { id, court_code, court_name, address, phone, email, province, status } = req.body;
+        const {
+            id, court_code, court_name, address, phone, email, province, status,
+            chief_judge_name, chief_judge_position, director_name, director_position
+        } = req.body;
 
         if (!id || !court_code || !court_name) {
             return res.status(400).json({ message: 'ข้อมูลไม่ครบถ้วน' });
@@ -54,13 +64,17 @@ exports.updateCourt = async (req, res) => {
         const query = `
             UPDATE courts SET 
                 court_code = ?, court_name = ?, address = ?, 
-                phone = ?, email = ?, province = ?, status = ? 
+                phone = ?, email = ?, province = ?,
+                chief_judge_name = ?, chief_judge_position = ?,
+                director_name = ?, director_position = ?, status = ?
             WHERE id = ?
         `;
         
         await pool.query(query, [
             court_code.toLowerCase(), court_name, address || null, 
-            phone || null, email || null, province || null, status || 'ใช้งาน', id
+            phone || null, email || null, province || null,
+            chief_judge_name || null, chief_judge_position || null,
+            director_name || null, director_position || null, status || 'ใช้งาน', id
         ]);
 
         logActivity(req, 'อัปเดตข้อมูล', 'จัดการศาล', `อัปเดตศาล ID: ${id}`);

@@ -18,6 +18,8 @@ import ManageTemplateView from '../views/ManageTemplateView.vue'
 import ManageGoogleCalendarView from '../views/ManageGoogleCalendarView.vue'
 import ManageTermView from '../views/ManageTermView.vue'
 import ProfileView from '../views/ProfileView.vue'
+import ParticipationReportView from '../views/ParticipationReportView.vue'
+import DutyScheduleView from '../views/DutyScheduleView.vue'
 import api from '../services/api'
 import { currentUser, isSessionVerified, setSessionUser, clearSession } from '../services/session'
 
@@ -83,6 +85,16 @@ const router = createRouter({
           path: 'manage-events',
           name: 'manage-events',
           component: ManageEventView
+        },
+        {
+          path: 'participation-report',
+          name: 'participation-report',
+          component: ParticipationReportView
+        },
+        {
+          path: 'duty-schedule',
+          name: 'duty-schedule',
+          component: DutyScheduleView
         },
         {
           path: 'manage-event-types',

@@ -21,6 +21,7 @@
               <option value="leave_template_abroad">แบบฟอร์มลาไปต่างประเทศ</option>
               <option value="leave_template_meeting">แบบฟอร์มลาประชุม</option>
               <option value="leave_template">แบบฟอร์มใบลา (ทั่วไป/อื่นๆ)</option>
+              <option value="duty_swap_template">แบบฟอร์มการเปลี่ยนเวร</option>
             </select>
             
             <!-- ⭐️ ปุ่มสำหรับดาวน์โหลดฟอร์มเดิม -->
@@ -40,6 +41,9 @@
           <label>อัปโหลดไฟล์เทมเพลต Word (.docx)</label>
           <input type="file" accept=".docx,.doc" @change="handleFileUpload" required class="file-input" />
           <small class="text-muted mt-1 block">หมายเหตุ: ไฟล์ใหม่จะเข้าไปแทนที่ไฟล์เดิมในระบบทันที และต้องใส่ตัวแปร { } ในไฟล์ให้ถูกต้องด้วย</small>
+          <small class="text-muted mt-1 block">
+            ตัวแปรข้อมูลศาล: {court_name}, {chief_judge_name}, {chief_judge_position}, {director_name}, {director_position}
+          </small>
         </div>
 
         <div class="modal-actions full-width mt-4" style="justify-content: flex-end;">
