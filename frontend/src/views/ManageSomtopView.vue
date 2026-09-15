@@ -365,8 +365,8 @@
           <h4 style="font-size: 16px; font-weight: 600; color: #111827; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
                 <div style="display: flex; align-items: center; gap: 8px;">
                   <span>⏳</span> ประวัติการดำรงตำแหน่ง (วาระ)
-                  <!-- ⭐️ ป้ายแสดงจำนวนวาระต่อเนื่อง (แสดงเฉพาะเมื่อ > 1) -->
-                  <span v-if="consecutiveTermsCount > 1" class="status-badge active" style="font-size: 12px; font-weight: 600; padding: 4px 10px;">
+                  <!-- แสดงผลตั้งแต่วาระแรก และนับความต่อเนื่องตามลำดับรุ่นวาระจริง -->
+                  <span v-if="consecutiveTermsCount > 0" class="status-badge active" style="font-size: 12px; font-weight: 600; padding: 4px 10px;">
                     ต่อเนื่อง {{ consecutiveTermsCount }} วาระ
                   </span>
                 </div>
@@ -1143,28 +1143,32 @@ const deleteTermHistoryRecord = async (historyId) => {
 
 // === คำนวณจำนวนวาระที่ต่อเนื่องกับวาระล่าสุด ===
 const consecutiveTermsCount = computed(() => {
-  if (!personTermHistory.value || personTermHistory.value.length === 0) return 0;
-  
-  let count = 1; // เริ่มนับจากวาระล่าสุดเป็น 1 เสมอ
-  
-  // ลูปเช็กย้อนหลัง (Index 0 คือวาระล่าสุด, Index 1 คือวาระก่อนหน้า)
-  for (let i = 0; i < personTermHistory.value.length - 1; i++) {
-    const newerTermStart = new Date(personTermHistory.value[i].start_date);
-    const olderTermEnd = new Date(personTermHistory.value[i+1].end_date);
-    
-    // คำนวณช่องว่างระหว่างวาระ (หน่วยเป็นวัน)
-    const gapTime = newerTermStart.getTime() - olderTermEnd.getTime();
-    const gapDays = gapTime / (1000 * 3600 * 24);
-    
-    // ถ้าระยะห่างไม่เกิน 180 วัน (ประมาณ 6 เดือน) ถือว่าดำรงตำแหน่งต่อเนื่อง
-    if (gapDays <=( 180 * 3)) { // 180 วัน * 3 = 540 วัน (ประมาณ 1.5 ปี) เพื่อให้ยืดหยุ่นมากขึ้น
-      count++;
-    } else {
-      break; // หากเว้นช่วงนานกว่านั้น ถือว่าขาดตอน ให้หยุดนับทันที
+  const histories = personTermHistory.value || []
+  if (histories.length === 0) return 0
+
+  // termList เรียงรุ่นล่าสุดก่อนจาก API อยู่แล้ว แต่เรียงซ้ำเพื่อให้ผลเหมือนกันทุก server
+  const orderedTerms = [...termList.value].sort((a, b) => {
+    const dateCompare = String(b.start_date || '').localeCompare(String(a.start_date || ''))
+    return dateCompare || Number(b.id) - Number(a.id)
+  })
+  const historyTermIds = new Set(histories.map(term => String(term.term_id)))
+  const latestHistory = [...histories].sort((a, b) =>
+    String(b.start_date || '').localeCompare(String(a.start_date || ''))
+  )[0]
+  const latestTermIndex = orderedTerms.findIndex(term => String(term.id) === String(latestHistory.term_id))
+
+  // นับย้อนจากวาระล่าสุดของบุคคลจนกว่าจะพบรุ่นที่ไม่ได้ดำรงตำแหน่ง
+  if (latestTermIndex >= 0) {
+    let count = 0
+    for (let index = latestTermIndex; index < orderedTerms.length; index++) {
+      if (!historyTermIds.has(String(orderedTerms[index].id))) break
+      count++
     }
+    return count
   }
-  
-  return count;
+
+  // รองรับข้อมูลจาก backend รุ่นเก่าที่ยังไม่ได้ส่ง term_id
+  return 1
 })
 
 

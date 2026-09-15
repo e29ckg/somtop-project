@@ -307,6 +307,7 @@ exports.getSomtopHistory = async (req, res) => {
         const queryTerms = `
             SELECT 
                 sth.id,
+                sth.term_id,
                 wt.generation_name, 
                 wt.start_date, 
                 wt.end_date, 
