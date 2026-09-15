@@ -339,8 +339,9 @@
               <!-- ⭐️ กล่องเลือกสถานะ และปุ่มพิมพ์ใบลา -->
               <div v-if="isParticipant(person.id)" class="participant-actions">
                 <select 
-                  v-model="getParticipantStatus(person.id).status" 
+                  :value="getParticipantStatus(person.id)"
                   @change="updateStatus(person.id, $event.target.value)"
+                  :disabled="updatingParticipantIds.has(String(person.id))"
                   class="status-select"
                 >
                   <option value="รอตอบรับ">รอตอบรับ</option>
@@ -544,6 +545,7 @@ const eventTypeSearch = ref('')
 const eventTypeForm = ref({ id: null, name: '', status: 'ใช้งาน' })
 const somtopList = ref([])
 const currentParticipants = ref([])
+const updatingParticipantIds = ref(new Set())
 
 const isLoading = ref(false)
 const isModalOpen = ref(false)
@@ -957,7 +959,11 @@ const closeParticipantModal = () => {
   fetchEvents();
 }
 
-const isParticipant = (somtopId) => currentParticipants.value.some(p => p.somtop_id === somtopId);
+const findParticipant = (somtopId) => currentParticipants.value.find(
+  participant => String(participant.somtop_id) === String(somtopId)
+)
+
+const isParticipant = (somtopId) => Boolean(findParticipant(somtopId));
 
 const toggleParticipant = async (somtopId, isChecked) => {
   try {
@@ -967,10 +973,12 @@ const toggleParticipant = async (somtopId, isChecked) => {
       action: isChecked ? 'add' : 'remove'
     });
     if (isChecked) {
-      const person = somtopList.value.find(p => p.id === somtopId);
+      const person = somtopList.value.find(p => String(p.id) === String(somtopId));
       currentParticipants.value.push({ somtop_id: somtopId, status: 'เข้าร่วม', full_name: person?.full_name });
     }
-    else currentParticipants.value = currentParticipants.value.filter(p => p.somtop_id !== somtopId);
+    else currentParticipants.value = currentParticipants.value.filter(
+      participant => String(participant.somtop_id) !== String(somtopId)
+    );
   } catch (error) {
     console.error("จัดการผู้เข้าร่วมไม่สำเร็จ:", error);
     swalError('เกิดข้อผิดพลาด', 'ไม่สามารถอัปเดตรายชื่อได้');
@@ -1138,25 +1146,35 @@ const closeFilePreview = () => {
 
 // ฟังก์ชันดึงสถานะของคนๆ นั้น (ต้องอัปเดต fetchParticipants ให้ส่ง status กลับมาด้วย)
 const getParticipantStatus = (somtopId) => {
-  return currentParticipants.value.find(p => p.somtop_id === somtopId) || { status: 'รอตอบรับ' };
+  return findParticipant(somtopId)?.status || 'รอตอบรับ';
 };
 
 const canPrintMeetingLeave = (somtopId) => {
-  return getParticipantStatus(somtopId).status === 'ลาประชุม';
+  return getParticipantStatus(somtopId) === 'ลาประชุม';
 };
 
 const updateStatus = async (somtopId, newStatus) => {
+  const participant = findParticipant(somtopId);
+  if (!selectedEvent.value?.id || !participant || updatingParticipantIds.value.has(String(somtopId))) return;
+
+  const previousStatus = participant.status;
+  participant.status = newStatus;
+  updatingParticipantIds.value = new Set(updatingParticipantIds.value).add(String(somtopId));
+
   try {
-    await api.put('/events/participants/status', {
+    const response = await api.put('/events/participants/status', {
       event_id: selectedEvent.value.id,
       somtop_id: somtopId,
       status: newStatus
     });
-    // อัปเดต state ในหน้าจอ
-    const p = currentParticipants.value.find(p => p.somtop_id === somtopId);
-    if (p) p.status = newStatus;
+    participant.status = response.data.status || newStatus;
   } catch (error) {
-    swalError('เกิดข้อผิดพลาด', 'อัปเดตสถานะไม่สำเร็จ');
+    participant.status = previousStatus;
+    swalError('อัปเดตสถานะไม่สำเร็จ', error.response?.data?.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์');
+  } finally {
+    const nextUpdatingIds = new Set(updatingParticipantIds.value);
+    nextUpdatingIds.delete(String(somtopId));
+    updatingParticipantIds.value = nextUpdatingIds;
   }
 };
 

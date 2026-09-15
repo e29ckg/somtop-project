@@ -340,6 +340,9 @@ exports.exportToWord = async (req, res) => {
         const thaiMonths = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
         const current_month = thaiMonths[today.getMonth()];
         const current_year = today.getFullYear() + 543;
+        const noteForTemplate = leaveData.leave_type_name === 'ลาไปต่างประเทศ'
+            ? String(leaveData.note || '-').trim().replace(/^(?:เดินทางไป)?ประเทศ\s*/, '')
+            : (leaveData.note || '-');
 
         // แมปข้อมูลลงในตัวแปรของเอกสาร Word
         doc.render({
@@ -348,7 +351,7 @@ exports.exportToWord = async (req, res) => {
             start_date: formatThaiDate(leaveData.start_date),
             end_date: formatThaiDate(leaveData.end_date),
             total_days: normalizeLeaveDays(leaveData.total_days),
-            note: leaveData.note || '-',
+            note: noteForTemplate,
             dob: formatThaiDate(leaveData.dob),
             join_date: formatThaiDate(leaveData.join_date),
             current_day: current_day,

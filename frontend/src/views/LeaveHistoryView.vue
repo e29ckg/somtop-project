@@ -324,8 +324,12 @@
           </div>
 
           <div class="input-group full-width">
-            <label>เหตุผล/หมายเหตุ</label>
-            <textarea v-model="formData.note" rows="2" placeholder="ระบุเหตุผลการลา..."></textarea>
+            <label>{{ isAbroadLeave ? 'ประเทศที่เดินทางไป' : 'เหตุผล/หมายเหตุ' }}</label>
+            <textarea
+              v-model="formData.note"
+              rows="2"
+              :placeholder="isAbroadLeave ? 'ระบุประเทศที่เดินทางไป เช่น ญี่ปุ่น' : 'ระบุเหตุผลการลา...'"
+            ></textarea>
           </div>
 
           <div class="input-group full-width upload-section">
@@ -433,6 +437,10 @@ const leaveList = ref([])
 const somtopList = ref([]) 
 const leaveTypes = ref([]) // ⭐️ เปลี่ยนมารอรับค่าจาก Backend
 const adminLeaveTypes = ref([])
+const isAbroadLeave = computed(() => {
+  const selectedType = leaveTypes.value.find(type => String(type.id) === String(formData.value.leave_type_id))
+  return selectedType?.name === 'ลาไปต่างประเทศ'
+})
 const isLeaveTypeManagerOpen = ref(false)
 const isLeaveTypeFormOpen = ref(false)
 const isLeaveTypeLoading = ref(false)

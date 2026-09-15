@@ -48,6 +48,9 @@
           <small class="text-muted mt-1 block" v-if="formData.template_type === 'duty_order_template'">
             ตัวแปรคำสั่งเวร: {order_number}, {order_title}, {order_month_th}, {issued_date_th} และรายการ {#schedules}...{/schedules}
           </small>
+          <small class="text-muted mt-1 block" v-if="formData.template_type === 'leave_template_abroad'">
+            ตัวแปรประเทศที่เดินทางไป: {note} (ดึงจากช่อง “ประเทศที่เดินทางไป” ในประวัติการลา)
+          </small>
         </div>
 
         <div class="modal-actions full-width mt-4" style="justify-content: flex-end;">

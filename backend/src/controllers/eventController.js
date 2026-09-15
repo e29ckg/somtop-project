@@ -555,7 +555,13 @@ exports.manageParticipant = async (req, res) => {
 exports.updateParticipantStatus = async (req, res) => {
     try {
         const { event_id, somtop_id, status } = req.body;
-        if (!['เข้าร่วม', 'ลา', 'ไม่เข้าร่วม'].includes(status)) {
+        if (!event_id || !somtop_id) {
+            return res.status(400).json({ message: 'กรุณาระบุกิจกรรมและผู้เข้าร่วม' });
+        }
+
+        // ให้ตรงกับ ENUM ของ event_participants และค่าที่ใช้ในหน้ารายงาน
+        const normalizedStatus = status === 'ลา' ? 'ลาประชุม' : status;
+        if (!['รอตอบรับ', 'เข้าร่วม', 'ไม่เข้าร่วม', 'ลาประชุม'].includes(normalizedStatus)) {
             return res.status(400).json({ message: 'สถานะผู้เข้าร่วมไม่ถูกต้อง' });
         }
         await pool.query(
@@ -563,11 +569,12 @@ exports.updateParticipantStatus = async (req, res) => {
              JOIN events e ON ep.event_id = e.id
              SET ep.status = ?
              WHERE ep.event_id = ? AND ep.somtop_id = ? AND (? IS NULL OR e.court_code = ?)`,
-            [status, event_id, somtop_id, req.user.court_code, req.user.court_code]
+            [normalizedStatus, event_id, somtop_id, req.user.court_code, req.user.court_code]
         );
         logActivity(req, 'อัปเดตข้อมูล', 'ผู้เข้าร่วมกิจกรรม', `อัปเดตสถานะผู้เข้าร่วม กิจกรรม ID: ${event_id}, พ.สมทบ ID: ${somtop_id}`);
-        res.status(200).json({ message: 'อัปเดตสถานะสำเร็จ' });
+        res.status(200).json({ message: 'อัปเดตสถานะสำเร็จ', status: normalizedStatus });
     } catch (error) {
+        console.error('Error updating participant status:', error);
         res.status(500).json({ message: 'เกิดข้อผิดพลาดในการอัปเดตสถานะ' });
     }
 };
