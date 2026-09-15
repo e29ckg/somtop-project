@@ -61,16 +61,15 @@
                 <td>{{ formatThaiDate(term.end_date) }}</td>
                 <td>
                   <div v-if="normalizeFilePaths(term.file_paths).length > 0" class="term-file-links">
-                    <a
-                      v-for="fileUrl in normalizeFilePaths(term.file_paths)"
+                    <button
+                      v-for="(fileUrl, fileIndex) in normalizeFilePaths(term.file_paths)"
                       :key="fileUrl"
-                      :href="fileUrl"
-                      target="_blank"
-                      rel="noopener noreferrer"
                       class="term-file-link"
+                      type="button"
+                      @click="openFilePreview(fileUrl)"
                     >
-                       ดูไฟล์ 📎 
-                    </a>
+                      👁️ ดูไฟล์{{ normalizeFilePaths(term.file_paths).length > 1 ? ` ${fileIndex + 1}` : '' }}
+                    </button>
                   </div>
                   <span v-else class="text-muted">-</span>
                 </td>
@@ -212,11 +211,69 @@
         </form>
       </div>
     </div>
+
+    <!-- Modal ดูไฟล์แนบ -->
+    <div v-if="isFilePreviewOpen" class="modal-overlay no-print" @click.self="closeFilePreview">
+      <div class="modal-card file-preview-modal" role="dialog" aria-modal="true" aria-labelledby="file-preview-title">
+        <div class="modal-header">
+          <div class="file-preview-heading">
+            <h2 id="file-preview-title">ดูไฟล์แนบวาระการทำงาน</h2>
+            <span class="file-preview-name">{{ previewFileName }}</span>
+          </div>
+          <button class="close-btn" type="button" aria-label="ปิดหน้าต่างดูไฟล์" @click="closeFilePreview">✕</button>
+        </div>
+
+        <div class="file-preview-body">
+          <div v-if="isPreviewLoading" class="file-preview-state">
+            <div class="loading-spinner"></div>
+            <span>กำลังโหลดไฟล์...</span>
+          </div>
+
+          <div v-else-if="previewError" class="file-preview-state error-state">
+            <span class="file-state-icon">⚠️</span>
+            <strong>ไม่สามารถเปิดไฟล์ได้</strong>
+            <span>{{ previewError }}</span>
+          </div>
+
+          <img
+            v-else-if="previewKind === 'image'"
+            :src="previewObjectUrl"
+            :alt="previewFileName"
+            class="image-preview"
+          />
+
+          <iframe
+            v-else-if="previewKind === 'pdf'"
+            :src="previewObjectUrl"
+            :title="previewFileName"
+            class="document-preview"
+          ></iframe>
+
+          <div v-else class="file-preview-state">
+            <span class="file-state-icon">📄</span>
+            <strong>{{ previewFileName }}</strong>
+            <span>ไฟล์ชนิดนี้ไม่รองรับการแสดงตัวอย่างในเบราว์เซอร์ กรุณาดาวน์โหลดเพื่อเปิดดู</span>
+          </div>
+        </div>
+
+        <div class="modal-actions file-preview-actions">
+          <button type="button" class="btn-secondary" @click="closeFilePreview">ปิด</button>
+          <button
+            type="button"
+            class="btn-primary"
+            :disabled="!previewObjectUrl || isPreviewLoading"
+            @click="downloadPreviewFile"
+          >
+            ⬇️ ดาวน์โหลดไฟล์
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import api from '../services/api' 
 import { swalSuccess, swalError, swalConfirm } from '../utils/swal'
 
@@ -225,6 +282,12 @@ const dataList = ref([])
 const isLoading = ref(false)
 const isModalOpen = ref(false)
 const isEditing = ref(false)
+const isFilePreviewOpen = ref(false)
+const isPreviewLoading = ref(false)
+const previewObjectUrl = ref('')
+const previewFileName = ref('')
+const previewKind = ref('other')
+const previewError = ref('')
 
 const formData = ref({ 
   id: null, 
@@ -309,6 +372,55 @@ const handleFileUpload = (event) => {
   formData.value.files = Array.from(event.target.files || [])
 }
 
+const revokePreviewObjectUrl = () => {
+  if (previewObjectUrl.value) URL.revokeObjectURL(previewObjectUrl.value)
+  previewObjectUrl.value = ''
+}
+
+const getPreviewKind = (fileName, mimeType = '') => {
+  const lowerName = fileName.toLowerCase()
+  if (mimeType === 'application/pdf' || lowerName.endsWith('.pdf')) return 'pdf'
+  if (mimeType.startsWith('image/') || /\.(jpe?g|png|gif|webp|bmp)$/i.test(lowerName)) return 'image'
+  return 'other'
+}
+
+const openFilePreview = async (fileUrl) => {
+  revokePreviewObjectUrl()
+  previewFileName.value = getFileName(fileUrl)
+  previewKind.value = 'other'
+  previewError.value = ''
+  isPreviewLoading.value = true
+  isFilePreviewOpen.value = true
+
+  try {
+    const response = await api.get(fileUrl, { responseType: 'blob' })
+    previewObjectUrl.value = URL.createObjectURL(response.data)
+    previewKind.value = getPreviewKind(previewFileName.value, response.data.type)
+  } catch (error) {
+    previewError.value = error.response?.status === 404
+      ? 'ไม่พบไฟล์บนเซิร์ฟเวอร์'
+      : 'กรุณาตรวจสอบไฟล์หรือเข้าสู่ระบบใหม่อีกครั้ง'
+  } finally {
+    isPreviewLoading.value = false
+  }
+}
+
+const closeFilePreview = () => {
+  isFilePreviewOpen.value = false
+  previewError.value = ''
+  revokePreviewObjectUrl()
+}
+
+const downloadPreviewFile = () => {
+  if (!previewObjectUrl.value) return
+  const downloadLink = document.createElement('a')
+  downloadLink.href = previewObjectUrl.value
+  downloadLink.download = previewFileName.value || 'attachment'
+  document.body.appendChild(downloadLink)
+  downloadLink.click()
+  downloadLink.remove()
+}
+
 const deleteTermFile = async (fileUrl) => {
   if (!formData.value.id) return
 
@@ -316,8 +428,18 @@ const deleteTermFile = async (fileUrl) => {
   if (!result.isConfirmed) return
 
   try {
-    await api.delete(`/working-terms/${formData.value.id}/files`, { data: { file_url: fileUrl } })
-    formData.value.existing_file_paths = formData.value.existing_file_paths.filter(path => path !== fileUrl)
+    const response = await api.delete(`/working-terms/${formData.value.id}/files`, { data: { file_url: fileUrl } })
+    const updatedPaths = normalizeFilePaths(response.data?.file_paths)
+
+    // อัปเดตทั้ง Modal และข้อมูลต้นทางของตาราง เพื่อไม่ให้ไฟล์ที่ลบแล้วยังค้างบนหน้าจอ
+    formData.value.existing_file_paths = updatedPaths
+    const termIndex = dataList.value.findIndex(term => term.id === formData.value.id)
+    if (termIndex !== -1) {
+      dataList.value[termIndex] = {
+        ...dataList.value[termIndex],
+        file_paths: updatedPaths
+      }
+    }
     swalSuccess('ลบไฟล์สำเร็จ', 'ลบไฟล์แนบเรียบร้อยแล้ว')
   } catch (error) {
     swalError('ลบไฟล์ไม่สำเร็จ', error.response?.data?.message || 'ไม่สามารถลบไฟล์แนบได้')
@@ -430,6 +552,8 @@ const closeModal = () => isModalOpen.value = false
 onMounted(() => {
   fetchData()
 })
+
+onBeforeUnmount(revokePreviewObjectUrl)
 </script>
 
 <style scoped>
@@ -445,8 +569,18 @@ onMounted(() => {
 .term-file-link {
   color: #2563EB;
   font-size: 13px;
-  text-decoration: underline;
+  font-family: inherit;
+  text-align: left;
+  text-decoration: none;
   overflow-wrap: anywhere;
+  background: none;
+  border: 0;
+  padding: 3px 0;
+  cursor: pointer;
+}
+.term-file-link:hover {
+  color: #1D4ED8;
+  text-decoration: underline;
 }
 .existing-file-row {
   display: flex;
@@ -458,6 +592,84 @@ onMounted(() => {
   flex-shrink: 0;
   padding: 2px 6px;
   font-size: 12px;
+}
+.file-preview-modal {
+  width: min(1000px, calc(100vw - 32px));
+  max-width: 1000px;
+  height: min(780px, calc(100vh - 40px));
+  display: flex;
+  flex-direction: column;
+}
+.file-preview-heading {
+  min-width: 0;
+}
+.file-preview-heading h2 {
+  margin-bottom: 4px;
+}
+.file-preview-name {
+  display: block;
+  max-width: 760px;
+  overflow: hidden;
+  color: #6B7280;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-preview-body {
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  background: #F3F4F6;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+}
+.document-preview {
+  width: 100%;
+  height: 100%;
+  min-height: 480px;
+  border: 0;
+  background: #FFFFFF;
+}
+.image-preview {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.file-preview-state {
+  min-height: 260px;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #6B7280;
+  text-align: center;
+}
+.file-preview-state strong {
+  color: #111827;
+}
+.file-preview-state.error-state strong {
+  color: #B91C1C;
+}
+.file-state-icon {
+  font-size: 42px;
+}
+.file-preview-actions {
+  margin-top: 16px;
+}
+@media (max-width: 640px) {
+  .file-preview-modal {
+    width: calc(100vw - 16px);
+    height: calc(100vh - 16px);
+  }
+  .document-preview {
+    min-height: 360px;
+  }
 }
 /* ดีไซน์อื่นๆ ดึงมาจาก Global Styles (manage-layout, btn-primary, status-badge, ฯลฯ) ที่มีอยู่แล้ว */
 </style>
