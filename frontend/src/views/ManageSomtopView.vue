@@ -393,9 +393,15 @@
                   <td style="font-size: 13px;">{{ formatThaiDateShort(term.start_date) }} - {{ formatThaiDateShort(term.end_date) }}</td>
                   <td>
                     <div v-if="term.file_paths && term.file_paths.length > 0" class="file-list">
-                      <a v-for="file_path in term.file_paths" :key="file_path" :href="file_path" target="_blank" class="text-blue-500 underline text-sm">
-                        ดูไฟล์ 📎
-                      </a>
+                      <button
+                        v-for="(filePath, fileIndex) in term.file_paths"
+                        :key="filePath"
+                        type="button"
+                        class="document-view-button"
+                        @click="openDocumentPreview(filePath)"
+                      >
+                        👁️ ดูไฟล์{{ term.file_paths.length > 1 ? ` ${fileIndex + 1}` : '' }}
+                      </button>
                     </div>
                     <span v-else class="text-muted text-sm">-</span>
                   </td>
@@ -446,9 +452,9 @@
                   <td style="font-weight: 500; color: #047857;">{{ dec.decoration_name }} ({{ dec.short_name }})</td>
                   <td style="font-size: 13px;">{{ dec.gazette_ref || '-' }}</td>
                   <td>
-                    <a v-if="dec.file_path" :href="dec.file_path" target="_blank" class="text-blue-500 underline text-sm">
-                      ดูไฟล์ 📎
-                    </a>
+                    <button v-if="dec.file_path" type="button" class="document-view-button" @click="openDocumentPreview(dec.file_path)">
+                      👁️ ดูไฟล์
+                    </button>
                     <span v-else class="text-muted text-sm">-</span>
                   </td>
                   <td class="text-center">
@@ -540,6 +546,64 @@
 
         <div class="modal-actions mt-4">
           <button type="button" class="btn-secondary" @click="closeViewModal">ปิดหน้าต่าง</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 📄 Modal: ดูเอกสารแนบของ พ.สมทบ -->
+    <div v-if="isDocumentPreviewOpen" class="modal-overlay no-print" @click.self="closeDocumentPreview">
+      <div class="modal-card document-preview-modal" role="dialog" aria-modal="true" aria-labelledby="document-preview-title">
+        <div class="modal-header">
+          <div class="document-preview-heading">
+            <h2 id="document-preview-title">ดูเอกสารแนบ</h2>
+            <span class="document-preview-name">{{ documentPreviewName }}</span>
+          </div>
+          <button type="button" class="close-btn" aria-label="ปิดหน้าต่างดูเอกสาร" @click="closeDocumentPreview">✕</button>
+        </div>
+
+        <div class="document-preview-body">
+          <div v-if="isDocumentPreviewLoading" class="document-preview-state">
+            <div class="loading-spinner"></div>
+            <span>กำลังโหลดเอกสาร...</span>
+          </div>
+
+          <div v-else-if="documentPreviewError" class="document-preview-state error-state">
+            <span class="document-state-icon">⚠️</span>
+            <strong>ไม่สามารถเปิดเอกสารได้</strong>
+            <span>{{ documentPreviewError }}</span>
+          </div>
+
+          <img
+            v-else-if="documentPreviewKind === 'image'"
+            :src="documentPreviewObjectUrl"
+            :alt="documentPreviewName"
+            class="document-image-preview"
+          />
+
+          <iframe
+            v-else-if="documentPreviewKind === 'pdf'"
+            :src="documentPreviewObjectUrl"
+            :title="documentPreviewName"
+            class="document-frame-preview"
+          ></iframe>
+
+          <div v-else class="document-preview-state">
+            <span class="document-state-icon">📄</span>
+            <strong>{{ documentPreviewName }}</strong>
+            <span>เอกสารชนิดนี้ไม่รองรับการแสดงตัวอย่างในเบราว์เซอร์ กรุณาดาวน์โหลดเพื่อเปิดดู</span>
+          </div>
+        </div>
+
+        <div class="modal-actions document-preview-actions">
+          <button type="button" class="btn-secondary" @click="closeDocumentPreview">ปิด</button>
+          <button
+            type="button"
+            class="btn-primary"
+            :disabled="!documentPreviewObjectUrl || isDocumentPreviewLoading"
+            @click="downloadPreviewDocument"
+          >
+            ⬇️ ดาวน์โหลดเอกสาร
+          </button>
         </div>
       </div>
     </div>
@@ -662,7 +726,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import api from '../services/api' 
 import { isAdmin } from '../services/session'
 import { swalSuccess, swalError, swalConfirm } from '../utils/swal'
@@ -698,6 +762,12 @@ const isEditing = ref(false)
 // === State สำหรับ Modal ดูรายละเอียด ===
 const isViewModalOpen = ref(false)
 const selectedSomtopToView = ref(null)
+const isDocumentPreviewOpen = ref(false)
+const isDocumentPreviewLoading = ref(false)
+const documentPreviewObjectUrl = ref('')
+const documentPreviewName = ref('')
+const documentPreviewKind = ref('other')
+const documentPreviewError = ref('')
 
 // === State สำหรับประวัติ ===
 const personLeaveHistory = ref([])
@@ -767,6 +837,63 @@ const formatThaiDateFull = (dateStr) => {
   const [year, month, day] = dateStr.split('-');  
   const monthNames = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
   return `${parseInt(day)} ${monthNames[parseInt(month) - 1]} ${parseInt(year) + 543}`;
+}
+
+const getDocumentFileName = (fileUrl) => {
+  try {
+    const pathname = new URL(fileUrl, window.location.origin).pathname
+    return decodeURIComponent(pathname.split('/').pop()) || 'เอกสารแนบ'
+  } catch {
+    return 'เอกสารแนบ'
+  }
+}
+
+const getDocumentPreviewKind = (fileName, mimeType = '') => {
+  if (mimeType === 'application/pdf' || fileName.toLowerCase().endsWith('.pdf')) return 'pdf'
+  if (mimeType.startsWith('image/') || /\.(jpe?g|png|gif|webp|bmp)$/i.test(fileName)) return 'image'
+  return 'other'
+}
+
+const revokeDocumentPreviewUrl = () => {
+  if (documentPreviewObjectUrl.value) URL.revokeObjectURL(documentPreviewObjectUrl.value)
+  documentPreviewObjectUrl.value = ''
+}
+
+const openDocumentPreview = async (fileUrl) => {
+  revokeDocumentPreviewUrl()
+  documentPreviewName.value = getDocumentFileName(fileUrl)
+  documentPreviewKind.value = 'other'
+  documentPreviewError.value = ''
+  isDocumentPreviewLoading.value = true
+  isDocumentPreviewOpen.value = true
+
+  try {
+    const response = await api.get(fileUrl, { responseType: 'blob' })
+    documentPreviewObjectUrl.value = URL.createObjectURL(response.data)
+    documentPreviewKind.value = getDocumentPreviewKind(documentPreviewName.value, response.data.type)
+  } catch (error) {
+    documentPreviewError.value = error.response?.status === 404
+      ? 'ไม่พบไฟล์บนเซิร์ฟเวอร์'
+      : 'กรุณาตรวจสอบไฟล์หรือเข้าสู่ระบบใหม่อีกครั้ง'
+  } finally {
+    isDocumentPreviewLoading.value = false
+  }
+}
+
+const closeDocumentPreview = () => {
+  isDocumentPreviewOpen.value = false
+  documentPreviewError.value = ''
+  revokeDocumentPreviewUrl()
+}
+
+const downloadPreviewDocument = () => {
+  if (!documentPreviewObjectUrl.value) return
+  const downloadLink = document.createElement('a')
+  downloadLink.href = documentPreviewObjectUrl.value
+  downloadLink.download = documentPreviewName.value || 'document'
+  document.body.appendChild(downloadLink)
+  downloadLink.click()
+  downloadLink.remove()
 }
 
 const getStatusClass = (status) => {
@@ -1308,6 +1435,8 @@ onMounted(() => {
   fetchTerms()
   fetchMasterDecorations()
 })
+
+onBeforeUnmount(revokeDocumentPreviewUrl)
 </script>
 
 <style scoped>
@@ -1414,6 +1543,89 @@ onMounted(() => {
   gap: 6px;
   white-space: nowrap;
 }
+.document-view-button {
+  padding: 3px 0;
+  color: #2563EB;
+  font-family: inherit;
+  font-size: 13px;
+  text-align: left;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.document-view-button:hover {
+  color: #1D4ED8;
+  text-decoration: underline;
+}
+.document-preview-modal {
+  width: min(1000px, calc(100vw - 32px));
+  max-width: 1000px;
+  height: min(780px, calc(100vh - 40px));
+  display: flex;
+  flex-direction: column;
+}
+.document-preview-heading {
+  min-width: 0;
+}
+.document-preview-heading h2 {
+  margin-bottom: 4px;
+}
+.document-preview-name {
+  display: block;
+  max-width: 760px;
+  overflow: hidden;
+  color: #6B7280;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.document-preview-body {
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  background: #F3F4F6;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+}
+.document-frame-preview {
+  width: 100%;
+  height: 100%;
+  min-height: 480px;
+  background: #FFFFFF;
+  border: 0;
+}
+.document-image-preview {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.document-preview-state {
+  min-height: 260px;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #6B7280;
+  text-align: center;
+}
+.document-preview-state strong {
+  color: #111827;
+}
+.document-preview-state.error-state strong {
+  color: #B91C1C;
+}
+.document-state-icon {
+  font-size: 42px;
+}
+.document-preview-actions {
+  margin-top: 16px;
+}
 
 @media (max-width: 768px) {
   .detail-modal {
@@ -1429,6 +1641,16 @@ onMounted(() => {
 
   .detail-item.full-width {
     grid-column: span 1;
+  }
+
+  .document-preview-modal {
+    width: calc(100vw - 16px);
+    height: calc(100vh - 16px);
+    padding: 16px;
+  }
+
+  .document-frame-preview {
+    min-height: 360px;
   }
 }
 
