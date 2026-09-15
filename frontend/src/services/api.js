@@ -21,7 +21,8 @@ api.interceptors.response.use(
     // ดักจับ Error Status 401 Unauthorized
     if (error.response?.status === 401) {
       clearSession()
-      if (window.location.pathname !== '/') window.location.assign('/')
+      if (window.location.pathname !== '/') router.push('/') 
+      // if (window.location.pathname !== '/') window.location.assign('/')
     } else if (error.response?.status === 403) {
       swal.fire({
         icon: 'warning',
