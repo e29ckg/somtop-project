@@ -631,7 +631,7 @@
               <option value="" disabled>-- เลือกรุ่นวาระการทำงาน --</option>
               <!-- ดึงข้อมูลจาก termList ที่โหลดไว้แล้วมาแสดง -->
               <option v-for="term in termList" :key="term.id" :value="term.id">
-                {{ term.generation_name }} 
+                {{ term.generation_name }} ({{ formatThaiDateShort(term.start_date) }} - {{ formatThaiDateShort(term.end_date) }})
               </option>
             </select>
           </div>
