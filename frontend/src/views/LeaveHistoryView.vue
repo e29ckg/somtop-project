@@ -28,6 +28,11 @@
           </select>
         </div>
 
+        <div class="filter-group month-filter-group">
+          <label for="leave-month">เดือน-ปี</label>
+          <input id="leave-month" v-model="filters.month_year" type="month" />
+        </div>
+
         <div class="filter-actions">
           <button class="btn-secondary" @click="clearFilters">ล้างค่า</button>
           <button class="btn-primary print-btn" @click="printReport">
@@ -430,7 +435,8 @@ const annualYears = Array.from({length: 15}, (_, i) => {
 
 const filters = ref({
   name: '',
-  annual_year: String(getCurrentAnnualYear())
+  annual_year: String(getCurrentAnnualYear()),
+  month_year: ''
 })
 
 const leaveList = ref([])
@@ -537,6 +543,7 @@ const filteredLeaveList = computed(() => {
   return leaveList.value.filter(leave => {
     let matchName = true
     let matchAnnualYear = true
+    let matchMonthYear = true
 
     if (filters.value.name) {
       matchName = leave.full_name.toLowerCase().includes(filters.value.name.toLowerCase())
@@ -551,7 +558,16 @@ const filteredLeaveList = computed(() => {
       matchAnnualYear = leaveStart <= annualEnd && leaveEnd >= annualStart
     }
 
-    return matchName && matchAnnualYear
+    if (filters.value.month_year) {
+      const [monthYear, month] = filters.value.month_year.split('-').map(Number)
+      const monthStart = new Date(monthYear, month - 1, 1)
+      const monthEnd = new Date(monthYear, month, 0, 23, 59, 59)
+      const leaveStart = new Date(leave.start_date)
+      const leaveEnd = new Date(leave.end_date || leave.start_date)
+      matchMonthYear = leaveStart <= monthEnd && leaveEnd >= monthStart
+    }
+
+    return matchName && matchAnnualYear && matchMonthYear
   })
 })
 
@@ -607,7 +623,7 @@ watch(filters, () => {
 }, { deep: true });
 
 const clearFilters = () => {
-  filters.value = { name: '', annual_year: '' }
+  filters.value = { name: '', annual_year: '', month_year: '' }
 }
 
 const printReport = () => {
@@ -618,6 +634,11 @@ const printReport = () => {
   if (filters.value.annual_year) {
     const buddhistYear = Number(filters.value.annual_year) + 543
     headerText = `<p>รอบปี ${buddhistYear}: 1 เมษายน ${buddhistYear} ถึง 31 มีนาคม ${buddhistYear + 1}</p>`;
+  }
+  if (filters.value.month_year) {
+    const [selectedYear, selectedMonth] = filters.value.month_year.split('-').map(Number)
+    const monthName = thaiMonths[selectedMonth - 1]?.label || ''
+    headerText += `<p>ประจำเดือน ${monthName} ${selectedYear + 543}</p>`
   }
 
   printWindow.document.write(`
