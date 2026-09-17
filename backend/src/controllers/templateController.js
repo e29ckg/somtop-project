@@ -11,6 +11,7 @@ const ALLOWED_TEMPLATE_TYPES = new Set([
     'leave_template',
     'duty_swap_template',
     'duty_order_template'
+    , 'performance_evaluation_template'
 ]);
 
 const isAllowedTemplateType = (templateType) => (

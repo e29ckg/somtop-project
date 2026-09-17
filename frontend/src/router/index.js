@@ -18,6 +18,7 @@ import ManageTermView from '../views/ManageTermView.vue'
 import ProfileView from '../views/ProfileView.vue'
 import ParticipationReportView from '../views/ParticipationReportView.vue'
 import DutyScheduleView from '../views/DutyScheduleView.vue'
+import PerformanceEvaluationView from '../views/PerformanceEvaluationView.vue'
 import api from '../services/api'
 import { currentUser, isSessionVerified, setSessionUser, clearSession } from '../services/session'
 
@@ -94,6 +95,7 @@ const router = createRouter({
           name: 'duty-schedule',
           component: DutyScheduleView
         },
+        { path: 'performance-evaluation', name: 'performance-evaluation', component: PerformanceEvaluationView },
         {
           path: 'manage-event-types',
           name: 'manage-event-types',

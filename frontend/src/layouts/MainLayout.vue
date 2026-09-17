@@ -38,6 +38,9 @@
            <span class="nav-icon">📊</span>
            <span class="sidebar-text">รายงานการเข้าร่วมกิจกรรม</span>
         </router-link>
+        <router-link to="/performance-evaluation" class="nav-item">
+           <span class="nav-icon">📝</span><span class="sidebar-text">ประเมินผลงานรอบปี</span>
+        </router-link>
         <!-- ⭐️ ซ่อน/แสดงเมนูตั้งค่า เฉพาะผู้ที่มี Role = admin เท่านั้น -->
         <div v-if="userRole === 'admin'">
           <div class="menu-category">ตั้งค่าระบบ</div>
@@ -165,6 +168,7 @@ const currentRouteName = computed(() => {
   if (route.path === '/leave-history') return 'ประวัติการลา'
   if (route.path === '/manage-events') return 'จัดการกิจกรรม'
   if (route.path === '/participation-report') return 'รายงานการเข้าร่วมกิจกรรม'
+  if (route.path === '/performance-evaluation') return 'ประเมินผลงานรอบปี'
   if (route.path === '/duty-schedule') return 'เวรปฏิบัติหน้าที่'
   if (route.path === '/manage-users') return 'จัดการผู้ใช้งานระบบ'
   if (route.path === '/manage-courts') return 'จัดการข้อมูลศาล'

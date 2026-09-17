@@ -23,6 +23,7 @@
               <option value="leave_template">แบบฟอร์มใบลา (ทั่วไป/อื่นๆ)</option>
               <option value="duty_swap_template">แบบฟอร์มการเปลี่ยนเวร</option>
               <option value="duty_order_template">แบบฟอร์มคำสั่งเวรปฏิบัติหน้าที่</option>
+              <option value="performance_evaluation_template">แบบฟอร์มประเมินผลงานรอบปี</option>
             </select>
             
             <!-- ⭐️ ปุ่มสำหรับดาวน์โหลดฟอร์มเดิม -->
@@ -50,6 +51,9 @@
           </small>
           <small class="text-muted mt-1 block" v-if="formData.template_type === 'leave_template_abroad'">
             ตัวแปรประเทศที่เดินทางไป: {note} (ดึงจากช่อง “ประเทศที่เดินทางไป” ในประวัติการลา)
+          </small>
+          <small class="text-muted mt-1 block" v-if="formData.template_type === 'performance_evaluation_template'">
+            ตัวแปรแบบประเมิน: {evaluation_year}, {start_date_th}, {end_date_th}, {full_name}, {occupation}, {duty_days}, {activity_count}, {personal_leave_days}, {sick_leave_count}, {absent_days}, {abroad_leave_days}, {swap_count}
           </small>
         </div>
 

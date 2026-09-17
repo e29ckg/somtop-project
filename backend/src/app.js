@@ -23,6 +23,7 @@ const termHistoryRoutes = require('./routes/termHistoryRoutes');
 const workingTermRoutes = require('./routes/workingTermRoutes');
 const decorationRoutes = require('./routes/decorationRoutes');
 const dutyRoutes = require('./routes/dutyRoutes');
+const performanceRoutes = require('./routes/performanceRoutes');
 
 
 const app = express();
@@ -76,6 +77,7 @@ app.use('/api/term-history', termHistoryRoutes);
 app.use('/api/working-terms', workingTermRoutes);
 app.use('/api/decorations', decorationRoutes);
 app.use('/api/duties', dutyRoutes);
+app.use('/api/performance-reports', performanceRoutes);
 
 app.get('/', (req, res) => {res.json({ message: 'Welcome to Somtop API' });});
 
