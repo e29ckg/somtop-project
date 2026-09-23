@@ -255,10 +255,14 @@
             </select>
           </div>
 
-          <div class="input-group full-width">
-            <label>ที่อยู่</label>
-            <textarea v-model="formData.address" rows="2" placeholder="บ้านเลขที่, ถนน, ตำบล, อำเภอ, จังหวัด..."></textarea>
-          </div>
+          <div class="input-group"><label>บ้านเลขที่</label><input v-model="formData.house_no" /></div>
+          <div class="input-group"><label>หมู่ที่</label><input v-model="formData.moo" /></div>
+          <div class="input-group"><label>ซอย</label><input v-model="formData.soi" /></div>
+          <div class="input-group"><label>ถนน</label><input v-model="formData.road" /></div>
+          <div class="input-group"><label>ตำบล/แขวง</label><input v-model="formData.subdistrict" /></div>
+          <div class="input-group"><label>อำเภอ/เขต</label><input v-model="formData.district" /></div>
+          <div class="input-group"><label>จังหวัด</label><input v-model="formData.province" /></div>
+          <div class="input-group"><label>รหัสไปรษณีย์</label><input v-model="formData.postal_code" maxlength="10" /></div>
 
           <div class="input-group full-width">
             <label>หมายเหตุ</label>
@@ -344,7 +348,17 @@
               <span class="detail-icon">🏠</span>
               <div class="detail-content">
                 <label>ที่อยู่</label>
-                <p>{{ selectedSomtopToView.address || '-' }}</p>
+                <p v-if="selectedSomtopToView.house_no || selectedSomtopToView.moo || selectedSomtopToView.soi || selectedSomtopToView.road || selectedSomtopToView.subdistrict || selectedSomtopToView.district || selectedSomtopToView.province || selectedSomtopToView.postal_code">
+                  {{ selectedSomtopToView.house_no ? `บ้านเลขที่ ${selectedSomtopToView.house_no}` : '' }}
+                  {{ selectedSomtopToView.moo ? ` หมู่ที่ ${selectedSomtopToView.moo}` : '' }}
+                  {{ selectedSomtopToView.soi ? ` ซอย${selectedSomtopToView.soi}` : '' }}
+                  {{ selectedSomtopToView.road ? ` ถนน${selectedSomtopToView.road}` : '' }}
+                  {{ selectedSomtopToView.subdistrict ? ` ${['กรุงเทพมหานคร', 'กรุงเทพฯ', 'กรุงเทพ'].includes(selectedSomtopToView.province) ? 'แขวง' : 'ตำบล'}${selectedSomtopToView.subdistrict}` : '' }}
+                  {{ selectedSomtopToView.district ? ` ${['กรุงเทพมหานคร', 'กรุงเทพฯ', 'กรุงเทพ'].includes(selectedSomtopToView.province) ? 'เขต' : 'อำเภอ'}${selectedSomtopToView.district}` : '' }}
+                  {{ selectedSomtopToView.province ? ` จังหวัด${selectedSomtopToView.province}` : '' }}
+                  {{ selectedSomtopToView.postal_code ? ` ${selectedSomtopToView.postal_code}` : '' }}
+                </p>
+                <p v-else>{{ selectedSomtopToView.address || '-' }}</p>
               </div>
             </div>
           </div>
@@ -799,7 +813,7 @@ const formData = ref({
   dob_day: '', dob_month: '', dob_year: '', 
   position_id: '', 
   join_day: '', join_month: '', join_year: '', 
-  address: '', phone: '', status: 'ใช้งาน', note: '',
+  address: '', house_no: '', moo: '', soi: '', road: '', subdistrict: '', district: '', province: '', postal_code: '', phone: '', status: 'ใช้งาน', note: '',
   term_id: '',
   photo: null, existing_photo_path: ''
 })
@@ -1068,6 +1082,14 @@ const saveData = async () => {
     payload.append('id_card', formData.value.idCard || '') 
     payload.append('dob', formattedDob)
     payload.append('address', formData.value.address || '') 
+    payload.append('house_no', formData.value.house_no || '')
+    payload.append('moo', formData.value.moo || '')
+    payload.append('soi', formData.value.soi || '')
+    payload.append('road', formData.value.road || '')
+    payload.append('subdistrict', formData.value.subdistrict || '')
+    payload.append('district', formData.value.district || '')
+    payload.append('province', formData.value.province || '')
+    payload.append('postal_code', formData.value.postal_code || '')
     payload.append('phone', formData.value.phone || '')     
     payload.append('status', formData.value.status)
     payload.append('note', formData.value.note || '')  
@@ -1179,7 +1201,7 @@ const openAddModal = () => {
     id: null, title: 'นาย', firstName: '', lastName: '', idCard: '', 
     dob_day: '', dob_month: '', dob_year: '', 
     position_id: '', join_day: '', join_month: '', join_year: '',
-    address: '', phone: '', status: 'ใช้งาน', note: '',
+    address: '', house_no: '', moo: '', soi: '', road: '', subdistrict: '', district: '', province: '', postal_code: '', phone: '', status: 'ใช้งาน', note: '',
     term_id: '',
     photo: null, existing_photo_path: ''
   }
@@ -1221,7 +1243,8 @@ const openEditModal = (person) => {
     join_day: jDay, 
     join_month: jMonth, 
     join_year: jYear, 
-    address: person.address || '',      
+    address: person.address || '', house_no: person.house_no || '', moo: person.moo || '', soi: person.soi || '', road: person.road || '',
+    subdistrict: person.subdistrict || '', district: person.district || '', province: person.province || '', postal_code: person.postal_code || '',
     phone: person.phone || '',          
     status: person.status,
     note: person.note || '',  

@@ -34,7 +34,8 @@ exports.getAllSomtop = async (req, res) => {
                 wt.id AS current_term_id,
                 wt.generation_name AS current_term_name,
                 
-                s.address, s.phone, s.status, s.note, s.photo_path, 
+                s.address, s.house_no, s.moo, s.soi, s.road, s.subdistrict, s.district, s.province, s.postal_code,
+                s.phone, s.status, s.note, s.photo_path, 
                 CONCAT(s.title, s.first_name, ' ', s.last_name) AS full_name 
             FROM somtop s
             LEFT JOIN somtop_positions sp ON s.position_id = sp.id
@@ -81,7 +82,7 @@ exports.createSomtop = async (req, res) => {
     let photoPath = null;
 
     try {
-        const { title, first_name, last_name, id_card, dob, occupation, join_date, position_id, address, phone, status, note, term_id } = req.body;
+        const { title, first_name, last_name, id_card, dob, occupation, join_date, position_id, address, house_no, moo, soi, road, subdistrict, district, province, postal_code, phone, status, note, term_id } = req.body;
         const courtCode = req.user.court_code; 
 
         if (!title || !first_name || !last_name) {
@@ -96,14 +97,15 @@ exports.createSomtop = async (req, res) => {
         // 1. บันทึกข้อมูล พ.สมทบ ลงตารางหลัก
         const query = `
             INSERT INTO somtop 
-            (title, first_name, last_name, id_card, court_code, dob, occupation, join_date, position_id, address, phone, status, note, photo_path)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (title, first_name, last_name, id_card, court_code, dob, occupation, join_date, position_id, address, house_no, moo, soi, road, subdistrict, district, province, postal_code, phone, status, note, photo_path)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         const [result] = await connection.query(query, [
             title, first_name, last_name, id_card || null, courtCode, 
             dob || null, occupation || null, join_date || null, position_id || null, 
-            address || null, phone || null, status || 'ใช้งาน', 
+            address || null, house_no || null, moo || null, soi || null, road || null, subdistrict || null, district || null, province || null, postal_code || null,
+            phone || null, status || 'ใช้งาน', 
             note || null, photoPath
         ]);
 
@@ -155,7 +157,7 @@ exports.updateSomtop = async (req, res) => {
         const courtCode = req.user.court_code;
         const scopeSql = courtCode ? ' AND court_code = ?' : '';
         const scopeParams = courtCode ? [id, courtCode] : [id];
-        const { title, first_name, last_name, id_card, dob, occupation, join_date, position_id, address, phone, status, note, term_id } = req.body;
+        const { title, first_name, last_name, id_card, dob, occupation, join_date, position_id, address, house_no, moo, soi, road, subdistrict, district, province, postal_code, phone, status, note, term_id } = req.body;
 
         if (!id) return res.status(400).json({ message: 'ไม่พบ ID ที่ต้องการแก้ไข' });
 
@@ -180,13 +182,13 @@ exports.updateSomtop = async (req, res) => {
             UPDATE somtop SET 
                 title = ?, first_name = ?, last_name = ?, id_card = ?, 
                 dob = ?, occupation = ?, join_date = ?, position_id = ?, 
-                address = ?, phone = ?, status = ?, note = ?, photo_path = ?
+                address = ?, house_no = ?, moo = ?, soi = ?, road = ?, subdistrict = ?, district = ?, province = ?, postal_code = ?, phone = ?, status = ?, note = ?, photo_path = ?
             WHERE id = ?${scopeSql}
         `;
 
         await connection.query(updateQuery, [
             title, first_name, last_name, id_card || null, dob || null, occupation || null, 
-            join_date || null, position_id || null, address || null, 
+            join_date || null, position_id || null, address || null, house_no || null, moo || null, soi || null, road || null, subdistrict || null, district || null, province || null, postal_code || null,
             phone || null, status || 'ใช้งาน', note || null, finalPhotoPath, ...scopeParams
         ]);
 
