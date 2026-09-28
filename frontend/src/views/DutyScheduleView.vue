@@ -39,7 +39,7 @@
       </div>
       <div class="filter-actions duty-filter-actions">
         <button class="btn-primary print-order-button" :disabled="!selectedOrderId" @click="printSelectedOrder">🖨️ พิมพ์ตามคำสั่ง</button>
-        <button v-if="isAdmin" class="btn-secondary print-order-button" :disabled="!selectedOrderId" @click="openPaymentPreview">🧾 พิมพ์หลักฐานการรับเงิน</button>
+        <!-- <button v-if="isAdmin" class="btn-secondary print-order-button" :disabled="!selectedOrderId" @click="openPaymentPreview">🧾 พิมพ์หลักฐานการรับเงิน</button> -->
       </div>
     </section>
 
@@ -181,6 +181,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import api from '../services/api'
 import { isAdmin } from '../services/session'
 import { swalConfirm, swalError, swalSuccess } from '../utils/swal'
+import { thaiBahtText } from '../utils/thaiBahtText'
 
 const now = new Date()
 const thaiMonths = [
@@ -214,7 +215,21 @@ const monthTitle = computed(() => new Date(`${selectedMonth.value}-01T00:00:00`)
 const daysInMonth = computed(() => { const [y,m]=selectedMonth.value.split('-').map(Number); const total=new Date(y,m,0).getDate(); return Array.from({length:total},(_,i)=>({day:i+1,date:`${selectedMonth.value}-${String(i+1).padStart(2,'0')}`})) })
 const leadingBlanks = computed(() => Array.from({length:(new Date(`${selectedMonth.value}-01T00:00:00`).getDay()+6)%7},(_,i)=>i))
 const trailingBlanks = computed(() => Array.from({length:(7-((leadingBlanks.value.length+daysInMonth.value.length)%7))%7},(_,i)=>i))
-const schedulesByDate = computed(() => schedules.value.reduce((map,item)=>{(map[item.duty_date] ||= []).push(item);return map},{}))
+const thaiCollator = new Intl.Collator('th', { numeric: true, sensitivity: 'base' })
+const compareSchedules = (a, b) => {
+  const typeOrder = Number(a.duty_type_id) - Number(b.duty_type_id)
+  if (typeOrder) return typeOrder
+  if (!a.team_name && b.team_name) return 1
+  if (a.team_name && !b.team_name) return -1
+  const teamOrder = thaiCollator.compare(a.team_name || '', b.team_name || '')
+  if (teamOrder) return teamOrder
+  return thaiCollator.compare(a.full_name || '', b.full_name || '') || Number(a.id) - Number(b.id)
+}
+const schedulesByDate = computed(() => {
+  const byDate = schedules.value.reduce((map, item) => { (map[item.duty_date] ||= []).push(item); return map }, {})
+  Object.values(byDate).forEach(items => items.sort(compareSchedules))
+  return byDate
+})
 const activeDaySchedules = computed(() => schedulesByDate.value[activeDate.value] || [])
 const replacementPeople = computed(() => people.value.filter(p=>p.id!==swapSource.value?.somtop_id))
 const filterPeople = (query, selectedId) => {const text=query.trim().toLowerCase();if(!text)return people.value;return people.value.filter(person=>String(person.id)===selectedId||`${person.full_name} ${person.position_name||''}`.toLowerCase().includes(text))}
@@ -266,7 +281,7 @@ const buildPaymentEvidence = () => {
   const paymentDate = paymentForm.value.paymentDate ? new Date(`${paymentForm.value.paymentDate}T00:00:00`).toLocaleDateString('th-TH', { day:'numeric', month:'long', year:'numeric' }) : ''
   const body = [...rows.values()].map((row, index) => `<tr><td>${index + 1}</td><td class="name">${escapePrintText(row.name)}</td><td>${money(rate)}</td>${dates.map(date => `<td>${row.dates.includes(date) ? '✓' : ''}</td>`).join('')}<td>${row.dates.length}</td><td>${money(row.dates.length * rate)}</td><td>${escapePrintText(paymentDate)}</td><td>โอนเงินเข้าบัญชี</td></tr>`).join('')
   const total = [...rows.values()].reduce((sum, row) => sum + row.dates.length * rate, 0)
-  paymentPreviewHtml.value = `<style>table{width:100%;border-collapse:collapse;font-size:14px}th,td{border:1px solid #222;padding:4px 3px;text-align:center;white-space:nowrap}th{background:#f5f5f5}.name{text-align:left}.total td{font-weight:bold}.footer{text-align:left;margin-top:8px}.signatures{display:flex;justify-content:space-around;margin-top:30px;text-align:center}.signatures>div{width:30%}</style><h3 style="text-align:center;margin:4px">${escapePrintText(paymentForm.value.title)}</h3><p style="text-align:center">${escapePrintText(order.title)} เลขที่คำสั่ง ${escapePrintText(order.order_number)} ประจำเดือน ${escapePrintText(monthTitle.value)}</p><table><thead><tr><th rowspan="2">ลำดับ</th><th rowspan="2">ชื่อ - สกุล</th><th rowspan="2">อัตรา/วัน</th><th colspan="${dates.length}">วันที่ปฏิบัติงาน</th><th rowspan="2">จำนวนวัน</th><th rowspan="2">จำนวนเงิน</th><th rowspan="2">วันเดือนปีที่รับเงิน</th><th rowspan="2">ลายมือชื่อผู้รับเงิน</th></tr><tr>${dates.map(date => `<th>${dateLabel(date)}</th>`).join('')}</tr></thead><tbody>${body}<tr class="total"><td colspan="${3 + dates.length}">รวมเป็นเงินทั้งสิ้น</td><td>${money(total)}</td><td colspan="2"></td></tr></tbody></table><div class="footer">ขอรับรองว่าได้มีการปฏิบัติหน้าที่ตามระเบียบ และได้จ่ายค่าตอบแทนให้แก่ผู้มีสิทธิรับ จำนวน ${rows.size} ราย รวมเป็นเงินทั้งสิ้น ${money(total)} บาท (ห้าหมื่นห้าพันบาทถ้วน) จริง</div><div class="signatures"><div>ลงชื่อ ................................<br>(ผู้รับรอง)<br>${escapePrintText(paymentForm.value.directorName)}<br>${escapePrintText(paymentForm.value.directorPosition)}</div><div>ลงชื่อ ................................<br>(ผู้จัดทำ)<br>${escapePrintText(paymentForm.value.financeName)}<br>${escapePrintText(paymentForm.value.financePosition)}</div><div>ลงชื่อ ................................<br>(ผู้จ่ายเงิน)<br>${escapePrintText(paymentForm.value.financeName)}<br>${escapePrintText(paymentForm.value.financePosition)}</div></div>`
+  paymentPreviewHtml.value = `<style>table{width:100%;border-collapse:collapse;font-size:14px}th,td{border:1px solid #222;padding:4px 3px;text-align:center;white-space:nowrap}th{background:#f5f5f5}.name{text-align:left}.total td{font-weight:bold}.footer{text-align:left;margin-top:8px}.signatures{display:flex;justify-content:space-around;margin-top:30px;text-align:center}.signatures>div{width:30%}</style><h3 style="text-align:center;margin:4px">${escapePrintText(paymentForm.value.title)}</h3><p style="text-align:center">${escapePrintText(order.title)} เลขที่คำสั่ง ${escapePrintText(order.order_number)} ประจำเดือน ${escapePrintText(monthTitle.value)}</p><table><thead><tr><th rowspan="2">ลำดับ</th><th rowspan="2">ชื่อ - สกุล</th><th rowspan="2">อัตรา/วัน</th><th colspan="${dates.length}">วันที่ปฏิบัติงาน</th><th rowspan="2">จำนวนวัน</th><th rowspan="2">จำนวนเงิน</th><th rowspan="2">วันเดือนปีที่รับเงิน</th><th rowspan="2">ลายมือชื่อผู้รับเงิน</th></tr><tr>${dates.map(date => `<th>${dateLabel(date)}</th>`).join('')}</tr></thead><tbody>${body}<tr class="total"><td colspan="${3 + dates.length}">รวมเป็นเงินทั้งสิ้น</td><td>${money(total)}</td><td colspan="2"></td></tr></tbody></table><div class="footer">ขอรับรองว่าได้มีการปฏิบัติหน้าที่ตามระเบียบ และได้จ่ายค่าตอบแทนให้แก่ผู้มีสิทธิรับ จำนวน ${rows.size} ราย รวมเป็นเงินทั้งสิ้น ${money(total)} บาท (${thaiBahtText(total)}) จริง</div><div class="signatures"><div>ลงชื่อ ................................<br>(ผู้รับรอง)<br>${escapePrintText(paymentForm.value.directorName)}<br>${escapePrintText(paymentForm.value.directorPosition)}</div><div>ลงชื่อ ................................<br>(ผู้จัดทำ)<br>${escapePrintText(paymentForm.value.financeName)}<br>${escapePrintText(paymentForm.value.financePosition)}</div><div>ลงชื่อ ................................<br>(ผู้จ่ายเงิน)<br>${escapePrintText(paymentForm.value.financeName)}<br>${escapePrintText(paymentForm.value.financePosition)}</div></div>`
   return true
 }
 const exportPaymentExcel = async () => {

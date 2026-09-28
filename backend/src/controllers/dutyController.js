@@ -5,6 +5,7 @@ const PizZip = require('pizzip');
 const Docxtemplater = require('docxtemplater');
 const ExcelJS = require('exceljs');
 const { logActivity } = require('../utils/logger');
+const { thaiBahtText } = require('../utils/thaiBahtText');
 
 const validMonth = value => /^\d{4}-\d{2}$/.test(String(value || ''));
 const validDate = value => /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''));
@@ -533,7 +534,7 @@ exports.exportPaymentExcel = async (req, res) => {
     sheet.eachRow(row => { row.eachCell(cell => { cell.font = { ...(cell.font || {}), name: 'TH Sarabun New', size: cell.font?.size || 14 }; cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } }; }); });
     sheet.getColumn(3).numFmt = '#,##0.00'; sheet.getColumn(4 + dates.length + 1).numFmt = '#,##0.00';
     sheet.columns.forEach((column, index) => { column.width = index === 2 ? 28 : index > 2 && index <= dates.length + 2 ? 12 : 18; }); sheet.getColumn(1).width = 8;
-    const noteRow = sheet.addRow([]); sheet.mergeCells(noteRow.number, 1, noteRow.number, headers.length); sheet.getCell(noteRow.number, 1).value = `รวมเป็นเงินทั้งสิ้น ${people.reduce((sum, person) => sum + person.dates.length * rate, 0).toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท (ห้าหมื่นห้าพันบาทถ้วน) จริง`;
+    const noteRow = sheet.addRow([]); sheet.mergeCells(noteRow.number, 1, noteRow.number, headers.length); const total = people.reduce((sum, person) => sum + person.dates.length * rate, 0); sheet.getCell(noteRow.number, 1).value = `รวมเป็นเงินทั้งสิ้น ${total.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท (${thaiBahtText(total)}) จริง`;
     const signRow = sheet.addRow([]); signRow.height = 48; sheet.mergeCells(signRow.number, 1, signRow.number, Math.ceil(headers.length / 3)); sheet.getCell(signRow.number, 1).value = `ลงชื่อ ................................ (ผู้รับรอง)\n${req.query.director_name || ''}\n${req.query.director_position || 'ผู้อำนวยการ'}`; sheet.mergeCells(signRow.number, Math.ceil(headers.length / 3) + 1, signRow.number, Math.ceil(headers.length * 2 / 3)); sheet.getCell(signRow.number, Math.ceil(headers.length / 3) + 1).value = `ลงชื่อ ................................ (ผู้จัดทำ)\n${req.query.finance_name || ''}\n${req.query.finance_position || 'เจ้าหน้าที่การเงิน'}`; sheet.mergeCells(signRow.number, Math.ceil(headers.length * 2 / 3) + 1, signRow.number, headers.length); sheet.getCell(signRow.number, Math.ceil(headers.length * 2 / 3) + 1).value = `ลงชื่อ ................................ (ผู้จ่ายเงิน)\n${req.query.finance_name || ''}\n${req.query.finance_position || 'เจ้าหน้าที่การเงิน'}`; signRow.eachCell(cell => { cell.font = { name: 'TH Sarabun New', size: 14 }; cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }; });
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(`หลักฐานการรับเงิน_${orders[0].order_number}.xlsx`)}`); res.send(await workbook.xlsx.writeBuffer());
 };
