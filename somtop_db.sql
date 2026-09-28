@@ -287,6 +287,7 @@ CREATE TABLE duty_orders (
     order_number VARCHAR(100) NOT NULL COMMENT 'เลขที่คำสั่ง',
     title VARCHAR(255) NOT NULL COMMENT 'ชื่อหรือหัวข้อคำสั่ง',
     order_month DATE NOT NULL COMMENT 'เดือนของคำสั่ง โดยเก็บเป็นวันแรกของเดือน',
+    duty_type_id INT NULL COMMENT 'ประเภทเวรของคำสั่ง',
     court_code VARCHAR(50) NOT NULL COMMENT 'รหัสศาลเจ้าของคำสั่ง',
     note TEXT NULL,
     signed_order_file_path VARCHAR(500) NULL COMMENT 'ที่อยู่ไฟล์ PDF คำสั่งที่ลงนามแล้ว',
@@ -297,6 +298,8 @@ CREATE TABLE duty_orders (
 
     UNIQUE KEY unique_duty_order (court_code, order_number),
     INDEX idx_duty_order_month (court_code, order_month),
+    INDEX idx_duty_order_type (duty_type_id),
+    FOREIGN KEY (duty_type_id) REFERENCES duty_types(id) ON DELETE RESTRICT,
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

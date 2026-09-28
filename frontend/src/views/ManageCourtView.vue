@@ -179,6 +179,16 @@
             <input type="text" v-model="formData.director_position" placeholder="เช่น ผู้อำนวยการสำนักงานประจำศาล..." />
           </div>
 
+          <div class="input-group">
+            <label>ชื่อเจ้าหน้าที่การเงิน</label>
+            <input type="text" v-model="formData.finance_officer_name" placeholder="ชื่อและนามสกุล" />
+          </div>
+
+          <div class="input-group">
+            <label>ตำแหน่งเจ้าหน้าที่การเงิน</label>
+            <input type="text" v-model="formData.finance_officer_position" placeholder="เช่น เจ้าหน้าที่การเงินและบัญชี" />
+          </div>
+
           <div class="modal-actions full-width">
             <button type="button" class="btn-secondary" @click="closeModal">ยกเลิก</button>
             <button type="submit" class="btn-primary">บันทึกข้อมูล</button>
@@ -214,7 +224,9 @@ const formData = ref({
   chief_judge_name: '',
   chief_judge_position: '',
   director_name: '',
-  director_position: ''
+  director_position: '',
+  finance_officer_name: '',
+  finance_officer_position: ''
 })
 
 // ==========================================
@@ -298,7 +310,7 @@ const openAddModal = () => {
   isEditing.value = false
   formData.value = { 
     id: null, court_code: '', court_name: '', address: '', phone: '', email: '', province: '', status: 'ใช้งาน',
-    chief_judge_name: '', chief_judge_position: '', director_name: '', director_position: ''
+    chief_judge_name: '', chief_judge_position: '', director_name: '', director_position: '', finance_officer_name: '', finance_officer_position: ''
   }
   isModalOpen.value = true
 }

@@ -39,6 +39,7 @@
       </div>
       <div class="filter-actions duty-filter-actions">
         <button class="btn-primary print-order-button" :disabled="!selectedOrderId" @click="printSelectedOrder">🖨️ พิมพ์ตามคำสั่ง</button>
+        <button v-if="isAdmin" class="btn-secondary print-order-button" :disabled="!selectedOrderId" @click="openPaymentPreview">🧾 พิมพ์หลักฐานการรับเงิน</button>
       </div>
     </section>
 
@@ -82,12 +83,29 @@
       </div>
     </section>
 
+    <div v-if="isPaymentPreviewOpen" class="modal-overlay no-print" @click.self="isPaymentPreviewOpen=false">
+      <div class="modal-card payment-preview-modal">
+        <div class="modal-header"><div><h2>ตรวจสอบหลักฐานการรับเงินก่อนพิมพ์</h2><small>สามารถแก้ไขข้อความผู้ลงนามได้ก่อนพิมพ์</small></div><button class="close-btn" @click="isPaymentPreviewOpen=false">✕</button></div>
+        <div class="payment-edit-grid">
+          <div class="input-group full-width"><label>หัวข้อเอกสาร</label><input v-model="paymentForm.title" /></div>
+          <div class="input-group"><label>ชื่อเจ้าหน้าที่การเงิน</label><input v-model="paymentForm.financeName" /></div>
+          <div class="input-group"><label>ตำแหน่งเจ้าหน้าที่การเงิน</label><input v-model="paymentForm.financePosition" /></div>
+          <div class="input-group"><label>ชื่อผู้อำนวยการ</label><input v-model="paymentForm.directorName" /></div>
+          <div class="input-group"><label>ตำแหน่งผู้อำนวยการ</label><input v-model="paymentForm.directorPosition" /></div>
+          <div class="input-group"><label>วันเดือนปีที่รับเงิน</label><input v-model="paymentForm.paymentDate" type="date" /></div>
+        </div>
+        <div class="payment-preview-scroll" v-html="paymentPreviewHtml"></div>
+        <div class="modal-actions"><button class="btn-secondary" @click="isPaymentPreviewOpen=false">ยกเลิก</button><button class="btn-secondary" @click="exportPaymentExcel">📊 ส่งออก Excel</button><button class="btn-primary" @click="printPaymentEvidence">🖨️ พิมพ์เอกสาร</button></div>
+      </div>
+    </div>
+
     <div v-if="isOrderModalOpen" class="modal-overlay no-print">
       <div class="modal-card compact-modal">
         <div class="modal-header"><h2>{{ orderForm.id ? 'แก้ไขคำสั่ง' : 'เพิ่มคำสั่งประจำเดือน' }}</h2><button class="close-btn" @click="isOrderModalOpen=false">✕</button></div>
         <form class="form-grid" @submit.prevent="saveOrder">
           <div class="input-group"><label>เลขที่คำสั่ง *</label><input v-model.trim="orderForm.order_number" required /></div>
           <div class="input-group"><label>ประจำเดือน *</label><input v-model="orderForm.order_month" type="month" required :disabled="!!orderForm.id" /></div>
+          <div class="input-group full-width"><label for="order-duty-type">ประเภทเวร *</label><select id="order-duty-type" v-model="orderForm.duty_type_id" required><option value="" disabled>เลือกประเภทเวร</option><option v-for="type in dutyTypes" :key="type.id" :value="String(type.id)">{{ type.name }}</option></select></div>
           <div class="input-group full-width"><label>ชื่อคำสั่ง *</label><input v-model.trim="orderForm.title" required /></div>
           <div class="input-group full-width"><label>หมายเหตุ</label><textarea v-model="orderForm.note" rows="3"></textarea></div>
           <div class="modal-actions full-width"><button type="button" class="btn-secondary" @click="isOrderModalOpen=false">ยกเลิก</button><button class="btn-primary">บันทึกคำสั่ง</button></div>
@@ -110,7 +128,7 @@
         <form v-if="isAdmin && activeDaySchedules.length < 4" class="schedule-form" @submit.prevent="saveSchedule">
           <h3>{{ scheduleForm.id ? 'แก้ไขรายการเวร' : 'เพิ่มผู้ปฏิบัติหน้าที่' }}</h3>
           <div class="form-grid">
-            <div class="input-group"><label>คำสั่ง *</label><select v-model="scheduleForm.order_id" required><option value="" disabled>เลือกคำสั่ง</option><option v-for="order in orders" :key="order.id" :value="String(order.id)">{{ order.order_number }}</option></select></div>
+            <div class="input-group"><label>คำสั่ง *</label><select v-model="scheduleForm.order_id" required @change="syncScheduleDutyType"><option value="" disabled>เลือกคำสั่ง</option><option v-for="order in orders" :key="order.id" :value="String(order.id)">{{ order.order_number }}</option></select></div>
             <div class="input-group"><label>ประเภทเวร *</label><select v-model="scheduleForm.duty_type_id" required><option v-for="type in dutyTypes" :key="type.id" :value="String(type.id)">{{ type.name }}</option></select></div>
             <div v-if="!scheduleForm.id" class="input-group full-width"><label>เพิ่มเป็นคณะ (คณะละ 2 คน)</label><select v-model="scheduleForm.team_id"><option value="">ไม่ใช้คณะ — เพิ่มรายบุคคล</option><option v-for="team in teams" :key="team.id" :value="String(team.id)">{{ team.team_name }} — {{ team.member_one_name }} / {{ team.member_two_name }}</option></select></div>
             <div class="input-group full-width"><label>ผู้ปฏิบัติหน้าที่{{ scheduleForm.team_id ? ' (ระบบเลือกจากคณะ)' : ' *' }}</label><select v-model="scheduleForm.somtop_id" :required="!scheduleForm.team_id" :disabled="!!scheduleForm.team_id"><option value="" disabled>{{ scheduleForm.team_id ? 'เพิ่มสมาชิกทั้ง 2 คนจากคณะที่เลือก' : 'เลือกรายชื่อ' }}</option><option v-for="person in people" :key="person.id" :value="String(person.id)">{{ person.full_name }}</option></select></div>
@@ -180,9 +198,12 @@ const selectedMonth = computed({
 })
 const selectedOrderId = ref('')
 const orders = ref([]), schedules = ref([]), dutyTypes = ref([]), people = ref([]), teams = ref([])
-const isLoading = ref(false), isOrderModalOpen = ref(false), isDayModalOpen = ref(false), isSwapModalOpen = ref(false), isTeamModalOpen = ref(false)
+const isLoading = ref(false), isOrderModalOpen = ref(false), isDayModalOpen = ref(false), isSwapModalOpen = ref(false), isTeamModalOpen = ref(false), isPaymentPreviewOpen = ref(false)
+const courtInfo = ref({})
+const paymentForm = ref({ title:'', financeName:'', financePosition:'เจ้าหน้าที่การเงิน', directorName:'', directorPosition:'ผู้อำนวยการ', paymentDate:'' })
+const paymentPreviewHtml = ref('')
 const activeDate = ref(''), swapSource = ref(null)
-const orderForm = ref({ id:null, order_number:'', title:'', order_month:selectedMonth.value, note:'', status:'ใช้งาน' })
+const orderForm = ref({ id:null, order_number:'', title:'', order_month:selectedMonth.value, duty_type_id:'', note:'', status:'ใช้งาน' })
 const scheduleForm = ref({ id:null, order_id:'', team_id:'', somtop_id:'', duty_type_id:'', note:'' })
 const teamForm = ref({ id:null, team_name:'', member_one_somtop_id:'', member_two_somtop_id:'' })
 const teamSearchOne = ref(''), teamSearchTwo = ref('')
@@ -206,11 +227,13 @@ const fetchTeams = async () => { const {data}=await api.get('/duties/teams');tea
 const changeMonth = amount => { const [y,m]=selectedMonth.value.split('-').map(Number);const date=new Date(y,m-1+amount,1);selectedMonth.value=`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}` }
 const formatThaiDate = value => new Date(`${value}T00:00:00`).toLocaleDateString('th-TH',{dateStyle:'long'})
 const dayClass = day => { const count=(schedulesByDate.value[day.date]||[]).length;return {understaffed:count>0&&count<2,complete:count>=2,full:count>=4,today:day.date===new Date().toISOString().slice(0,10)} }
-const openDay = date => { activeDate.value=date;resetScheduleForm();if(selectedOrderId.value)scheduleForm.value.order_id=selectedOrderId.value;isDayModalOpen.value=true }
+const openDay = date => { activeDate.value=date;resetScheduleForm();isDayModalOpen.value=true }
 const closeDayModal = () => {isDayModalOpen.value=false;resetScheduleForm()}
-const resetScheduleForm = () => {scheduleForm.value={id:null,order_id:selectedOrderId.value||'',team_id:'',somtop_id:'',duty_type_id:String(dutyTypes.value[0]?.id||''),note:''}}
+const dutyTypeForOrder = orderId => String(orders.value.find(order => String(order.id) === String(orderId))?.duty_type_id || dutyTypes.value[0]?.id || '')
+const syncScheduleDutyType = () => { scheduleForm.value.duty_type_id = dutyTypeForOrder(scheduleForm.value.order_id) }
+const resetScheduleForm = () => {const orderId=selectedOrderId.value||'';scheduleForm.value={id:null,order_id:orderId,team_id:'',somtop_id:'',duty_type_id:dutyTypeForOrder(orderId),note:''}}
 const editSchedule = item => {scheduleForm.value={id:item.id,order_id:String(item.order_id||''),team_id:'',somtop_id:String(item.somtop_id),duty_type_id:String(item.duty_type_id),note:item.note||''}}
-const openOrderModal = order => {orderForm.value=order?{id:order.id,order_number:order.order_number,title:order.title,order_month:String(order.order_month).slice(0,7),note:order.note||'',status:order.status}:{id:null,order_number:'',title:'คำสั่งเวรปฏิบัติหน้าที่',order_month:selectedMonth.value,note:'',status:'ใช้งาน'};isOrderModalOpen.value=true}
+const openOrderModal = order => {orderForm.value=order?{id:order.id,order_number:order.order_number,title:order.title,order_month:String(order.order_month).slice(0,7),duty_type_id:String(order.duty_type_id||''),note:order.note||'',status:order.status}:{id:null,order_number:'',title:'คำสั่งเวรปฏิบัติหน้าที่',order_month:selectedMonth.value,duty_type_id:'',note:'',status:'ใช้งาน'};isOrderModalOpen.value=true}
 const saveOrder = async () => {try{if(orderForm.value.id)await api.put(`/duties/orders/${orderForm.value.id}`,orderForm.value);else await api.post('/duties/orders',orderForm.value);isOrderModalOpen.value=false;selectedMonth.value=orderForm.value.order_month;await fetchCalendar();swalSuccess('บันทึกสำเร็จ','บันทึกคำสั่งเรียบร้อยแล้ว')}catch(e){swalError('บันทึกไม่สำเร็จ',e.response?.data?.message||'เกิดข้อผิดพลาด')}}
 const deleteOrder = async order => {const ok=await swalConfirm('ยืนยันการลบคำสั่ง',`รายการเวรทั้งหมดใน ${order.order_number} จะถูกลบด้วย`);if(!ok.isConfirmed)return;try{await api.delete(`/duties/orders/${order.id}`);selectedOrderId.value='';await fetchCalendar()}catch(e){swalError('ลบไม่สำเร็จ',e.response?.data?.message)}}
 const uploadSignedPdf = async (order,event) => {const file=event.target.files?.[0];event.target.value='';if(!file)return;if(file.type!=='application/pdf'&&!file.name.toLowerCase().endsWith('.pdf')){swalError('ไฟล์ไม่ถูกต้อง','กรุณาเลือกไฟล์ PDF เท่านั้น');return}try{const data=new FormData();data.append('signed_order_pdf',file);await api.post(`/duties/orders/${order.id}/signed-pdf`,data,{headers:{'Content-Type':'multipart/form-data'}});await fetchCalendar();swalSuccess('แนบไฟล์สำเร็จ','บันทึกคำสั่ง PDF ที่ลงนามแล้วเรียบร้อย')}catch(e){swalError('แนบไฟล์ไม่สำเร็จ',e.response?.data?.message||'ไม่สามารถบันทึกไฟล์ PDF ได้')}}
@@ -226,10 +249,60 @@ const deleteSchedule = async item => {const ok=await swalConfirm('ยืนย�
 const openSwap = item => {swapSource.value=item;swapForm.value={replacement_somtop_id:'',reason:''};isSwapModalOpen.value=true}
 const saveSwap = async () => {try{const {data}=await api.post('/duties/swaps',{schedule_id:swapSource.value.id,...swapForm.value});const file=await api.get(`/duties/swaps/${data.id}/export-word`,{responseType:'blob'});const url=URL.createObjectURL(file.data);const a=document.createElement('a');a.href=url;a.download=`ใบเปลี่ยนเวร_${data.id}.docx`;a.click();URL.revokeObjectURL(url);isSwapModalOpen.value=false;await fetchCalendar();swalSuccess('เปลี่ยนเวรสำเร็จ','ดาวน์โหลดใบเปลี่ยนเวรแล้ว')}catch(e){swalError('เปลี่ยนเวรไม่สำเร็จ',e.response?.data?.message||'เกิดข้อผิดพลาด')}}
 const printSelectedOrder = async () => {try{const response=await api.get(`/duties/orders/${selectedOrderId.value}/export-word`,{responseType:'blob'});const order=orders.value.find(item=>String(item.id)===selectedOrderId.value);const url=URL.createObjectURL(response.data);const a=document.createElement('a');a.href=url;a.download=`คำสั่งเวร_${order?.order_number||selectedOrderId.value}.docx`;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);swalSuccess('สร้างเอกสารสำเร็จ','ดาวน์โหลดคำสั่งเวรปฏิบัติหน้าที่แล้ว')}catch(e){swalError('พิมพ์ไม่สำเร็จ',e.response?.data?.message||'ไม่สามารถสร้างเอกสารคำสั่งได้')}}
+const escapePrintText = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char]))
+const buildPaymentEvidence = () => {
+  const order = orders.value.find(item => String(item.id) === selectedOrderId.value)
+  const rows = schedules.value.reduce((map, item) => {
+    const key = item.somtop_id || item.full_name
+    if (!map.has(key)) map.set(key, { name: item.full_name, dates: [] })
+    map.get(key).dates.push(item.duty_date)
+    return map
+  }, new Map())
+  if (!order || !rows.size) { swalError('พิมพ์ไม่สำเร็จ', 'คำสั่งนี้ยังไม่มีรายชื่อผู้ปฏิบัติหน้าที่'); return false }
+  const rate = 1250
+  const dates = [...new Set(schedules.value.map(item => item.duty_date))].sort()
+  const dateLabel = date => String(Number(String(date).slice(8, 10)))
+  const money = value => Number(value).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const paymentDate = paymentForm.value.paymentDate ? new Date(`${paymentForm.value.paymentDate}T00:00:00`).toLocaleDateString('th-TH', { day:'numeric', month:'long', year:'numeric' }) : ''
+  const body = [...rows.values()].map((row, index) => `<tr><td>${index + 1}</td><td class="name">${escapePrintText(row.name)}</td><td>${money(rate)}</td>${dates.map(date => `<td>${row.dates.includes(date) ? '✓' : ''}</td>`).join('')}<td>${row.dates.length}</td><td>${money(row.dates.length * rate)}</td><td>${escapePrintText(paymentDate)}</td><td>โอนเงินเข้าบัญชี</td></tr>`).join('')
+  const total = [...rows.values()].reduce((sum, row) => sum + row.dates.length * rate, 0)
+  paymentPreviewHtml.value = `<style>table{width:100%;border-collapse:collapse;font-size:14px}th,td{border:1px solid #222;padding:4px 3px;text-align:center;white-space:nowrap}th{background:#f5f5f5}.name{text-align:left}.total td{font-weight:bold}.footer{text-align:left;margin-top:8px}.signatures{display:flex;justify-content:space-around;margin-top:30px;text-align:center}.signatures>div{width:30%}</style><h3 style="text-align:center;margin:4px">${escapePrintText(paymentForm.value.title)}</h3><p style="text-align:center">${escapePrintText(order.title)} เลขที่คำสั่ง ${escapePrintText(order.order_number)} ประจำเดือน ${escapePrintText(monthTitle.value)}</p><table><thead><tr><th rowspan="2">ลำดับ</th><th rowspan="2">ชื่อ - สกุล</th><th rowspan="2">อัตรา/วัน</th><th colspan="${dates.length}">วันที่ปฏิบัติงาน</th><th rowspan="2">จำนวนวัน</th><th rowspan="2">จำนวนเงิน</th><th rowspan="2">วันเดือนปีที่รับเงิน</th><th rowspan="2">ลายมือชื่อผู้รับเงิน</th></tr><tr>${dates.map(date => `<th>${dateLabel(date)}</th>`).join('')}</tr></thead><tbody>${body}<tr class="total"><td colspan="${3 + dates.length}">รวมเป็นเงินทั้งสิ้น</td><td>${money(total)}</td><td colspan="2"></td></tr></tbody></table><div class="footer">ขอรับรองว่าได้มีการปฏิบัติหน้าที่ตามระเบียบ และได้จ่ายค่าตอบแทนให้แก่ผู้มีสิทธิรับ จำนวน ${rows.size} ราย รวมเป็นเงินทั้งสิ้น ${money(total)} บาท (ห้าหมื่นห้าพันบาทถ้วน) จริง</div><div class="signatures"><div>ลงชื่อ ................................<br>(ผู้รับรอง)<br>${escapePrintText(paymentForm.value.directorName)}<br>${escapePrintText(paymentForm.value.directorPosition)}</div><div>ลงชื่อ ................................<br>(ผู้จัดทำ)<br>${escapePrintText(paymentForm.value.financeName)}<br>${escapePrintText(paymentForm.value.financePosition)}</div><div>ลงชื่อ ................................<br>(ผู้จ่ายเงิน)<br>${escapePrintText(paymentForm.value.financeName)}<br>${escapePrintText(paymentForm.value.financePosition)}</div></div>`
+  return true
+}
+const exportPaymentExcel = async () => {
+  try {
+    const query = new URLSearchParams({ title: paymentForm.value.title, payment_date: paymentForm.value.paymentDate, finance_name: paymentForm.value.financeName, finance_position: paymentForm.value.financePosition, director_name: paymentForm.value.directorName, director_position: paymentForm.value.directorPosition })
+    const response = await api.get(`/duties/orders/${selectedOrderId.value}/export-payment-excel?${query.toString()}`, { responseType: 'blob' })
+    const url = URL.createObjectURL(response.data); const link = document.createElement('a'); link.href = url; link.download = `หลักฐานการรับเงิน_${selectedOrderId.value}.xlsx`; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url)
+    swalSuccess('ส่งออกสำเร็จ', 'ดาวน์โหลดไฟล์ Excel แล้ว')
+  } catch (e) { swalError('ส่งออกไม่สำเร็จ', e.response?.data?.message || 'ไม่สามารถสร้างไฟล์ Excel ได้') }
+}
+const openPaymentPreview = async () => {
+  const order = orders.value.find(item => String(item.id) === selectedOrderId.value)
+  if (!order) return
+  paymentForm.value = {
+    title: 'หลักฐานการรับเงินค่าตอบแทนการปฏิบัติหน้าที่เวร', paymentDate: '',
+    financeName: courtInfo.value.finance_officer_name || '',
+    financePosition: courtInfo.value.finance_officer_position || 'เจ้าหน้าที่การเงิน',
+    directorName: courtInfo.value.director_name || '',
+    directorPosition: courtInfo.value.director_position || 'ผู้อำนวยการ'
+  }
+  if (!buildPaymentEvidence()) return
+  isPaymentPreviewOpen.value = true
+}
+const printPaymentEvidence = () => {
+  if (!buildPaymentEvidence()) return
+  const printWindow = window.open('', '_blank', 'height=800,width=1200')
+  if (!printWindow) { swalError('พิมพ์ไม่สำเร็จ', 'กรุณาอนุญาตการเปิดหน้าต่างใหม่ในเบราว์เซอร์'); return }
+  printWindow.document.write(`<!doctype html><html lang="th"><head><meta charset="utf-8"><title>หลักฐานการรับเงิน</title><style>@page{size:A4 landscape;margin:10mm}body{font-family:'TH Sarabun New','Sarabun',Tahoma,Arial,sans-serif;font-size:14px;color:#111}</style></head><body>${paymentPreviewHtml.value}</body></html>`)
+  printWindow.document.close(); printWindow.focus(); setTimeout(() => { printWindow.print(); printWindow.close() }, 250)
+}
 
 watch(selectedMonth,()=>{selectedOrderId.value='';fetchCalendar()})
 watch(selectedOrderId,fetchCalendar)
-onMounted(()=>Promise.all([fetchCalendar(),fetchPeople(),fetchTeams()]))
+watch(paymentForm, buildPaymentEvidence, { deep: true })
+const fetchCourtInfo = async () => { try { const { data } = await api.get('/duties/court-info'); courtInfo.value = data.court || {} } catch (e) { /* ใช้ช่องว่างให้เจ้าหน้าที่กรอกเองได้ */ } }
+onMounted(()=>Promise.all([fetchCalendar(),fetchPeople(),fetchTeams(),fetchCourtInfo()]))
 </script>
 
 <style scoped>
@@ -265,6 +338,7 @@ onMounted(()=>Promise.all([fetchCalendar(),fetchPeople(),fetchTeams()]))
 .duty-events-container{display:flex;flex-direction:column;gap:4px;max-height:74px;overflow-y:auto;padding-right:2px}.duty-events-container::-webkit-scrollbar{width:4px}.duty-events-container::-webkit-scrollbar-thumb{background:#d1d5db;border-radius:4px}
 .duty-event-pill{display:block;width:100%;box-sizing:border-box;overflow:hidden;padding:3px 6px;border-left:3px solid #3b82f6;border-radius:4px;background:#dbeafe;color:#1e40af;font-size:10px;line-height:1.35;text-overflow:ellipsis;white-space:nowrap}.duty-calendar-cell.understaffed .duty-event-pill{border-left-color:#f59e0b;background:#fef3c7;color:#92400e}.duty-calendar-cell.complete .duty-event-pill,.duty-calendar-cell.full .duty-event-pill{border-left-color:#10b981;background:#d1fae5;color:#065f46}
 .duty-total{margin:auto 3px 2px;text-align:right;color:#6b7280;font-size:10px}
+.payment-preview-modal{width:min(1200px,96vw);max-width:none;max-height:92vh;overflow:auto}.payment-edit-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:14px}.payment-preview-scroll{overflow:auto;border:1px solid #e5e7eb;padding:14px;background:#fff}
 @media(max-width:1000px){.toolbar{grid-template-columns:1fr 1fr}.order-field{grid-column:1/-1}.duty-filter-actions{grid-column:1/-1;justify-content:flex-end}}
-@media(max-width:768px){.header-actions{width:100%;margin-top:12px;flex-direction:column}.header-actions button{width:100%}.toolbar{grid-template-columns:1fr;gap:14px;padding:16px}.order-field,.duty-filter-actions{grid-column:auto}.duty-filter-actions{justify-content:stretch}.duty-filter-actions .print-order-button{flex:1}.month-input,.year-input,.order-select{min-width:0}.order-strip{margin-inline:-2px}.order-card{min-width:280px}.duty-calendar-section{padding:12px;min-height:auto}.duty-calendar-header{align-items:flex-start;flex-direction:column}.duty-day-name{padding:8px 3px;font-size:11px}.duty-calendar-cell{min-height:72px;padding:2px}.duty-date-number{width:20px;height:20px;margin:1px 1px 2px auto;font-size:11px}.duty-events-container{max-height:48px}.duty-event-pill{padding:2px 3px;font-size:9px}.duty-total{display:none}}
+@media(max-width:768px){.header-actions{width:100%;margin-top:12px;flex-direction:column}.header-actions button{width:100%}.toolbar{grid-template-columns:1fr;gap:14px;padding:16px}.order-field,.duty-filter-actions{grid-column:auto}.duty-filter-actions{justify-content:stretch;flex-wrap:wrap}.duty-filter-actions .print-order-button{flex:1}.month-input,.year-input,.order-select{min-width:0}.order-strip{margin-inline:-2px}.order-card{min-width:280px}.duty-calendar-section{padding:12px;min-height:auto}.duty-calendar-header{align-items:flex-start;flex-direction:column}.duty-day-name{padding:8px 3px;font-size:11px}.duty-calendar-cell{min-height:72px;padding:2px}.duty-date-number{width:20px;height:20px;margin:1px 1px 2px auto;font-size:11px}.duty-events-container{max-height:48px}.duty-event-pill{padding:2px 3px;font-size:9px}.duty-total{display:none}}
 </style>

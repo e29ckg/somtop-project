@@ -17,7 +17,7 @@ exports.createCourt = async (req, res) => {
     try {
         const {
             court_code, court_name, address, phone, email, province, status,
-            chief_judge_name, chief_judge_position, director_name, director_position
+            chief_judge_name, chief_judge_position, director_name, director_position, finance_officer_name, finance_officer_position
         } = req.body;
 
         if (!court_code || !court_name) {
@@ -27,15 +27,16 @@ exports.createCourt = async (req, res) => {
         const query = `
             INSERT INTO courts (
                 court_code, court_name, address, phone, email, province,
-                chief_judge_name, chief_judge_position, director_name, director_position, status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                chief_judge_name, chief_judge_position, director_name, director_position, finance_officer_name, finance_officer_position, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         
         await pool.query(query, [
             court_code.toLowerCase(), court_name, address || null, 
             phone || null, email || null, province || null,
             chief_judge_name || null, chief_judge_position || null,
-            director_name || null, director_position || null, status || 'ใช้งาน'
+            director_name || null, director_position || null,
+            finance_officer_name || null, finance_officer_position || null, status || 'ใช้งาน'
         ]);
 
         logActivity(req, 'เพิ่มข้อมูล', 'จัดการศาล', `เพิ่มศาล: ${court_code} - ${court_name}`);
@@ -54,7 +55,7 @@ exports.updateCourt = async (req, res) => {
     try {
         const {
             id, court_code, court_name, address, phone, email, province, status,
-            chief_judge_name, chief_judge_position, director_name, director_position
+            chief_judge_name, chief_judge_position, director_name, director_position, finance_officer_name, finance_officer_position
         } = req.body;
 
         if (!id || !court_code || !court_name) {
@@ -66,7 +67,7 @@ exports.updateCourt = async (req, res) => {
                 court_code = ?, court_name = ?, address = ?, 
                 phone = ?, email = ?, province = ?,
                 chief_judge_name = ?, chief_judge_position = ?,
-                director_name = ?, director_position = ?, status = ?
+                director_name = ?, director_position = ?, finance_officer_name = ?, finance_officer_position = ?, status = ?
             WHERE id = ?
         `;
         
@@ -74,7 +75,8 @@ exports.updateCourt = async (req, res) => {
             court_code.toLowerCase(), court_name, address || null, 
             phone || null, email || null, province || null,
             chief_judge_name || null, chief_judge_position || null,
-            director_name || null, director_position || null, status || 'ใช้งาน', id
+            director_name || null, director_position || null,
+            finance_officer_name || null, finance_officer_position || null, status || 'ใช้งาน', id
         ]);
 
         logActivity(req, 'อัปเดตข้อมูล', 'จัดการศาล', `อัปเดตศาล ID: ${id}`);

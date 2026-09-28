@@ -50,7 +50,7 @@
               <td class="font-mono font-bold">{{ user.court_code ? user.court_code.toUpperCase() : '-' }}</td>
               <td>
                 <span class="status-badge" :class="user.role === 'admin' ? 'active' : 'warning'">
-                  {{ user.role === 'admin' ? 'ผู้ดูแลระบบ (Admin)' : 'ผู้ใช้งาน (Viewer)' }}
+                  {{ user.role === 'admin' ? 'ผู้ดูแลระบบ (Admin)' : user.role === 'finance' ? 'เจ้าหน้าที่การเงิน' : 'ผู้ใช้งาน (Viewer)' }}
                 </span>
               </td>
               <td class="text-muted">{{ user.last_login || '-' }}</td>
@@ -120,6 +120,7 @@
             <select v-model="formData.role">
               <option value="viewer">ผู้ใช้งานทั่วไป (Viewer) - จัดการข้อมูล พ.สมทบได้</option>
               <option value="admin">ผู้ดูแลระบบ (Admin) - ดูแลระบบและจัดการผู้ใช้งานได้</option>
+              <option value="finance">เจ้าหน้าที่การเงิน - ตรวจสอบและพิมพ์หลักฐานการรับเงิน</option>
             </select>
           </div>
 

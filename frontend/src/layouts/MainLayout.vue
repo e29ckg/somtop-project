@@ -41,6 +41,9 @@
         <router-link to="/performance-evaluation" class="nav-item">
            <span class="nav-icon">📝</span><span class="sidebar-text">ประเมินผลงานรอบปี</span>
         </router-link>
+        <router-link v-if="['admin', 'finance'].includes(userRole)" to="/payment-evidence" class="nav-item">
+           <span class="nav-icon">🧾</span><span class="sidebar-text">ตรวจสอบหลักฐานการรับเงิน</span>
+        </router-link>
         <!-- ⭐️ ซ่อน/แสดงเมนูตั้งค่า เฉพาะผู้ที่มี Role = admin เท่านั้น -->
         <div v-if="userRole === 'admin'">
           <div class="menu-category">ตั้งค่าระบบ</div>

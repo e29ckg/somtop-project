@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const PizZip = require('pizzip');
 const Docxtemplater = require('docxtemplater');
+const ExcelJS = require('exceljs');
 const { logActivity } = require('../utils/logger');
 
 const validMonth = value => /^\d{4}-\d{2}$/.test(String(value || ''));
@@ -172,12 +173,15 @@ exports.getCalendar = async (req, res) => {
 
 exports.createOrder = async (req, res) => {
     try {
-        const { order_number, title, order_month, note } = req.body;
-        if (!order_number?.trim() || !title?.trim() || !validMonth(order_month)) return res.status(400).json({ message: 'ข้อมูลคำสั่งไม่ครบถ้วน' });
+        const { order_number, title, order_month, duty_type_id, note } = req.body;
+        const dutyTypeId = Number(duty_type_id);
+        if (!order_number?.trim() || !title?.trim() || !validMonth(order_month) || !Number.isSafeInteger(dutyTypeId) || dutyTypeId < 1) return res.status(400).json({ message: 'ข้อมูลคำสั่งไม่ครบถ้วน' });
+        const [types] = await pool.query("SELECT id FROM duty_types WHERE id = ? AND status = 'ใช้งาน'", [dutyTypeId]);
+        if (!types.length) return res.status(400).json({ message: 'ไม่พบประเภทเวรที่เลือก' });
         const [result] = await pool.query(
-            `INSERT INTO duty_orders (order_number, title, order_month, court_code, note, created_by)
-             VALUES (?, ?, ?, ?, ?, ?)`,
-            [order_number.trim(), title.trim(), `${order_month}-01`, req.user.court_code, note || null, req.user.id]
+            `INSERT INTO duty_orders (order_number, title, order_month, duty_type_id, court_code, note, created_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [order_number.trim(), title.trim(), `${order_month}-01`, dutyTypeId, req.user.court_code, note || null, req.user.id]
         );
         logActivity(req, 'เพิ่มข้อมูล', 'เวรปฏิบัติหน้าที่', `เพิ่มคำสั่ง ${order_number}`);
         res.status(201).json({ message: 'เพิ่มคำสั่งสำเร็จ', id: result.insertId });
@@ -188,10 +192,14 @@ exports.createOrder = async (req, res) => {
 };
 
 exports.updateOrder = async (req, res) => {
-    const { order_number, title, note, status } = req.body;
-    const params = scopeParams(req.user.court_code, [order_number, title, note || null, status || 'ใช้งาน', req.params.id]);
+    const { order_number, title, duty_type_id, note, status } = req.body;
+    const dutyTypeId = Number(duty_type_id);
+    if (!Number.isSafeInteger(dutyTypeId) || dutyTypeId < 1) return res.status(400).json({ message: 'กรุณาเลือกประเภทเวร' });
+    const [types] = await pool.query("SELECT id FROM duty_types WHERE id = ? AND status = 'ใช้งาน'", [dutyTypeId]);
+    if (!types.length) return res.status(400).json({ message: 'ไม่พบประเภทเวรที่เลือก' });
+    const params = scopeParams(req.user.court_code, [order_number, title, dutyTypeId, note || null, status || 'ใช้งาน', req.params.id]);
     const [result] = await pool.query(
-        `UPDATE duty_orders SET order_number = ?, title = ?, note = ?, status = ? WHERE id = ?${inScope(req.user.court_code)}`,
+        `UPDATE duty_orders SET order_number = ?, title = ?, duty_type_id = ?, note = ?, status = ? WHERE id = ?${inScope(req.user.court_code)}`,
         params
     );
     if (!result.affectedRows) return res.status(404).json({ message: 'ไม่พบคำสั่ง' });
@@ -491,6 +499,43 @@ exports.getOrderPrintData = async (req, res) => {
     }
     const { signed_order_file_path: filePath, ...safeOrder } = orders[0];
     res.json({ order: { ...safeOrder, has_signed_order_pdf: Boolean(filePath) }, records });
+};
+
+exports.getCourtInfo = async (req, res) => {
+    const [rows] = await pool.query(
+        `SELECT court_name, director_name, director_position, finance_officer_name, finance_officer_position
+         FROM courts WHERE court_code = ? LIMIT 1`,
+        [req.user.court_code]
+    );
+    if (!rows.length) return res.status(404).json({ message: 'ไม่พบข้อมูลศาล' });
+    res.json({ court: rows[0] });
+};
+
+exports.exportPaymentExcel = async (req, res) => {
+    const orderId = req.params.id;
+    const [orders] = await pool.query(`SELECT dor.*, c.court_name FROM duty_orders dor LEFT JOIN courts c ON dor.court_code = c.court_code WHERE dor.id = ?${inScope(req.user.court_code, 'dor.')}`, scopeParams(req.user.court_code, [orderId]));
+    if (!orders.length) return res.status(404).json({ message: 'ไม่พบคำสั่ง' });
+    const [records] = await pool.query(`SELECT ds.duty_date, ds.somtop_id, CONCAT(s.title, s.first_name, ' ', s.last_name) AS full_name FROM duty_schedules ds JOIN somtop s ON ds.somtop_id = s.id WHERE ds.order_id = ?${inScope(req.user.court_code, 'ds.')} ORDER BY ds.duty_date, s.first_name, s.last_name`, scopeParams(req.user.court_code, [orderId]));
+    if (!records.length) return res.status(400).json({ message: 'คำสั่งนี้ยังไม่มีรายชื่อผู้ปฏิบัติหน้าที่' });
+    const rate = 1250;
+    const dates = [...new Set(records.map(row => String(row.duty_date).slice(0, 10)))].sort();
+    const people = [...records.reduce((map, row) => { const key = row.somtop_id; if (!map.has(key)) map.set(key, { name: row.full_name, dates: [] }); map.get(key).dates.push(String(row.duty_date).slice(0, 10)); return map; }, new Map()).values()];
+    const workbook = new ExcelJS.Workbook(); const sheet = workbook.addWorksheet('หลักฐานการรับเงิน');
+    const headers = ['ลำดับ', 'ชื่อ - สกุล', 'อัตรา/วัน (บาท)', ...dates.map(date => String(Number(date.slice(8, 10)))), 'จำนวนวัน', 'จำนวนเงิน (บาท)', 'วันที่รับเงิน', 'ลายมือชื่อผู้รับเงิน'];
+    sheet.mergeCells(1, 1, 1, headers.length); sheet.getCell(1, 1).value = req.query.title || 'หลักฐานการรับเงินค่าตอบแทนการปฏิบัติหน้าที่เวร'; sheet.getCell(1, 1).font = { name: 'TH Sarabun New', size: 18, bold: true }; sheet.getCell(1, 1).alignment = { horizontal: 'center' };
+    sheet.mergeCells(2, 1, 2, headers.length); sheet.getCell(2, 1).value = `${orders[0].title} เลขที่คำสั่ง ${orders[0].order_number}`; sheet.getCell(2, 1).font = { name: 'TH Sarabun New', size: 14 }; sheet.getCell(2, 1).alignment = { horizontal: 'center' };
+    const headerRow = sheet.addRow(headers); headerRow.font = { name: 'TH Sarabun New', size: 14, bold: true }; headerRow.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    people.forEach((person, index) => { const count = person.dates.length; sheet.addRow([index + 1, person.name, rate, ...dates.map(date => person.dates.includes(date) ? '✓' : ''), count, count * rate, req.query.payment_date || '', 'โอนเงินเข้าบัญชี']); });
+    const totalRow = sheet.addRow(['รวมเป็นเงินทั้งสิ้น', '', '', ...dates.map(() => ''), '', people.reduce((sum, person) => sum + person.dates.length * rate, 0), '', '']);
+    sheet.mergeCells(totalRow.number, 1, totalRow.number, dates.length + 4);
+    totalRow.getCell(1).alignment = { horizontal: 'right' };
+    totalRow.font = { name: 'TH Sarabun New', size: 14, bold: true };
+    sheet.eachRow(row => { row.eachCell(cell => { cell.font = { ...(cell.font || {}), name: 'TH Sarabun New', size: cell.font?.size || 14 }; cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } }; }); });
+    sheet.getColumn(3).numFmt = '#,##0.00'; sheet.getColumn(4 + dates.length + 1).numFmt = '#,##0.00';
+    sheet.columns.forEach((column, index) => { column.width = index === 2 ? 28 : index > 2 && index <= dates.length + 2 ? 12 : 18; }); sheet.getColumn(1).width = 8;
+    const noteRow = sheet.addRow([]); sheet.mergeCells(noteRow.number, 1, noteRow.number, headers.length); sheet.getCell(noteRow.number, 1).value = `รวมเป็นเงินทั้งสิ้น ${people.reduce((sum, person) => sum + person.dates.length * rate, 0).toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท (ห้าหมื่นห้าพันบาทถ้วน) จริง`;
+    const signRow = sheet.addRow([]); signRow.height = 48; sheet.mergeCells(signRow.number, 1, signRow.number, Math.ceil(headers.length / 3)); sheet.getCell(signRow.number, 1).value = `ลงชื่อ ................................ (ผู้รับรอง)\n${req.query.director_name || ''}\n${req.query.director_position || 'ผู้อำนวยการ'}`; sheet.mergeCells(signRow.number, Math.ceil(headers.length / 3) + 1, signRow.number, Math.ceil(headers.length * 2 / 3)); sheet.getCell(signRow.number, Math.ceil(headers.length / 3) + 1).value = `ลงชื่อ ................................ (ผู้จัดทำ)\n${req.query.finance_name || ''}\n${req.query.finance_position || 'เจ้าหน้าที่การเงิน'}`; sheet.mergeCells(signRow.number, Math.ceil(headers.length * 2 / 3) + 1, signRow.number, headers.length); sheet.getCell(signRow.number, Math.ceil(headers.length * 2 / 3) + 1).value = `ลงชื่อ ................................ (ผู้จ่ายเงิน)\n${req.query.finance_name || ''}\n${req.query.finance_position || 'เจ้าหน้าที่การเงิน'}`; signRow.eachCell(cell => { cell.font = { name: 'TH Sarabun New', size: 14 }; cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }; });
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(`หลักฐานการรับเงิน_${orders[0].order_number}.xlsx`)}`); res.send(await workbook.xlsx.writeBuffer());
 };
 
 exports.exportOrderWord = async (req, res) => {

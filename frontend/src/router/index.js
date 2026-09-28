@@ -19,6 +19,7 @@ import ProfileView from '../views/ProfileView.vue'
 import ParticipationReportView from '../views/ParticipationReportView.vue'
 import DutyScheduleView from '../views/DutyScheduleView.vue'
 import PerformanceEvaluationView from '../views/PerformanceEvaluationView.vue'
+import PaymentEvidenceView from '../views/PaymentEvidenceView.vue'
 import api from '../services/api'
 import { currentUser, isSessionVerified, setSessionUser, clearSession } from '../services/session'
 
@@ -96,6 +97,7 @@ const router = createRouter({
           component: DutyScheduleView
         },
         { path: 'performance-evaluation', name: 'performance-evaluation', component: PerformanceEvaluationView },
+        { path: 'payment-evidence', name: 'payment-evidence', component: PaymentEvidenceView, meta: { requiresFinance: true } },
         {
           path: 'manage-event-types',
           name: 'manage-event-types',
@@ -161,6 +163,7 @@ router.beforeEach(async (to) => {
 
   if (to.meta.requiresAuth && !currentUser.value) return '/'
   if (to.meta.requiresAdmin && currentUser.value?.role !== 'admin') return '/dashboard'
+  if (to.meta.requiresFinance && !['admin', 'finance'].includes(currentUser.value?.role)) return '/dashboard'
   if (to.path === '/' && currentUser.value) return '/dashboard'
 
   return true
