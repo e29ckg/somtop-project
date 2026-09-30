@@ -566,20 +566,20 @@ exports.exportPaymentExcel = async (req, res) => {
     for (const rowNumber of [3, 4]) {
         const headerRow = sheet.getRow(rowNumber);
         headerRow.height = rowNumber === 3 ? 38 : 24;
-        headerRow.font = { name: 'TH Sarabun New', size: 12, bold: true };
+        headerRow.font = { name: 'TH Sarabun New', size: 14, bold: true };
         headerRow.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
     }
-    people.forEach((person, index) => { const count = person.dates.size; sheet.addRow([index + 1, person.name, rate, ...dates.map(date => person.dates.has(date) ? '✓' : ''), count, count * rate, formatThaiTransferDate(req.query.payment_date), 'โอนเงินเข้าบัญชี', '']); });
+    people.forEach((person, index) => { const count = person.dates.size; const row = sheet.addRow([index + 1, person.name, rate, ...dates.map(date => person.dates.has(date) ? '✓' : ''), count, count * rate, formatThaiTransferDate(req.query.payment_date), 'โอนเงินเข้าบัญชี', '']); row.height = 25; row.getCell(2).alignment = { horizontal: 'left', vertical: 'middle', wrapText: false }; });
     const total = people.reduce((sum, person) => sum + person.dates.size * rate, 0);
     const totalRow = sheet.addRow(['รวมเป็นเงินทั้งสิ้น', ...Array(lastColumn - 1).fill('')]);
     sheet.mergeCells(totalRow.number, 1, totalRow.number, countColumn);
     totalRow.getCell(amountColumn).value = total;
     sheet.mergeCells(totalRow.number, amountColumn + 1, totalRow.number, lastColumn);
     totalRow.getCell(1).alignment = { horizontal: 'right' };
-    totalRow.font = { name: 'TH Sarabun New', size: 14, bold: true };
-    sheet.eachRow(row => { row.eachCell(cell => { cell.font = { ...(cell.font || {}), name: 'TH Sarabun New', size: cell.font?.size || 14 }; if (row.number >= 3) cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } }; }); });
+    totalRow.font = { name: 'TH Sarabun New', size: 16, bold: true };
+    sheet.eachRow(row => { row.eachCell(cell => { cell.font = { ...(cell.font || {}), name: 'TH Sarabun New', size: cell.font?.size || (row.number >= 5 ? 16 : 14) }; if (row.number >= 3) cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } }; }); });
     sheet.getCell(2, 1).border = { bottom: { style: 'thin' } };
-    sheet.getColumn(1).width = 7; sheet.getColumn(2).width = 28; sheet.getColumn(3).width = 19;
+    sheet.getColumn(1).width = 7; sheet.getColumn(2).width = 34; sheet.getColumn(3).width = 19;
     dates.forEach((date, index) => {
         const column = sheet.getColumn(dayStartColumn + index);
         column.width = 4;

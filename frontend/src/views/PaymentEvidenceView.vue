@@ -120,19 +120,17 @@ const print = () => {
   if (!w) return
   const style = w.document.createElement('style')
   style.textContent = `
-    @page { size: A4 landscape; margin: 10mm; }
+    @page { size: A4 landscape; margin: 6mm; }
     body { font-family: 'TH Sarabun New', 'Sarabun', Tahoma, sans-serif; font-size: 14px; color: #111; }
     .document-heading { text-align: center; padding-bottom: 6px; border-bottom: 1px solid #222; }
     .document-heading h3 { margin: 0; font-size: 18px; }
     .document-heading p { margin: 0; font-size: 16px; font-weight: bold; }
-    .payment-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 9px; }
-    .payment-table th, .payment-table td { border: 1px solid #222; padding: 2px 1px; text-align: center; vertical-align: middle; overflow-wrap: anywhere; }
-    .payment-table .day-column { width: 2%; padding: 2px 0; }
+    .payment-table { width: 100%; border-collapse: collapse; table-layout: auto; font-size: 12px; }
+    .payment-table th, .payment-table td { border: 1px solid #222; padding: 3px 2px; text-align: center; vertical-align: middle; }
+    .payment-table .day-column { min-width: 13px; padding: 3px 0; }
     .payment-table .weekend { background: #999; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-    .payment-table .person-name { width: 13%; text-align: left; }
-    .payment-table thead tr:first-child th:first-child { width: 3%; }
-    .payment-table thead tr:first-child th:nth-child(3) { width: 7%; }
-    .total-row td:first-child { text-align: right; font-weight: bold; }
+    .payment-table .person-name { min-width: 165px; text-align: left; white-space: nowrap; }
+    .total-row td:first-child { text-align: center; font-weight: bold; }
     .total-row td:nth-child(2) { font-weight: bold; }
     .payment-certification { margin-top: 10px; line-height: 1.4; }
     .payment-signatures { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 68px 0 20px; text-align: center; break-inside: avoid; }
@@ -231,10 +229,10 @@ onMounted(load)
   font-size: 18px;
 }
 .preview-html :deep(table) {
-  width: 100%;
-  min-width: 1250px;
+  width: max-content;
+  min-width: 100%;
   border-collapse: collapse;
-  font-size: 11px;
+  font-size: 14px;
 }
 .preview-html :deep(th),
 .preview-html :deep(td) {
@@ -255,8 +253,9 @@ onMounted(load)
   background: #9ca3af;
 }
 .preview-html :deep(.person-name) {
-  min-width: 165px;
+  min-width: 210px;
   text-align: left;
+  white-space: nowrap;
 }
 .preview-html :deep(td:nth-child(2)) {
   text-align: left;
