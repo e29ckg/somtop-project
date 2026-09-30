@@ -9,8 +9,8 @@
     <section class="card filter-card">
       <div class="filter-controls">
         <div class="filter-group month-field"><label for="payment-month">เดือน</label><select id="payment-month" v-model="month"><option v-for="item in monthOptions" :key="item.value" :value="item.value">{{ item.label }}</option></select></div>
-        <div class="filter-group order-field"><label for="payment-order">คำสั่งประจำเดือน</label><select id="payment-order" v-model="orderId"><option value="">เลือกคำสั่ง</option><option v-for="o in orders" :key="o.id" :value="String(o.id)">{{ o.order_number }} — {{ o.title }}</option></select></div>
-        <div class="filter-actions"><button class="btn-primary" :disabled="!orderId" @click="openPreview">ตรวจสอบหลักฐาน</button></div>
+        <div class="filter-group order-field"><label for="payment-order">คำสั่งประจำเดือน</label><select id="payment-order" v-model="orderId"><option value="">ทุกคำสั่งในเดือน</option><option v-for="o in orders" :key="o.id" :value="String(o.id)">{{ o.order_number }} — {{ o.title }}</option></select></div>
+        <div class="filter-actions"><button class="btn-primary" :disabled="!schedules.length" @click="openPreview">ตรวจสอบหลักฐาน</button></div>
       </div>
     </section>
     <div v-if="previewOpen" class="card preview-card">
@@ -34,7 +34,7 @@ import { swalError, swalSuccess } from '../utils/swal'
 import { thaiBahtText } from '../utils/thaiBahtText'
 const now = new Date(); const thaiMonths=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม']; const month = ref(`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`); const monthOptions = Array.from({length:24},(_,i)=>{const d=new Date(now.getFullYear(),now.getMonth()-i,1);const value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;return {value,label:`${thaiMonths[d.getMonth()]} ${d.getFullYear()+543}`}}); const orders = ref([]); const orderId = ref(''); const schedules = ref([]); const court = ref({}); const previewOpen = ref(false); const html = ref('');
 const form = ref({ title:'หลักฐานการจ่ายเงินค่าป่วยการและค่าตอบแทนของผู้พิพากษาสมทบ', paymentDate:'', financeName:'', financePosition:'เจ้าหน้าที่การเงิน', directorName:'', directorPosition:'ผู้อำนวยการ' })
-const load = async () => { try { const r = await api.get('/duties/calendar', { params:{ month:month.value } }); orders.value=r.data.orders||[]; schedules.value=r.data.schedules||[]; if (!orders.value.some(o=>String(o.id)===orderId.value)) orderId.value=orders.value[0] ? String(orders.value[0].id) : '' } catch(e){ swalError('โหลดข้อมูลไม่สำเร็จ',e.response?.data?.message||'ไม่สามารถโหลดข้อมูลได้') } }
+const load = async () => { try { const r = await api.get('/duties/calendar', { params:{ month:month.value } }); orders.value=r.data.orders||[]; schedules.value=r.data.schedules||[]; if (orderId.value && !orders.value.some(o=>String(o.id)===orderId.value)) orderId.value=''; if (previewOpen.value) build() } catch(e){ swalError('โหลดข้อมูลไม่สำเร็จ',e.response?.data?.message||'ไม่สามารถโหลดข้อมูลได้') } }
 const escape = v => String(v ?? '').replace(/&/g,'&amp;').replace(new RegExp(String.fromCharCode(60),'g'),'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); const money = v => Number(v).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})
 const documentSubtitle = (courtInfo, orderMonth) => {
   const [year, monthNumber] = String(orderMonth).split('-').map(Number)
@@ -57,20 +57,25 @@ const formatThaiTransferDate = value => {
   return `${Number(match[3])} ${shortThaiMonths[Number(match[2]) - 1]} ${String(Number(match[1]) + 543).slice(-2)}`
 }
 const isWeekend = date => [0, 6].includes(new Date(`${date}T12:00:00Z`).getUTCDay())
+const compareSeniority = (a, b) =>
+  (a.positionLevel ?? -1) - (b.positionLevel ?? -1) ||
+  String(a.joinDate || '').localeCompare(String(b.joinDate || '')) ||
+  String(a.firstName || '').localeCompare(String(b.firstName || ''), 'th') ||
+  String(a.lastName || '').localeCompare(String(b.lastName || ''), 'th') ||
+  Number(a.id) - Number(b.id)
 const build = () => {
   const tag = (name, content = '', attrs = '') => `<${name}${attrs}>${content}</${name}>`
-  const order = orders.value.find(item => String(item.id) === orderId.value)
-  const selected = schedules.value.filter(item => String(item.order_id) === orderId.value)
-  if (!order || !selected.length) { html.value = ''; return }
+  const selected = schedules.value.filter(item => !orderId.value || String(item.order_id) === orderId.value)
+  if (!selected.length) { html.value = ''; return }
 
   const [year, monthNumber] = month.value.split('-').map(Number)
   const dates = Array.from({ length: new Date(year, monthNumber, 0).getDate() }, (_, index) => `${month.value}-${String(index + 1).padStart(2, '0')}`)
   const people = [...selected.reduce((map, item) => {
     const key = item.somtop_id || item.full_name
-    if (!map.has(key)) map.set(key, { name: item.full_name, dates: new Set() })
+    if (!map.has(key)) map.set(key, { id: key, name: item.full_name, positionLevel: item.position_level, joinDate: item.join_date, firstName: item.first_name, lastName: item.last_name, dates: new Set() })
     map.get(key).dates.add(String(item.duty_date).slice(0, 10))
     return map
-  }, new Map()).values()]
+  }, new Map()).values()].sort(compareSeniority)
   const rate = 1250
   const total = people.reduce((sum, person) => sum + person.dates.size * rate, 0)
   const transferDate = escape(formatThaiTransferDate(form.value.paymentDate))
@@ -108,8 +113,8 @@ const build = () => {
     ' class="document-heading"'
   ) + tag('table', tag('thead', tag('tr', mainHeaders) + tag('tr', dayHeaders)) + tag('tbody', rows + totalRow), ' class="payment-table"') + buildFooter(people.length, total)
 }
-const openPreview=async()=>{if(!orderId.value)return;const c=await api.get('/duties/court-info');court.value=c.data.court||{};form.value.financeName=court.value.finance_officer_name||'';form.value.financePosition=court.value.finance_officer_position||'เจ้าหน้าที่การเงิน';form.value.directorName=court.value.director_name||'';form.value.directorPosition=court.value.director_position||'ผู้อำนวยการ';previewOpen.value=true;build()}; watch([month,orderId],async()=>{if(month.value)await load();if(previewOpen.value)build()}); watch(form,build,{deep:true});
-const exportExcel=async()=>{try{const q=new URLSearchParams({title:form.value.title,payment_date:form.value.paymentDate,finance_name:form.value.financeName,finance_position:form.value.financePosition,director_name:form.value.directorName,director_position:form.value.directorPosition});const r=await api.get(`/duties/orders/${orderId.value}/export-payment-excel?${q}`,{responseType:'blob'});const u=URL.createObjectURL(r.data),a=document.createElement('a');a.href=u;a.download=`หลักฐานการรับเงิน_${orderId.value}.xlsx`;a.click();URL.revokeObjectURL(u);swalSuccess('ส่งออกสำเร็จ','ดาวน์โหลดไฟล์ Excel แล้ว')}catch(e){swalError('ส่งออกไม่สำเร็จ',e.response?.data?.message||'ไม่สามารถส่งออกได้')}}
+const openPreview=async()=>{if(!schedules.value.length)return;const c=await api.get('/duties/court-info');court.value=c.data.court||{};form.value.financeName=court.value.finance_officer_name||'';form.value.financePosition=court.value.finance_officer_position||'เจ้าหน้าที่การเงิน';form.value.directorName=court.value.director_name||'';form.value.directorPosition=court.value.director_position||'ผู้อำนวยการ';previewOpen.value=true;build()}; watch(month,load); watch(orderId,()=>{if(previewOpen.value)build()}); watch(form,build,{deep:true});
+const exportExcel=async()=>{try{const q=new URLSearchParams({title:form.value.title,payment_date:form.value.paymentDate,finance_name:form.value.financeName,finance_position:form.value.financePosition,director_name:form.value.directorName,director_position:form.value.directorPosition});const endpoint=orderId.value?`/duties/orders/${orderId.value}/export-payment-excel`:'/duties/payment-excel';if(!orderId.value)q.set('month',month.value);const r=await api.get(`${endpoint}?${q}`,{responseType:'blob'});const u=URL.createObjectURL(r.data),a=document.createElement('a');a.href=u;a.download=`หลักฐานการรับเงิน_${orderId.value||month.value}.xlsx`;a.click();URL.revokeObjectURL(u);swalSuccess('ส่งออกสำเร็จ','ดาวน์โหลดไฟล์ Excel แล้ว')}catch(e){swalError('ส่งออกไม่สำเร็จ',e.response?.data?.message||'ไม่สามารถส่งออกได้')}}
 const print = () => {
   const w = window.open('', '_blank')
   if (!w) return

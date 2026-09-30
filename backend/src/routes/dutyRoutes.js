@@ -14,6 +14,7 @@ router.get('/teams', asyncHandler(dutyController.getTeams));
 router.get('/orders/:id/print-data', asyncHandler(dutyController.getOrderPrintData));
 router.get('/orders/:id/export-word', asyncHandler(dutyController.exportOrderWord));
 router.get('/orders/:id/export-payment-excel', asyncHandler(dutyController.exportPaymentExcel));
+router.get('/payment-excel', asyncHandler(dutyController.exportPaymentExcel));
 router.get('/orders/:id/signed-pdf', asyncHandler(dutyController.downloadSignedOrderPdf));
 router.post('/orders', verifyAdmin, asyncHandler(dutyController.createOrder));
 router.put('/orders/:id', verifyAdmin, asyncHandler(dutyController.updateOrder));

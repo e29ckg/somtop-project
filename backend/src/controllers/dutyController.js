@@ -157,9 +157,11 @@ exports.getCalendar = async (req, res) => {
         const [schedules] = await pool.query(`
             SELECT ds.id, ds.order_id, ds.team_id, ds.somtop_id, ds.duty_type_id, ds.duty_date, ds.note, ds.status,
                 CONCAT(s.title, s.first_name, ' ', s.last_name) AS full_name,
+                s.first_name, s.last_name, s.join_date, sp.level AS position_level,
                 dt.name AS duty_type_name, dor.order_number, dor.title AS order_title, t.team_name
             FROM duty_schedules ds
             JOIN somtop s ON ds.somtop_id = s.id
+            LEFT JOIN somtop_positions sp ON s.position_id = sp.id
             JOIN duty_types dt ON ds.duty_type_id = dt.id
             LEFT JOIN duty_orders dor ON ds.order_id = dor.id
             LEFT JOIN duty_teams t ON ds.team_id = t.id
@@ -520,10 +522,24 @@ exports.getCourtInfo = async (req, res) => {
 
 exports.exportPaymentExcel = async (req, res) => {
     const orderId = req.params.id;
-    const [orders] = await pool.query(`SELECT dor.*, c.court_name, c.province FROM duty_orders dor LEFT JOIN courts c ON dor.court_code = c.court_code WHERE dor.id = ?${inScope(req.user.court_code, 'dor.')}`, scopeParams(req.user.court_code, [orderId]));
-    if (!orders.length) return res.status(404).json({ message: 'ไม่พบคำสั่ง' });
-    const [records] = await pool.query(`SELECT ds.duty_date, ds.somtop_id, CONCAT(s.title, s.first_name, ' ', s.last_name) AS full_name FROM duty_schedules ds JOIN somtop s ON ds.somtop_id = s.id WHERE ds.order_id = ?${inScope(req.user.court_code, 'ds.')} ORDER BY ds.duty_date, s.first_name, s.last_name`, scopeParams(req.user.court_code, [orderId]));
-    if (!records.length) return res.status(400).json({ message: 'คำสั่งนี้ยังไม่มีรายชื่อผู้ปฏิบัติหน้าที่' });
+    const month = req.query.month;
+    if (!orderId && !validMonth(month)) return res.status(400).json({ message: 'กรุณาระบุเดือนในรูปแบบ YYYY-MM' });
+    const orderFilter = orderId ? 'dor.id = ?' : 'dor.order_month = ?';
+    const orderValue = orderId || `${month}-01`;
+    const [orders] = await pool.query(`SELECT dor.*, c.court_name, c.province FROM duty_orders dor LEFT JOIN courts c ON dor.court_code = c.court_code WHERE ${orderFilter}${inScope(req.user.court_code, 'dor.')} ORDER BY dor.id`, scopeParams(req.user.court_code, [orderValue]));
+    if (!orders.length) return res.status(404).json({ message: 'ไม่พบคำสั่งในเดือนที่เลือก' });
+    const scheduleFilter = orderId ? 'ds.order_id = ?' : 'dor.order_month = ?';
+    const [records] = await pool.query(`
+        SELECT ds.duty_date, ds.somtop_id,
+            CONCAT(s.title, s.first_name, ' ', s.last_name) AS full_name
+        FROM duty_schedules ds
+        JOIN duty_orders dor ON ds.order_id = dor.id
+        JOIN somtop s ON ds.somtop_id = s.id
+        LEFT JOIN somtop_positions sp ON s.position_id = sp.id
+        WHERE ${scheduleFilter}${inScope(req.user.court_code, 'ds.')}
+        ORDER BY sp.level ASC, s.join_date ASC, s.first_name ASC, s.last_name ASC, s.id ASC, ds.duty_date ASC
+    `, scopeParams(req.user.court_code, [orderValue]));
+    if (!records.length) return res.status(400).json({ message: 'เดือนนี้ยังไม่มีรายชื่อผู้ปฏิบัติหน้าที่' });
     const rate = 1250;
     const orderMonth = String(orders[0].order_month).slice(0, 7);
     const [year, monthNumber] = orderMonth.split('-').map(Number);
@@ -577,7 +593,7 @@ exports.exportPaymentExcel = async (req, res) => {
     const noteRow = sheet.addRow([]); sheet.mergeCells(noteRow.number, 1, noteRow.number, lastColumn); sheet.getCell(noteRow.number, 1).value = `ขอรับรองว่าได้มีการมาปฏิบัติหน้าที่ตามระเบียบฯ และได้จ่ายค่าตอบแทนให้แก่ผู้มีสิทธิรับ จำนวน ${people.length} คน รวมเป็นเงินทั้งสิ้น ${total.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท (${thaiBahtText(total)}) จริง`; sheet.getCell(noteRow.number, 1).alignment = { wrapText: true, vertical: 'middle' }; noteRow.height = 32;
     const signatureSpacer = sheet.addRow([]); signatureSpacer.height = 42; const signRow = sheet.addRow([]); signRow.height = 68; sheet.mergeCells(signRow.number, 1, signRow.number, Math.ceil(lastColumn / 3)); sheet.getCell(signRow.number, 1).value = `ลงชื่อ ................................ (ผู้รับรอง)\n${req.query.director_name || ''}\n${req.query.director_position || 'ผู้อำนวยการ'}`; sheet.mergeCells(signRow.number, Math.ceil(lastColumn / 3) + 1, signRow.number, Math.ceil(lastColumn * 2 / 3)); sheet.getCell(signRow.number, Math.ceil(lastColumn / 3) + 1).value = `ลงชื่อ ................................ (ผู้จัดทำ)\n${req.query.finance_name || ''}\n${req.query.finance_position || 'เจ้าหน้าที่การเงิน'}`; sheet.mergeCells(signRow.number, Math.ceil(lastColumn * 2 / 3) + 1, signRow.number, lastColumn); sheet.getCell(signRow.number, Math.ceil(lastColumn * 2 / 3) + 1).value = `ลงชื่อ ................................ (ผู้จ่ายเงิน)\n${req.query.finance_name || ''}\n${req.query.finance_position || 'เจ้าหน้าที่การเงิน'}`; signRow.eachCell(cell => { cell.font = { name: 'TH Sarabun New', size: 14 }; cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }; });
     const remarksRow = sheet.addRow([]); sheet.mergeCells(remarksRow.number, 1, remarksRow.number, lastColumn); sheet.getCell(remarksRow.number, 1).value = 'หมายเหตุ : กรณีจ่ายเป็นการโอนผ่านระบบอินเทอร์เน็ต ผู้รับเงินไม่ต้องลงลายมือชื่อผู้รับเงินในช่องผู้รับเงิน'; sheet.getCell(remarksRow.number, 1).font = { name: 'TH Sarabun New', size: 14 }; sheet.getCell(remarksRow.number, 1).alignment = { wrapText: true, vertical: 'middle' }; remarksRow.height = 28;
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(`หลักฐานการรับเงิน_${orders[0].order_number}.xlsx`)}`); res.send(await workbook.xlsx.writeBuffer());
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(`หลักฐานการรับเงิน_${orderId ? orders[0].order_number : month}.xlsx`)}`); res.send(await workbook.xlsx.writeBuffer());
 };
 
 exports.exportOrderWord = async (req, res) => {
