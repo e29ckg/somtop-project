@@ -19,7 +19,9 @@
         <div class="input-group full-width"><label for="payment-title">หัวข้อเอกสาร</label><input id="payment-title" v-model="form.title" /></div>
         <div class="input-group"><label for="payment-date">วันเดือนปีที่รับเงิน</label><input id="payment-date" v-model="form.paymentDate" type="date" /></div>
         <div class="input-group"><label for="payment-finance">เจ้าหน้าที่การเงิน</label><input id="payment-finance" v-model="form.financeName" /></div>
+        <div class="input-group"><label for="payment-finance-position">ตำแหน่งเจ้าหน้าที่การเงิน</label><input id="payment-finance-position" v-model="form.financePosition" /></div>
         <div class="input-group"><label for="payment-director">ผู้อำนวยการ</label><input id="payment-director" v-model="form.directorName" /></div>
+        <div class="input-group"><label for="payment-director-position">ตำแหน่งผู้อำนวยการ</label><input id="payment-director-position" v-model="form.directorPosition" /></div>
       </div>
       <div class="preview-html" v-html="html"></div>
     </div>
@@ -31,13 +33,115 @@ import api from '../services/api'
 import { swalError, swalSuccess } from '../utils/swal'
 import { thaiBahtText } from '../utils/thaiBahtText'
 const now = new Date(); const thaiMonths=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม']; const month = ref(`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`); const monthOptions = Array.from({length:24},(_,i)=>{const d=new Date(now.getFullYear(),now.getMonth()-i,1);const value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;return {value,label:`${thaiMonths[d.getMonth()]} ${d.getFullYear()+543}`}}); const orders = ref([]); const orderId = ref(''); const schedules = ref([]); const court = ref({}); const previewOpen = ref(false); const html = ref('');
-const form = ref({ title:'หลักฐานการรับเงินค่าตอบแทนการปฏิบัติหน้าที่เวร', paymentDate:'', financeName:'', directorName:'' })
-const load = async () => { try { const r = await api.get('/duties/calendar', { params:{ month:month.value } }); orders.value=r.data.orders||[]; schedules.value=r.data.schedules||[]; if (!orderId.value && orders.value[0]) orderId.value=String(orders.value[0].id) } catch(e){ swalError('โหลดข้อมูลไม่สำเร็จ',e.response?.data?.message||'ไม่สามารถโหลดข้อมูลได้') } }
+const form = ref({ title:'หลักฐานการจ่ายเงินค่าป่วยการและค่าตอบแทนของผู้พิพากษาสมทบ', paymentDate:'', financeName:'', financePosition:'เจ้าหน้าที่การเงิน', directorName:'', directorPosition:'ผู้อำนวยการ' })
+const load = async () => { try { const r = await api.get('/duties/calendar', { params:{ month:month.value } }); orders.value=r.data.orders||[]; schedules.value=r.data.schedules||[]; if (!orders.value.some(o=>String(o.id)===orderId.value)) orderId.value=orders.value[0] ? String(orders.value[0].id) : '' } catch(e){ swalError('โหลดข้อมูลไม่สำเร็จ',e.response?.data?.message||'ไม่สามารถโหลดข้อมูลได้') } }
 const escape = v => String(v ?? '').replace(/&/g,'&amp;').replace(new RegExp(String.fromCharCode(60),'g'),'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); const money = v => Number(v).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})
-const build = () => { const t=String.fromCharCode(60); const tag=(n,c='',attrs='')=>t+n+attrs+'>'+c+t+'/'+n+'>'; const selected=schedules.value.filter(x=>!orderId.value||String(x.order_id)===orderId.value); const order=orders.value.find(x=>String(x.id)===orderId.value); if(!order||!selected.length){html.value='';return} const dates=[...new Set(selected.map(x=>String(x.duty_date).slice(0,10)))].sort(); const people=[...selected.reduce((m,x)=>{const k=x.somtop_id||x.full_name;if(!m.has(k))m.set(k,{name:x.full_name,dates:[]});m.get(k).dates.push(String(x.duty_date).slice(0,10));return m},new Map()).values()]; const rows=people.map((p,i)=>tag('tr',tag('td',i+1)+tag('td',escape(p.name))+tag('td',money(1250))+dates.map(d=>tag('td',p.dates.includes(d)?'✓':'')).join('')+tag('td',p.dates.length)+tag('td',money(p.dates.length*1250))+tag('td',escape(form.value.paymentDate))+tag('td','โอนเงินเข้าบัญชี'))).join(''); const total=people.reduce((s,p)=>s+p.dates.length*1250,0); const heads=['ลำดับ','ชื่อ - สกุล','อัตรา/วัน',...dates.map(d=>Number(d.slice(8))),'จำนวนวัน','จำนวนเงิน','วันเดือนปีที่รับเงิน','ลายมือชื่อผู้รับเงิน'].map(x=>tag('th',x)).join(''); html.value=tag('h3',escape(form.value.title))+tag('p',`${escape(order.title)} เลขที่คำสั่ง ${escape(order.order_number)}`)+tag('table',tag('tr',heads)+rows+tag('tr',tag('td',`รวมเป็นเงินทั้งสิ้น (${thaiBahtText(total)})`,' colspan="'+(dates.length+4)+'"')+tag('td',money(total))+tag('td','',' colspan="2"'),' class="total-row"'))+tag('p',`รวมเป็นเงินทั้งสิ้น ${money(total)} บาท (${thaiBahtText(total)})`) }
-const openPreview=async()=>{if(!orderId.value)return;const c=await api.get('/duties/court-info');court.value=c.data.court||{};form.value.financeName=court.value.finance_officer_name||'';form.value.directorName=court.value.director_name||'';previewOpen.value=true;build()}; watch([month,orderId],async()=>{if(month.value)await load()}); watch(form,build,{deep:true});
-const exportExcel=async()=>{try{const q=new URLSearchParams({title:form.value.title,payment_date:form.value.paymentDate,finance_name:form.value.financeName,director_name:form.value.directorName});const r=await api.get(`/duties/orders/${orderId.value}/export-payment-excel?${q}`,{responseType:'blob'});const u=URL.createObjectURL(r.data),a=document.createElement('a');a.href=u;a.download=`หลักฐานการรับเงิน_${orderId.value}.xlsx`;a.click();URL.revokeObjectURL(u);swalSuccess('ส่งออกสำเร็จ','ดาวน์โหลดไฟล์ Excel แล้ว')}catch(e){swalError('ส่งออกไม่สำเร็จ',e.response?.data?.message||'ไม่สามารถส่งออกได้')}}
-const print=()=>{const w=window.open('','_blank');if(!w)return;const style=w.document.createElement('style');style.textContent="@page{size:A4 landscape;margin:10mm}body{font-family:'TH Sarabun New','Sarabun',Tahoma;font-size:14px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #222;padding:4px;text-align:center}.name{text-align:left}.sign{display:flex;justify-content:space-around;text-align:center;margin-top:30px}";w.document.head.appendChild(style);w.document.body.innerHTML=html.value;w.print();w.close()}; onMounted(load)
+const documentSubtitle = (courtInfo, orderMonth) => {
+  const [year, monthNumber] = String(orderMonth).split('-').map(Number)
+  const province = String(courtInfo.province || '').replace(/^จังหวัด/, '').trim()
+  return `ชื่อส่วนราชการ ${courtInfo.court_name || ''}${province ? ` จังหวัด${province}` : ''} ประจำเดือน ${thaiMonths[monthNumber - 1]} ${year + 543}`
+}
+const signature = (role, name, position) => `<div class="payment-signature"><div>ลงชื่อ <span class="signature-line">................................</span> ${role}</div><div>(${escape(name)})</div><div>${escape(position)}</div></div>`
+const buildFooter = (count, total) => `
+  <div class="payment-certification">ขอรับรองว่าได้มีการมาปฏิบัติหน้าที่ตามระเบียบฯ และได้จ่ายค่าตอบแทนให้แก่ผู้มีสิทธิรับ จำนวน ${count} คน รวมเป็นเงินทั้งสิ้น ${money(total)} บาท (${thaiBahtText(total)}) จริง</div>
+  <div class="payment-signatures">
+    ${signature('ผู้รับรอง', form.value.directorName, form.value.directorPosition)}
+    ${signature('ผู้จัดทำ', form.value.financeName, form.value.financePosition)}
+    ${signature('ผู้จ่ายเงิน', form.value.financeName, form.value.financePosition)}
+  </div>
+  <div class="payment-note"><strong>หมายเหตุ :</strong> กรณีจ่ายเป็นการโอนผ่านระบบอินเทอร์เน็ต ผู้รับเงินไม่ต้องลงลายมือชื่อผู้รับเงินในช่องผู้รับเงิน</div>`
+const shortThaiMonths = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.']
+const formatThaiTransferDate = value => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ''))
+  if (!match) return ''
+  return `${Number(match[3])} ${shortThaiMonths[Number(match[2]) - 1]} ${String(Number(match[1]) + 543).slice(-2)}`
+}
+const isWeekend = date => [0, 6].includes(new Date(`${date}T12:00:00Z`).getUTCDay())
+const build = () => {
+  const tag = (name, content = '', attrs = '') => `<${name}${attrs}>${content}</${name}>`
+  const order = orders.value.find(item => String(item.id) === orderId.value)
+  const selected = schedules.value.filter(item => String(item.order_id) === orderId.value)
+  if (!order || !selected.length) { html.value = ''; return }
+
+  const [year, monthNumber] = month.value.split('-').map(Number)
+  const dates = Array.from({ length: new Date(year, monthNumber, 0).getDate() }, (_, index) => `${month.value}-${String(index + 1).padStart(2, '0')}`)
+  const people = [...selected.reduce((map, item) => {
+    const key = item.somtop_id || item.full_name
+    if (!map.has(key)) map.set(key, { name: item.full_name, dates: new Set() })
+    map.get(key).dates.add(String(item.duty_date).slice(0, 10))
+    return map
+  }, new Map()).values()]
+  const rate = 1250
+  const total = people.reduce((sum, person) => sum + person.dates.size * rate, 0)
+  const transferDate = escape(formatThaiTransferDate(form.value.paymentDate))
+  const dayClass = date => ` class="day-column${isWeekend(date) ? ' weekend' : ''}"`
+  const dayHeaders = dates.map((date, index) => tag('th', index + 1, dayClass(date))).join('')
+  const mainHeaders = [
+    tag('th', 'ลำดับ', ' rowspan="2"'),
+    tag('th', 'ชื่อ - สกุล', ' rowspan="2"'),
+    tag('th', 'อัตราเงินค่าตอบแทน<br>(ต่อคนต่อวัน)', ' rowspan="2"'),
+    tag('th', 'วันที่ปฏิบัติงาน', ` colspan="${dates.length}"`),
+    tag('th', 'รวมวัน<br>ปฏิบัติงาน', ' rowspan="2"'),
+    tag('th', 'จำนวนเงิน', ' rowspan="2"'),
+    tag('th', 'วันเดือนปี<br>ที่รับเงิน', ' rowspan="2"'),
+    tag('th', 'ลายมือชื่อ<br>ผู้รับเงิน', ' rowspan="2"'),
+    tag('th', 'หมายเหตุ', ' rowspan="2"')
+  ].join('')
+  const rows = people.map((person, index) => tag('tr',
+    tag('td', index + 1) +
+    tag('td', escape(person.name), ' class="person-name"') +
+    tag('td', money(rate)) +
+    dates.map(date => tag('td', person.dates.has(date) ? '✓' : '', dayClass(date))).join('') +
+    tag('td', person.dates.size) +
+    tag('td', money(person.dates.size * rate)) +
+    tag('td', transferDate) +
+    tag('td', 'โอนเงินเข้าบัญชี') +
+    tag('td')
+  )).join('')
+  const totalRow = tag('tr',
+    tag('td', `รวมเป็นเงินทั้งสิ้น (${thaiBahtText(total)})`, ` colspan="${dates.length + 4}"`) +
+    tag('td', money(total)) + tag('td', '', ' colspan="3"'),
+    ' class="total-row"'
+  )
+  html.value = tag('div',
+    tag('h3', escape(form.value.title)) + tag('p', escape(documentSubtitle(court.value, month.value))),
+    ' class="document-heading"'
+  ) + tag('table', tag('thead', tag('tr', mainHeaders) + tag('tr', dayHeaders)) + tag('tbody', rows + totalRow), ' class="payment-table"') + buildFooter(people.length, total)
+}
+const openPreview=async()=>{if(!orderId.value)return;const c=await api.get('/duties/court-info');court.value=c.data.court||{};form.value.financeName=court.value.finance_officer_name||'';form.value.financePosition=court.value.finance_officer_position||'เจ้าหน้าที่การเงิน';form.value.directorName=court.value.director_name||'';form.value.directorPosition=court.value.director_position||'ผู้อำนวยการ';previewOpen.value=true;build()}; watch([month,orderId],async()=>{if(month.value)await load();if(previewOpen.value)build()}); watch(form,build,{deep:true});
+const exportExcel=async()=>{try{const q=new URLSearchParams({title:form.value.title,payment_date:form.value.paymentDate,finance_name:form.value.financeName,finance_position:form.value.financePosition,director_name:form.value.directorName,director_position:form.value.directorPosition});const r=await api.get(`/duties/orders/${orderId.value}/export-payment-excel?${q}`,{responseType:'blob'});const u=URL.createObjectURL(r.data),a=document.createElement('a');a.href=u;a.download=`หลักฐานการรับเงิน_${orderId.value}.xlsx`;a.click();URL.revokeObjectURL(u);swalSuccess('ส่งออกสำเร็จ','ดาวน์โหลดไฟล์ Excel แล้ว')}catch(e){swalError('ส่งออกไม่สำเร็จ',e.response?.data?.message||'ไม่สามารถส่งออกได้')}}
+const print = () => {
+  const w = window.open('', '_blank')
+  if (!w) return
+  const style = w.document.createElement('style')
+  style.textContent = `
+    @page { size: A4 landscape; margin: 10mm; }
+    body { font-family: 'TH Sarabun New', 'Sarabun', Tahoma, sans-serif; font-size: 14px; color: #111; }
+    .document-heading { text-align: center; padding-bottom: 6px; border-bottom: 1px solid #222; }
+    .document-heading h3 { margin: 0; font-size: 18px; }
+    .document-heading p { margin: 0; font-size: 16px; font-weight: bold; }
+    .payment-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 9px; }
+    .payment-table th, .payment-table td { border: 1px solid #222; padding: 2px 1px; text-align: center; vertical-align: middle; overflow-wrap: anywhere; }
+    .payment-table .day-column { width: 2%; padding: 2px 0; }
+    .payment-table .weekend { background: #999; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    .payment-table .person-name { width: 13%; text-align: left; }
+    .payment-table thead tr:first-child th:first-child { width: 3%; }
+    .payment-table thead tr:first-child th:nth-child(3) { width: 7%; }
+    .total-row td:first-child { text-align: right; font-weight: bold; }
+    .total-row td:nth-child(2) { font-weight: bold; }
+    .payment-certification { margin-top: 10px; line-height: 1.4; }
+    .payment-signatures { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 68px 0 20px; text-align: center; break-inside: avoid; }
+    .payment-signature { line-height: 1.35; }
+    .signature-line { white-space: nowrap; }
+    .payment-note { margin-top: 12px; line-height: 1.4; break-inside: avoid; }
+  `
+  w.document.head.appendChild(style)
+  w.document.body.innerHTML = html.value
+  w.document.close()
+  w.focus()
+  setTimeout(() => { w.print(); w.close() }, 250)
+}
+onMounted(load)
 </script>
 <style scoped>
 .payment-page .filter-card {
@@ -108,21 +212,46 @@ const print=()=>{const w=window.open('','_blank');if(!w)return;const style=w.doc
   margin: 8px 0 16px;
   text-align: center;
 }
+.preview-html :deep(.document-heading) {
+  padding-bottom: 8px;
+  border-bottom: 1px solid #374151;
+  text-align: center;
+}
+.preview-html :deep(.document-heading h3),
+.preview-html :deep(.document-heading p) {
+  margin: 0;
+  font-weight: 700;
+}
+.preview-html :deep(.document-heading p) {
+  font-size: 18px;
+}
 .preview-html :deep(table) {
   width: 100%;
-  min-width: 760px;
+  min-width: 1250px;
   border-collapse: collapse;
+  font-size: 11px;
 }
 .preview-html :deep(th),
 .preview-html :deep(td) {
   border: 1px solid #374151;
-  padding: 6px 8px;
+  padding: 3px 2px;
   text-align: center;
   vertical-align: middle;
 }
 .preview-html :deep(th) {
   background: #f9fafb;
   font-weight: 600;
+}
+.preview-html :deep(.day-column) {
+  min-width: 16px;
+  padding: 3px 0;
+}
+.preview-html :deep(.weekend) {
+  background: #9ca3af;
+}
+.preview-html :deep(.person-name) {
+  min-width: 165px;
+  text-align: left;
 }
 .preview-html :deep(td:nth-child(2)) {
   text-align: left;
@@ -134,6 +263,27 @@ const print=()=>{const w=window.open('','_blank');if(!w)return;const style=w.doc
 .preview-html :deep(.total-row td:nth-child(2)) {
   text-align: center;
   font-weight: 600;
+}
+.preview-html :deep(.payment-certification) {
+  margin-top: 12px;
+  line-height: 1.5;
+}
+.preview-html :deep(.payment-signatures) {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin: 72px 0 24px;
+  text-align: center;
+}
+.preview-html :deep(.payment-signature) {
+  line-height: 1.5;
+}
+.preview-html :deep(.signature-line) {
+  white-space: nowrap;
+}
+.preview-html :deep(.payment-note) {
+  margin-top: 12px;
+  line-height: 1.5;
 }
 @media (max-width: 768px) {
   .payment-page .month-field,
@@ -158,6 +308,9 @@ const print=()=>{const w=window.open('','_blank');if(!w)return;const style=w.doc
   }
   .preview-html {
     padding: 12px;
+  }
+  .preview-html :deep(.payment-signatures) {
+    min-width: 760px;
   }
 }
 </style>

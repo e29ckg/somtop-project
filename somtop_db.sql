@@ -113,6 +113,8 @@ CREATE TABLE IF NOT EXISTS somtop (
   province varchar(100) DEFAULT NULL COMMENT 'จังหวัด',
   postal_code varchar(10) DEFAULT NULL COMMENT 'รหัสไปรษณีย์',
   phone varchar(50) DEFAULT NULL COMMENT 'เบอร์โทร',
+  bank_account_number varchar(30) DEFAULT NULL COMMENT 'เลขบัญชีธนาคาร',
+  bank_branch varchar(255) DEFAULT NULL COMMENT 'สาขาธนาคาร',
   status varchar(50) DEFAULT 'ใช้งาน' COMMENT 'สถานะ',
   note text DEFAULT NULL COMMENT 'หมายเหตุ',
   photo_path varchar(255) DEFAULT NULL COMMENT 'ฟิลด์เก็บ Path ของรูปภาพ',

@@ -41,6 +41,12 @@ const formatThaiMonth = value => {
     const months = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
     return `${months[date.getMonth()]} ${date.getFullYear() + 543}`;
 };
+const formatThaiTransferDate = value => {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ''));
+    if (!match) return '';
+    const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+    return `${Number(match[3])} ${months[Number(match[2]) - 1]} ${String(Number(match[1]) + 543).slice(-2)}`;
+};
 const formatThaiDutyDate = value => {
     const dayNames = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
     const date = new Date(`${String(value).slice(0, 10)}T12:00:00Z`);
@@ -504,7 +510,7 @@ exports.getOrderPrintData = async (req, res) => {
 
 exports.getCourtInfo = async (req, res) => {
     const [rows] = await pool.query(
-        `SELECT court_name, director_name, director_position, finance_officer_name, finance_officer_position
+        `SELECT court_name, province, director_name, director_position, finance_officer_name, finance_officer_position
          FROM courts WHERE court_code = ? LIMIT 1`,
         [req.user.court_code]
     );
@@ -514,28 +520,63 @@ exports.getCourtInfo = async (req, res) => {
 
 exports.exportPaymentExcel = async (req, res) => {
     const orderId = req.params.id;
-    const [orders] = await pool.query(`SELECT dor.*, c.court_name FROM duty_orders dor LEFT JOIN courts c ON dor.court_code = c.court_code WHERE dor.id = ?${inScope(req.user.court_code, 'dor.')}`, scopeParams(req.user.court_code, [orderId]));
+    const [orders] = await pool.query(`SELECT dor.*, c.court_name, c.province FROM duty_orders dor LEFT JOIN courts c ON dor.court_code = c.court_code WHERE dor.id = ?${inScope(req.user.court_code, 'dor.')}`, scopeParams(req.user.court_code, [orderId]));
     if (!orders.length) return res.status(404).json({ message: 'ไม่พบคำสั่ง' });
     const [records] = await pool.query(`SELECT ds.duty_date, ds.somtop_id, CONCAT(s.title, s.first_name, ' ', s.last_name) AS full_name FROM duty_schedules ds JOIN somtop s ON ds.somtop_id = s.id WHERE ds.order_id = ?${inScope(req.user.court_code, 'ds.')} ORDER BY ds.duty_date, s.first_name, s.last_name`, scopeParams(req.user.court_code, [orderId]));
     if (!records.length) return res.status(400).json({ message: 'คำสั่งนี้ยังไม่มีรายชื่อผู้ปฏิบัติหน้าที่' });
     const rate = 1250;
-    const dates = [...new Set(records.map(row => String(row.duty_date).slice(0, 10)))].sort();
-    const people = [...records.reduce((map, row) => { const key = row.somtop_id; if (!map.has(key)) map.set(key, { name: row.full_name, dates: [] }); map.get(key).dates.push(String(row.duty_date).slice(0, 10)); return map; }, new Map()).values()];
+    const orderMonth = String(orders[0].order_month).slice(0, 7);
+    const [year, monthNumber] = orderMonth.split('-').map(Number);
+    const dates = Array.from({ length: new Date(year, monthNumber, 0).getDate() }, (_, index) => `${orderMonth}-${String(index + 1).padStart(2, '0')}`);
+    const people = [...records.reduce((map, row) => { const key = row.somtop_id; if (!map.has(key)) map.set(key, { name: row.full_name, dates: new Set() }); map.get(key).dates.add(String(row.duty_date).slice(0, 10)); return map; }, new Map()).values()];
     const workbook = new ExcelJS.Workbook(); const sheet = workbook.addWorksheet('หลักฐานการรับเงิน');
-    const headers = ['ลำดับ', 'ชื่อ - สกุล', 'อัตรา/วัน (บาท)', ...dates.map(date => String(Number(date.slice(8, 10)))), 'จำนวนวัน', 'จำนวนเงิน (บาท)', 'วันที่รับเงิน', 'ลายมือชื่อผู้รับเงิน'];
-    sheet.mergeCells(1, 1, 1, headers.length); sheet.getCell(1, 1).value = req.query.title || 'หลักฐานการรับเงินค่าตอบแทนการปฏิบัติหน้าที่เวร'; sheet.getCell(1, 1).font = { name: 'TH Sarabun New', size: 18, bold: true }; sheet.getCell(1, 1).alignment = { horizontal: 'center' };
-    sheet.mergeCells(2, 1, 2, headers.length); sheet.getCell(2, 1).value = `${orders[0].title} เลขที่คำสั่ง ${orders[0].order_number}`; sheet.getCell(2, 1).font = { name: 'TH Sarabun New', size: 14 }; sheet.getCell(2, 1).alignment = { horizontal: 'center' };
-    const headerRow = sheet.addRow(headers); headerRow.font = { name: 'TH Sarabun New', size: 14, bold: true }; headerRow.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-    people.forEach((person, index) => { const count = person.dates.length; sheet.addRow([index + 1, person.name, rate, ...dates.map(date => person.dates.includes(date) ? '✓' : ''), count, count * rate, req.query.payment_date || '', 'โอนเงินเข้าบัญชี']); });
-    const totalRow = sheet.addRow(['รวมเป็นเงินทั้งสิ้น', '', '', ...dates.map(() => ''), '', people.reduce((sum, person) => sum + person.dates.length * rate, 0), '', '']);
-    sheet.mergeCells(totalRow.number, 1, totalRow.number, dates.length + 4);
+    const lastColumn = dates.length + 8;
+    const dayStartColumn = 4;
+    const dayEndColumn = dates.length + 3;
+    const countColumn = dates.length + 4;
+    const amountColumn = dates.length + 5;
+    sheet.mergeCells(1, 1, 1, lastColumn); sheet.getCell(1, 1).value = req.query.title || 'หลักฐานการจ่ายเงินค่าป่วยการและค่าตอบแทนของผู้พิพากษาสมทบ'; sheet.getCell(1, 1).font = { name: 'TH Sarabun New', size: 18, bold: true }; sheet.getCell(1, 1).alignment = { horizontal: 'center' };
+    const province = String(orders[0].province || '').replace(/^จังหวัด/, '').trim();
+    sheet.mergeCells(2, 1, 2, lastColumn); sheet.getCell(2, 1).value = `ชื่อส่วนราชการ ${orders[0].court_name || ''}${province ? ` จังหวัด${province}` : ''} ประจำเดือน ${formatThaiMonth(orders[0].order_month)}`; sheet.getCell(2, 1).font = { name: 'TH Sarabun New', size: 16, bold: true }; sheet.getCell(2, 1).alignment = { horizontal: 'center', wrapText: true };
+    sheet.getRow(1).height = 28; sheet.getRow(2).height = 30;
+    const headingLabels = new Map([[1, 'ลำดับ'], [2, 'ชื่อ - สกุล'], [3, 'อัตราเงินค่าตอบแทน\n(ต่อคนต่อวัน)'], [countColumn, 'รวมวัน\nปฏิบัติงาน'], [amountColumn, 'จำนวนเงิน'], [amountColumn + 1, 'วันเดือนปี\nที่รับเงิน'], [amountColumn + 2, 'ลายมือชื่อ\nผู้รับเงิน'], [amountColumn + 3, 'หมายเหตุ']]);
+    for (const [column, label] of headingLabels) {
+        sheet.mergeCells(3, column, 4, column);
+        sheet.getCell(3, column).value = label;
+    }
+    sheet.mergeCells(3, dayStartColumn, 3, dayEndColumn);
+    sheet.getCell(3, dayStartColumn).value = 'วันที่ปฏิบัติงาน';
+    dates.forEach((date, index) => { sheet.getCell(4, dayStartColumn + index).value = index + 1; });
+    for (const rowNumber of [3, 4]) {
+        const headerRow = sheet.getRow(rowNumber);
+        headerRow.height = rowNumber === 3 ? 38 : 24;
+        headerRow.font = { name: 'TH Sarabun New', size: 12, bold: true };
+        headerRow.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    }
+    people.forEach((person, index) => { const count = person.dates.size; sheet.addRow([index + 1, person.name, rate, ...dates.map(date => person.dates.has(date) ? '✓' : ''), count, count * rate, formatThaiTransferDate(req.query.payment_date), 'โอนเงินเข้าบัญชี', '']); });
+    const total = people.reduce((sum, person) => sum + person.dates.size * rate, 0);
+    const totalRow = sheet.addRow(['รวมเป็นเงินทั้งสิ้น', ...Array(lastColumn - 1).fill('')]);
+    sheet.mergeCells(totalRow.number, 1, totalRow.number, countColumn);
+    totalRow.getCell(amountColumn).value = total;
+    sheet.mergeCells(totalRow.number, amountColumn + 1, totalRow.number, lastColumn);
     totalRow.getCell(1).alignment = { horizontal: 'right' };
     totalRow.font = { name: 'TH Sarabun New', size: 14, bold: true };
-    sheet.eachRow(row => { row.eachCell(cell => { cell.font = { ...(cell.font || {}), name: 'TH Sarabun New', size: cell.font?.size || 14 }; cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } }; }); });
-    sheet.getColumn(3).numFmt = '#,##0.00'; sheet.getColumn(4 + dates.length + 1).numFmt = '#,##0.00';
-    sheet.columns.forEach((column, index) => { column.width = index === 2 ? 28 : index > 2 && index <= dates.length + 2 ? 12 : 18; }); sheet.getColumn(1).width = 8;
-    const noteRow = sheet.addRow([]); sheet.mergeCells(noteRow.number, 1, noteRow.number, headers.length); const total = people.reduce((sum, person) => sum + person.dates.length * rate, 0); sheet.getCell(noteRow.number, 1).value = `รวมเป็นเงินทั้งสิ้น ${total.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท (${thaiBahtText(total)}) จริง`;
-    const signRow = sheet.addRow([]); signRow.height = 48; sheet.mergeCells(signRow.number, 1, signRow.number, Math.ceil(headers.length / 3)); sheet.getCell(signRow.number, 1).value = `ลงชื่อ ................................ (ผู้รับรอง)\n${req.query.director_name || ''}\n${req.query.director_position || 'ผู้อำนวยการ'}`; sheet.mergeCells(signRow.number, Math.ceil(headers.length / 3) + 1, signRow.number, Math.ceil(headers.length * 2 / 3)); sheet.getCell(signRow.number, Math.ceil(headers.length / 3) + 1).value = `ลงชื่อ ................................ (ผู้จัดทำ)\n${req.query.finance_name || ''}\n${req.query.finance_position || 'เจ้าหน้าที่การเงิน'}`; sheet.mergeCells(signRow.number, Math.ceil(headers.length * 2 / 3) + 1, signRow.number, headers.length); sheet.getCell(signRow.number, Math.ceil(headers.length * 2 / 3) + 1).value = `ลงชื่อ ................................ (ผู้จ่ายเงิน)\n${req.query.finance_name || ''}\n${req.query.finance_position || 'เจ้าหน้าที่การเงิน'}`; signRow.eachCell(cell => { cell.font = { name: 'TH Sarabun New', size: 14 }; cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }; });
+    sheet.eachRow(row => { row.eachCell(cell => { cell.font = { ...(cell.font || {}), name: 'TH Sarabun New', size: cell.font?.size || 14 }; if (row.number >= 3) cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } }; }); });
+    sheet.getCell(2, 1).border = { bottom: { style: 'thin' } };
+    sheet.getColumn(1).width = 7; sheet.getColumn(2).width = 28; sheet.getColumn(3).width = 19;
+    dates.forEach((date, index) => {
+        const column = sheet.getColumn(dayStartColumn + index);
+        column.width = 4;
+        if ([0, 6].includes(new Date(`${date}T12:00:00Z`).getUTCDay())) {
+            for (let rowNumber = 4; rowNumber < totalRow.number; rowNumber++) sheet.getCell(rowNumber, dayStartColumn + index).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF999999' } };
+        }
+    });
+    [12, 16, 16, 19, 15].forEach((width, index) => { sheet.getColumn(countColumn + index).width = width; });
+    sheet.getColumn(3).numFmt = '#,##0.00'; sheet.getColumn(amountColumn).numFmt = '#,##0.00';
+    sheet.pageSetup = { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, margins: { left: 0.25, right: 0.25, top: 0.35, bottom: 0.35, header: 0.1, footer: 0.1 } };
+    const noteRow = sheet.addRow([]); sheet.mergeCells(noteRow.number, 1, noteRow.number, lastColumn); sheet.getCell(noteRow.number, 1).value = `ขอรับรองว่าได้มีการมาปฏิบัติหน้าที่ตามระเบียบฯ และได้จ่ายค่าตอบแทนให้แก่ผู้มีสิทธิรับ จำนวน ${people.length} คน รวมเป็นเงินทั้งสิ้น ${total.toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท (${thaiBahtText(total)}) จริง`; sheet.getCell(noteRow.number, 1).alignment = { wrapText: true, vertical: 'middle' }; noteRow.height = 32;
+    const signatureSpacer = sheet.addRow([]); signatureSpacer.height = 42; const signRow = sheet.addRow([]); signRow.height = 68; sheet.mergeCells(signRow.number, 1, signRow.number, Math.ceil(lastColumn / 3)); sheet.getCell(signRow.number, 1).value = `ลงชื่อ ................................ (ผู้รับรอง)\n${req.query.director_name || ''}\n${req.query.director_position || 'ผู้อำนวยการ'}`; sheet.mergeCells(signRow.number, Math.ceil(lastColumn / 3) + 1, signRow.number, Math.ceil(lastColumn * 2 / 3)); sheet.getCell(signRow.number, Math.ceil(lastColumn / 3) + 1).value = `ลงชื่อ ................................ (ผู้จัดทำ)\n${req.query.finance_name || ''}\n${req.query.finance_position || 'เจ้าหน้าที่การเงิน'}`; sheet.mergeCells(signRow.number, Math.ceil(lastColumn * 2 / 3) + 1, signRow.number, lastColumn); sheet.getCell(signRow.number, Math.ceil(lastColumn * 2 / 3) + 1).value = `ลงชื่อ ................................ (ผู้จ่ายเงิน)\n${req.query.finance_name || ''}\n${req.query.finance_position || 'เจ้าหน้าที่การเงิน'}`; signRow.eachCell(cell => { cell.font = { name: 'TH Sarabun New', size: 14 }; cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }; });
+    const remarksRow = sheet.addRow([]); sheet.mergeCells(remarksRow.number, 1, remarksRow.number, lastColumn); sheet.getCell(remarksRow.number, 1).value = 'หมายเหตุ : กรณีจ่ายเป็นการโอนผ่านระบบอินเทอร์เน็ต ผู้รับเงินไม่ต้องลงลายมือชื่อผู้รับเงินในช่องผู้รับเงิน'; sheet.getCell(remarksRow.number, 1).font = { name: 'TH Sarabun New', size: 14 }; sheet.getCell(remarksRow.number, 1).alignment = { wrapText: true, vertical: 'middle' }; remarksRow.height = 28;
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(`หลักฐานการรับเงิน_${orders[0].order_number}.xlsx`)}`); res.send(await workbook.xlsx.writeBuffer());
 };
 

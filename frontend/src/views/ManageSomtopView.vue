@@ -226,6 +226,15 @@
           </div>
 
           <div class="input-group">
+            <label for="somtop-bank-account">เลขบัญชีธนาคาร</label>
+            <input id="somtop-bank-account" v-model.trim="formData.bank_account_number" type="text" maxlength="30" inputmode="numeric" autocomplete="off" />
+          </div>
+          <div class="input-group">
+            <label for="somtop-bank-branch">สาขา</label>
+            <input id="somtop-bank-branch" v-model.trim="formData.bank_branch" type="text" maxlength="255" autocomplete="off" />
+          </div>
+
+          <div class="input-group">
             <label>สถานะ</label>
             <select v-model="formData.status">
               <option value="ใช้งาน">ใช้งาน (Active)</option>
@@ -341,6 +350,21 @@
               <div class="detail-content">
                 <label>เบอร์โทรศัพท์</label>
                 <p>{{ selectedSomtopToView.phone || '-' }}</p>
+              </div>
+            </div>
+
+            <div v-if="isFinance" class="detail-item">
+              <span class="detail-icon">🏦</span>
+              <div class="detail-content">
+                <label>เลขบัญชีธนาคาร</label>
+                <p>{{ selectedSomtopToView.bank_account_number || '-' }}</p>
+              </div>
+            </div>
+            <div v-if="isFinance" class="detail-item">
+              <span class="detail-icon">🏦</span>
+              <div class="detail-content">
+                <label>สาขา</label>
+                <p>{{ selectedSomtopToView.bank_branch || '-' }}</p>
               </div>
             </div>
 
@@ -742,7 +766,7 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import api from '../services/api' 
-import { isAdmin } from '../services/session'
+import { isAdmin, isFinance } from '../services/session'
 import { swalSuccess, swalError, swalConfirm } from '../utils/swal'
 
 const isSaving = ref(false)
@@ -813,7 +837,7 @@ const formData = ref({
   dob_day: '', dob_month: '', dob_year: '', 
   position_id: '', 
   join_day: '', join_month: '', join_year: '', 
-  address: '', house_no: '', moo: '', soi: '', road: '', subdistrict: '', district: '', province: '', postal_code: '', phone: '', status: 'ใช้งาน', note: '',
+  address: '', house_no: '', moo: '', soi: '', road: '', subdistrict: '', district: '', province: '', postal_code: '', phone: '', bank_account_number: '', bank_branch: '', status: 'ใช้งาน', note: '',
   term_id: '',
   photo: null, existing_photo_path: ''
 })
@@ -1091,6 +1115,8 @@ const saveData = async () => {
     payload.append('province', formData.value.province || '')
     payload.append('postal_code', formData.value.postal_code || '')
     payload.append('phone', formData.value.phone || '')     
+    payload.append('bank_account_number', formData.value.bank_account_number || '')
+    payload.append('bank_branch', formData.value.bank_branch || '')
     payload.append('status', formData.value.status)
     payload.append('note', formData.value.note || '')  
     payload.append('position_id', formData.value.position_id)
@@ -1201,7 +1227,7 @@ const openAddModal = () => {
     id: null, title: 'นาย', firstName: '', lastName: '', idCard: '', 
     dob_day: '', dob_month: '', dob_year: '', 
     position_id: '', join_day: '', join_month: '', join_year: '',
-    address: '', house_no: '', moo: '', soi: '', road: '', subdistrict: '', district: '', province: '', postal_code: '', phone: '', status: 'ใช้งาน', note: '',
+    address: '', house_no: '', moo: '', soi: '', road: '', subdistrict: '', district: '', province: '', postal_code: '', phone: '', bank_account_number: '', bank_branch: '', status: 'ใช้งาน', note: '',
     term_id: '',
     photo: null, existing_photo_path: ''
   }
@@ -1245,7 +1271,9 @@ const openEditModal = (person) => {
     join_year: jYear, 
     address: person.address || '', house_no: person.house_no || '', moo: person.moo || '', soi: person.soi || '', road: person.road || '',
     subdistrict: person.subdistrict || '', district: person.district || '', province: person.province || '', postal_code: person.postal_code || '',
-    phone: person.phone || '',          
+    phone: person.phone || '',
+    bank_account_number: person.bank_account_number || '',
+    bank_branch: person.bank_branch || '',
     status: person.status,
     note: person.note || '',  
     term_id: person.current_term_id || '',

@@ -5,6 +5,7 @@ const { verifyToken, verifyAdmin } = require('../middlewares/authMiddleware');
 const uploadDutyOrder = require('../middlewares/uploadDutyOrderMiddleware');
 const asyncHandler = handler => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
 
+
 router.use(verifyToken);
 router.get('/calendar', asyncHandler(dutyController.getCalendar));
 router.get('/people', asyncHandler(dutyController.getPeople));
