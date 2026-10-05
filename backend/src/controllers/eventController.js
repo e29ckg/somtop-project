@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const { insertEventToGoogleCalendar, updateEventInGoogleCalendar, deleteEventFromGoogleCalendar } = require('../utils/googleCalendar');
 const { logActivity } = require('../utils/logger');
+const publicFileUrl = require('../utils/publicFileUrl');
 
 const deletePhysicalFiles = (filePathsJson) => {
     if (!filePathsJson) return;
@@ -121,9 +122,7 @@ exports.createEvent = async (req, res) => {
         // 1. จัดการไฟล์แนบ
         let filePathsArray = [];
         if (req.files && req.files.length > 0) {
-            const protocol = req.secure ? 'https' : 'http';
-            const host = req.headers.host;
-            filePathsArray = req.files.map(file => `${protocol}://${host}/uploads/events/${file.filename}`);
+            filePathsArray = req.files.map(file => publicFileUrl(req, `uploads/events/${file.filename}`));
         }
         const filePathsDb = filePathsArray.length > 0 ? JSON.stringify(filePathsArray) : null;
 
@@ -257,9 +256,7 @@ exports.updateEvent = async (req, res) => {
 
         // 3. นำมารวมกับไฟล์ใหม่ (Append)
         if (req.files && req.files.length > 0) {
-            const protocol = req.secure ? 'https' : 'http';
-            const host = req.headers.host;
-            const newPaths = req.files.map(file => `${protocol}://${host}/uploads/events/${file.filename}`);
+            const newPaths = req.files.map(file => publicFileUrl(req, `uploads/events/${file.filename}`));
             currentPaths = currentPaths.concat(newPaths);
         }
         const filePathsDb = currentPaths.length > 0 ? JSON.stringify(currentPaths) : null;

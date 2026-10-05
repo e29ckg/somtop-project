@@ -2,7 +2,7 @@ const pool = require('../config/db');
 const fs = require('fs');
 const path = require('path');
 
-const BASE_URL = process.env.APP_URL || 'http://localhost:8088';
+const publicFileUrl = require('../utils/publicFileUrl');
 const { logActivity } = require('../utils/logger');
 
 const deletePhysicalFile = (relativePath) => {
@@ -64,7 +64,7 @@ exports.getAllSomtop = async (req, res) => {
         const [rows] = await pool.query(query, params);
 
         const records = rows.map(row => {
-            if (row.photo_path) row.photo_path = `${process.env.APP_URL || 'http://localhost:8088'}/${row.photo_path}`;
+            if (row.photo_path) row.photo_path = publicFileUrl(req, row.photo_path);
             return row;
         });
 

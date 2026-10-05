@@ -56,17 +56,7 @@ npm run dev
 
 ## ☁️ การนำขึ้นใช้งานจริง (Deployment - Windows Server)
 
-ระบบนี้รองรับการนำไปติดตั้งบน Windows Server โดยใช้ XAMPP และ PM2:
-
-1. **Frontend:** รันคำสั่ง `npm run build` ในโฟลเดอร์ `frontend` จากนั้นนำไฟล์ทั้งหมดในโฟลเดอร์ `dist` ไปวางไว้ที่ `C:\xampp\htdocs\` (อย่าลืมสร้างไฟล์ `.htaccess` เพื่อรองรับ Vue Router)
-2. **Backend:** นำโฟลเดอร์ `backend` ไปวางบนเซิร์ฟเวอร์ แก้ไขไฟล์ `.env` เป็นโหมด `production` และสั่งรัน API ให้อยู่เบื้องหลังด้วยคำสั่ง:
-```bash
-pm2 start server.js --name "somtop-api"
-pm2 save
-
-```
-
-3. **Database:** เปิดใช้งาน MySQL เป็น Background Service
+สำหรับการติดตั้งภายในด้วย XAMPP/Apache, MySQL และ Node.js/PM2 ให้ทำตาม [คู่มือติดตั้ง XAMPP](DEPLOY_XAMPP.md) โดยตั้ง URL, path, พอร์ต และตำแหน่ง XAMPP ของแต่ละเครื่องใน `.env` ที่ root โปรเจกต์
 
 
 

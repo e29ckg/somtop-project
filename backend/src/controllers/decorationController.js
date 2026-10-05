@@ -2,6 +2,7 @@ const pool = require('../config/db');
 const fs = require('fs');
 const path = require('path');
 const { logActivity } = require('../utils/logger');
+const publicFileUrl = require('../utils/publicFileUrl');
 
 // ฟังก์ชันช่วยเหลือสำหรับลบไฟล์ออกจากเซิร์ฟเวอร์
 const deletePhysicalFile = (relativePath) => {
@@ -11,9 +12,9 @@ const deletePhysicalFile = (relativePath) => {
     }
 };
 
-const toFileUrl = (filePath) => {
+const toFileUrl = (req, filePath) => {
     if (!filePath || /^https?:\/\//i.test(filePath)) return filePath;
-    return `${process.env.APP_URL || 'http://localhost:8088'}/${filePath}`;
+    return publicFileUrl(req, filePath);
 };
 
 // ==========================================
@@ -47,7 +48,7 @@ exports.getSomtopDecorations = async (req, res) => {
         `;
         const [rows] = await pool.query(query, [somtop_id, req.user.court_code, req.user.court_code]);
         res.status(200).json({
-            records: rows.map(row => ({ ...row, file_path: toFileUrl(row.file_path) }))
+            records: rows.map(row => ({ ...row, file_path: toFileUrl(req, row.file_path) }))
         });
     } catch (error) {
         res.status(500).json({ message: 'เกิดข้อผิดพลาดในการดึงประวัติเครื่องราชฯ' });

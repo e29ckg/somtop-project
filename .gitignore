@@ -13,6 +13,7 @@ frontend/.env.*
 
 # ไฟล์ที่ได้จากการ Build ฝั่ง Frontend
 frontend/dist/
+deployment/*.local.conf
 
 # ไฟล์รูปภาพและใบลาอัปโหลด (ป้องกันการละเมิดข้อมูลส่วนบุคคล)
 backend/uploads/

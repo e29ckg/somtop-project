@@ -25,7 +25,7 @@ import { currentUser, isSessionVerified, setSessionUser, clearSession } from '..
 
 // 1. สร้าง router ขึ้นมาก่อน
 const router = createRouter({
-  history: createWebHistory(import.meta.env.VITE_BASE_URL),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
       path: '/', // หน้า Login ใช้ path เป็น '/'

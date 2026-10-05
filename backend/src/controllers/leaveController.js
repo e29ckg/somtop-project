@@ -5,8 +5,7 @@ const PizZip = require('pizzip');
 const Docxtemplater = require('docxtemplater');
 
 const { logActivity } = require('../utils/logger');
-
-const BASE_URL = process.env.APP_URL || 'http://localhost:8088';
+const publicFileUrl = require('../utils/publicFileUrl');
 
 // MySQL ส่งค่า DECIMAL เป็น string (เช่น "7.0") จึงแปลงเป็น number
 // เพื่อให้ JSON แสดงจำนวนเต็มเป็น 7 แต่ยังคงค่าทศนิยมจริง เช่น 7.5
@@ -115,9 +114,7 @@ exports.createLeave = async (req, res) => {
 
         let filePaths = [];
         if (req.files && req.files.length > 0) {
-            const protocol = req.secure ? 'https' : 'http';
-            const host = req.headers.host;
-            filePaths = req.files.map(file => `${protocol}://${host}/uploads/leaves/${file.filename}`);
+            filePaths = req.files.map(file => publicFileUrl(req, `uploads/leaves/${file.filename}`));
         }
         const filePathDb = filePaths.length > 0 ? JSON.stringify(filePaths) : null;
 
@@ -163,9 +160,7 @@ exports.updateLeave = async (req, res) => {
             deletePhysicalFiles(existing[0].file_path);
             
             // สร้าง Array ของไฟล์ใหม่
-            const protocol = req.secure ? 'https' : 'http';
-            const host = req.headers.host;
-            const newPaths = req.files.map(file => `${protocol}://${host}/uploads/leaves/${file.filename}`);
+            const newPaths = req.files.map(file => publicFileUrl(req, `uploads/leaves/${file.filename}`));
             
             filePathDb = JSON.stringify(newPaths);
         }
@@ -223,8 +218,7 @@ exports.uploadApprovedLeavePdf = async (req, res) => {
                 filePaths = [existing[0].file_path];
             }
         }
-        const protocol = req.secure ? 'https' : 'http';
-        filePaths.push(`${protocol}://${req.headers.host}/uploads/leaves/${req.file.filename}`);
+        filePaths.push(publicFileUrl(req, `uploads/leaves/${req.file.filename}`));
 
         await pool.query(
             `UPDATE leave_requests SET file_path = ?, status = 'อนุมัติแล้ว' WHERE id = ?${scopeSql}`,

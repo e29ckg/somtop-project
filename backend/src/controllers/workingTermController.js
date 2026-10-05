@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const { logActivity } = require('../utils/logger');
+const publicFileUrl = require('../utils/publicFileUrl');
 const path = require('path');
 const fs = require('fs');
 
@@ -73,9 +74,7 @@ exports.createWorkingTerm = async (req, res) => {
         // ⭐️ จัดการไฟล์แนบหลายไฟล์ แปลงเป็น JSON Array[cite: 1]
         let filePathsArray = [];
         if (req.files && req.files.length > 0) {
-            const protocol = req.secure ? 'https' : 'http';
-            const host = req.headers.host;
-            filePathsArray = req.files.map(file => `${protocol}://${host}/uploads/terms/${file.filename}`);
+            filePathsArray = req.files.map(file => publicFileUrl(req, `uploads/terms/${file.filename}`));
         }
         const filePathsDb = filePathsArray.length > 0 ? JSON.stringify(filePathsArray) : null;
 
@@ -131,9 +130,7 @@ exports.updateWorkingTerm = async (req, res) => {
 
         // ⭐️ ถ้ามีการอัปโหลดไฟล์ใหม่ ให้นำมารวมกับไฟล์เก่า (Append)[cite: 3]
         if (req.files && req.files.length > 0) {
-            const protocol = req.secure ? 'https' : 'http';
-            const host = req.headers.host;
-            const newPaths = req.files.map(file => `${protocol}://${host}/uploads/terms/${file.filename}`);
+            const newPaths = req.files.map(file => publicFileUrl(req, `uploads/terms/${file.filename}`));
             currentPaths = currentPaths.concat(newPaths);
         }
 

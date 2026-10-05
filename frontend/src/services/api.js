@@ -2,9 +2,9 @@ import axios from 'axios'
 import swal from 'sweetalert2' // นำเข้า SweetAlert2 สำหรับแสดง Alert
 import { clearSession, setSessionUser } from './session'
 
-// สร้าง Axios Instance พร้อมกำหนด Base URL ของ Backend PHP
+// เรียก API ผ่าน Apache ภายใต้ path เดียวกับหน้าเว็บ
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8088/api', // ใช้ VITE_API_URL จาก .env.development หรือค่าเริ่มต้น
+  baseURL: import.meta.env.VITE_API_URL || `${import.meta.env.BASE_URL}api`,
   withCredentials: true
 })
 
@@ -21,7 +21,7 @@ api.interceptors.response.use(
     // ดักจับ Error Status 401 Unauthorized
     if (error.response?.status === 401) {
       clearSession()
-      if (window.location.pathname !== '/') window.location.assign('/')
+      if (window.location.pathname !== import.meta.env.BASE_URL) window.location.assign(import.meta.env.BASE_URL)
     } else if (error.response?.status === 403) {
       swal.fire({
         icon: 'warning',

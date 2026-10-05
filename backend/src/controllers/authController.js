@@ -2,6 +2,8 @@ const pool = require('../config/db');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { logActivity } = require('../utils/logger'); // ถ้ามีการใช้ logger
+const cookieSecure = process.env.COOKIE_SECURE === 'false' ? false : process.env.NODE_ENV === 'production';
+const cookiePath = process.env.COOKIE_PATH || '/';
 
 exports.login = async (req, res) => {
     try {
@@ -79,10 +81,10 @@ exports.login = async (req, res) => {
 
         res.cookie('jwt', token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
+            secure: cookieSecure,
             sameSite: 'strict',
             maxAge: 8 * 60 * 60 * 1000,
-            path: '/'
+            path: cookiePath
         });
 
         req.user = payload.data; 
@@ -103,9 +105,9 @@ exports.logout = (req, res) => {
     // ⭐️ สั่งลบ Cookie ชื่อ 'jwt'
     res.clearCookie('jwt', {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: cookieSecure,
         sameSite: 'strict',
-        path: '/'
+        path: cookiePath
     });
     res.status(200).json({ message: 'ออกจากระบบสำเร็จ' });
 };
