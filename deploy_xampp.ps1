@@ -1,9 +1,11 @@
 param(
     [switch]$SkipInstall,
-    [switch]$ConfigureApache
+    [switch]$ConfigureApache,
+    [switch]$FrontendOnly
 )
 
 $ErrorActionPreference = 'Stop'
+if ($FrontendOnly -and $ConfigureApache) { throw 'FrontendOnly cannot configure Apache.' }
 $project = $PSScriptRoot
 $npm = (Get-Command npm.cmd -ErrorAction Stop).Source
 $frontendDir = Join-Path $project 'frontend'
@@ -41,8 +43,10 @@ $destination = [System.IO.Path]::GetFullPath((Join-Path $documentRoot $relativeB
 if (-not $destination.StartsWith($documentRoot.TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Deploy destination must be inside APACHE_DOCUMENT_ROOT.' }
 
 if (-not $SkipInstall) {
-    & $npm --prefix $backendDir ci --offline=false --no-audit --no-fund
-    if ($LASTEXITCODE -ne 0) { throw 'Backend npm install failed.' }
+    if (-not $FrontendOnly) {
+        & $npm --prefix $backendDir ci --offline=false --no-audit --no-fund
+        if ($LASTEXITCODE -ne 0) { throw 'Backend npm install failed.' }
+    }
     & $npm --prefix $frontendDir ci --offline=false --no-audit --no-fund
     if ($LASTEXITCODE -ne 0) { throw 'Frontend npm install failed.' }
 }
@@ -66,6 +70,15 @@ RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^ index.html [END]
 "@
 [System.IO.File]::WriteAllText((Join-Path $dist '.htaccess'), $htaccess)
+
+if ($FrontendOnly) {
+    New-Item -ItemType Directory -Path $destination -Force | Out-Null
+    Copy-Item -Path (Join-Path $dist '*') -Destination $destination -Recurse -Force
+    Copy-Item -LiteralPath (Join-Path $dist '.htaccess') -Destination $destination -Force
+    Write-Host "Deployed frontend to $destination"
+    Write-Host "URL: $($appUrl.TrimEnd('/'))/"
+    return
+}
 
 $apacheConfig = @"
 <IfModule !proxy_module>

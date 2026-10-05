@@ -95,6 +95,8 @@ pm2 status
 
 สำรองฐานข้อมูลและ `backend\uploads` ก่อนอัปเดต จาก root โปรเจกต์รัน `git pull --ff-only origin main` แล้ว `update_somtop.bat` สคริปต์จะ build และ restart PM2; หากเปลี่ยน `APP_URL`, `APP_BASE_PATH` หรือ `PORT` ให้ restart Apache หลังอัปเดตด้วย
 
+หากต้องอัปเดตเฉพาะหน้าเว็บ ให้รัน `git pull --ff-only origin main` แล้ว `update_somtop_frontend.bat` จาก root โปรเจกต์ สคริปต์จะติดตั้ง dependency ของ frontend, build ด้วยค่าใน `.env` และคัดลอกผลลัพธ์ไปยัง `APACHE_DOCUMENT_ROOT\somtop` โดยไม่ติดตั้ง backend, ไม่แตะ PM2 และไม่แก้ config Apache หลังเสร็จให้ผู้ใช้กด `Ctrl+Shift+R` เพื่อโหลดไฟล์ JavaScript ใหม่
+
 ระหว่างอัปเดต สคริปต์จะหยุด `somtop-api` ก่อน `npm ci` เพื่อให้ Windows ปล่อยไฟล์ native เช่น `bcrypt_lib.node` แล้วเริ่มบริการใหม่หลัง deploy หาก deploy ล้มเหลว สคริปต์จะพยายามเริ่มบริการเดิมกลับ หากยังพบ `EPERM` ให้ตรวจโปรเซส Node อื่นหรือโปรแกรมสแกนไวรัสที่กำลังเปิดไฟล์นั้นก่อนลองใหม่
 
 HTTP ภายใน LAN ส่งรหัสผ่านและข้อมูลส่วนบุคคลแบบไม่เข้ารหัส ควรจำกัดเครือข่ายที่เข้าถึงและใช้ HTTPS เมื่อพร้อม
