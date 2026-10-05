@@ -275,6 +275,7 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import api from '../services/api' 
+import { fetchProtectedFile } from '../services/protectedFiles'
 import { swalSuccess, swalError, swalConfirm } from '../utils/swal'
 
 // === 1. State ===
@@ -393,7 +394,7 @@ const openFilePreview = async (fileUrl) => {
   isFilePreviewOpen.value = true
 
   try {
-    const response = await api.get(fileUrl, { responseType: 'blob' })
+    const response = await fetchProtectedFile(fileUrl)
     previewObjectUrl.value = URL.createObjectURL(response.data)
     previewKind.value = getPreviewKind(previewFileName.value, response.data.type)
   } catch (error) {

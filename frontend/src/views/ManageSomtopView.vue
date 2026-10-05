@@ -766,6 +766,7 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import api from '../services/api' 
+import { fetchProtectedFile } from '../services/protectedFiles'
 import { isAdmin, isFinance } from '../services/session'
 import { swalSuccess, swalError, swalConfirm } from '../utils/swal'
 
@@ -906,7 +907,7 @@ const openDocumentPreview = async (fileUrl) => {
   isDocumentPreviewOpen.value = true
 
   try {
-    const response = await api.get(fileUrl, { responseType: 'blob' })
+    const response = await fetchProtectedFile(fileUrl)
     documentPreviewObjectUrl.value = URL.createObjectURL(response.data)
     documentPreviewKind.value = getDocumentPreviewKind(documentPreviewName.value, response.data.type)
   } catch (error) {
