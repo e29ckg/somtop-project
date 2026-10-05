@@ -1,47 +1,93 @@
 # Deploy ผ่าน XAMPP ในเครือข่ายภายใน
 
-XAMPP/Apache ให้บริการไฟล์ Vue และ proxy `/api/` กับ `/uploads/` ไปยัง Node.js บนเครื่องเดียวกัน MySQL ใช้ของ XAMPP โดยตรง โปรเจกต์ควรอยู่ **นอก** `htdocs` เพื่อป้องกันไฟล์ `.env` และไฟล์อัปโหลด
+Apache ให้บริการหน้าเว็บ Vue และส่ง `/somtop/api/` กับ `/somtop/uploads/` ไปยัง Node.js ที่ฟังเฉพาะ `127.0.0.1` ส่วน MySQL ใช้ของ XAMPP วางโปรเจกต์ **นอก** `htdocs` เพื่อไม่ให้ `.env`, ซอร์ส backend และไฟล์อัปโหลดถูกเสิร์ฟตรง ๆ
 
-## ตั้งค่าที่ต้องเปลี่ยนในแต่ละเครื่อง
+## 1. เตรียมเครื่องเซิร์ฟเวอร์
 
-คัดลอก `.env.example` เป็น `.env` ที่ root โปรเจกต์ แล้วแก้ค่าในไฟล์นี้เท่านั้น:
-
-- `APP_URL` คือ URL ที่ผู้ใช้เปิด เช่น เครื่องทดสอบ `http://localhost:8099/somtop` หรือเครื่องจริง `http://10.37.64.1/somtop`
-- `APP_BASE_PATH` คือ path ของเว็บ เช่น `/somtop/` ต้องตรงกับ path ใน `APP_URL`
-- `FRONTEND_URL` คือ origin ของ `APP_URL` โดยไม่มี `/somtop` เช่น `http://10.37.64.1`
-- `XAMPP_ROOT` คือ path ติดตั้ง XAMPP เช่น `C:/xampp`
-- `HOST=127.0.0.1` และ `PORT=8088` กำหนด API ที่ Apache จะส่งต่อภายในเครื่อง
-- `DB_*` และ `JWT_SECRET` ตั้งค่าฐานข้อมูลและ secret จริง ห้าม commit `.env`
-- `COOKIE_SECURE=false` สำหรับ HTTP ภายใน; เมื่อใช้ HTTPS ให้เป็น `true`
-
-ระบบอ่าน `.env` ที่ root ทั้งตอน build หน้าเว็บและตอนเริ่ม API สคริปต์ deploy จะสร้าง `.htaccess` กับ Apache proxy config จากค่าเหล่านี้เอง ไม่ต้องแก้ IP/path/port ในซอร์สโค้ด
-
-## ติดตั้งและ deploy
-
-เปิด Apache และ MySQL ใน XAMPP ติดตั้ง Node.js ที่รองรับ Vite (`^22.18.0` หรือ `>=24.12.0`) จากนั้นรัน PowerShell แบบ Administrator จาก root โปรเจกต์:
+1. ให้เครื่องมี IP ที่ผู้ใช้เข้าถึงได้ เช่น `10.37.64.1` ติดตั้ง XAMPP ที่ `C:\xampp` และติดตั้ง Node.js `^22.18.0` หรือ `>=24.12.0`, Git, npm และ PM2 (`npm install -g pm2`)
+2. ตั้ง Apache ให้ฟังพอร์ต 80 ใน `C:\xampp\apache\conf\httpd.conf` (`Listen 80`) เพราะ URL `http://10.37.64.1/somtop` ไม่ระบุพอร์ต หากต้องใช้พอร์ตอื่น ต้องใส่พอร์ตใน `APP_URL` และ `FRONTEND_URL` ด้วย
+3. เปิด Apache และ MySQL ผ่าน XAMPP Control Panel; ตั้งทั้งสองให้เริ่มเมื่อ Windows บูต เปิด Windows Firewall ขาเข้าเฉพาะพอร์ต Apache สำหรับ LAN ไม่เปิดพอร์ต Node (`8088`) ให้เครื่องลูกข่าย
+4. โคลน `main` ไปที่ตำแหน่งถาวรนอก `htdocs` เช่น `C:\apps\somtop-project`:
 
 ```powershell
-.\deploy_xampp.ps1 -ConfigureApache
+git clone --branch main https://github.com/e29ckg/somtop-project.git C:\apps\somtop-project
+cd C:\apps\somtop-project
 ```
 
-สคริปต์จะติดตั้ง dependency, build หน้าเว็บ, คัดลอกไปยัง `htdocs`, สร้าง proxy config ใน `C:\xampp\apache\conf\extra\somtop.conf` และเพิ่ม `Include` ใน `httpd.conf` พร้อมสำรองไฟล์เดิมและตรวจ Apache syntax หลังรันให้ restart Apache ผ่าน XAMPP Control Panel การรันซ้ำจะไม่เพิ่ม `Include` ซ้ำ
+## 2. ฐานข้อมูลและไฟล์เดิม
 
-เริ่ม Node API จากโฟลเดอร์ `backend`:
+- **ย้ายระบบที่ใช้งานอยู่:** สำรอง/ส่งออกฐานข้อมูล `somtop_db` จากเครื่องต้นทางด้วย XAMPP phpMyAdmin หรือ `mysqldump`; นำเข้าไฟล์สำรองนั้นบนเครื่องใหม่ จากนั้นคัดลอก `backend\uploads` และไฟล์เทมเพลตที่ผู้ใช้อัปโหลดใน `backend\templates` มาด้วย สำรองข้อมูลบนเครื่องปลายทางก่อนนำเข้าทับ
+- **เครื่องปลายทางมีฐานข้อมูลแล้ว:** ตรวจว่ามี `somtop_db` และตารางที่ระบบใช้ ไม่ต้องนำเข้า SQL ทับ และอย่ารัน migration ซ้ำโดยไม่ตรวจ schema
+- **เริ่มจากฐานข้อมูลว่าง:** ขอไฟล์ SQL export จากระบบที่ใช้งานได้ก่อน ไฟล์ `somtop_db.sql` ใน repository ยังไม่ใช่สคริปต์สร้างฐานข้อมูลจากศูนย์ที่รันได้ต่อเนื่อง เพราะมี `ALTER TABLE` ก่อนสร้างตาราง และสร้างบางตารางซ้ำ ไฟล์ `backend/migrations` ก็ต้องเลือกตาม schema ต้นทาง ไม่ควรรันทุกไฟล์ทับฐานข้อมูลใหม่
+
+ควรสร้างบัญชี MySQL เฉพาะแอปที่เชื่อมต่อผ่าน `127.0.0.1` ตัวอย่างคำสั่งใน phpMyAdmin แทนรหัสผ่านด้วยค่าจริงที่ไม่ซ้ำ:
+
+```sql
+CREATE USER 'somtop_app'@'127.0.0.1' IDENTIFIED BY 'replace-with-long-password';
+GRANT SELECT, INSERT, UPDATE, DELETE ON somtop_db.* TO 'somtop_app'@'127.0.0.1';
+```
+
+ใช้ชื่อกับรหัสผ่านนั้นใน `.env` หากย้ายข้อมูลทั้งฐาน บัญชีผู้ใช้ระบบจะย้ายมาด้วย; repository ไม่มีบัญชี admin เริ่มต้นสำหรับฐานว่าง
+
+## 3. ตั้งค่า `.env` ที่ root โปรเจกต์
+
+คัดลอก `.env.example` เป็น `.env` แล้วใส่ค่าของเครื่องจริง ตัวอย่างสำหรับ URL ที่ต้องการ:
+
+```dotenv
+APP_URL=http://10.37.64.1/somtop
+APP_BASE_PATH=/somtop/
+FRONTEND_URL=http://10.37.64.1
+XAMPP_ROOT=C:/xampp
+HOST=127.0.0.1
+PORT=8088
+APP_ENV=production
+COOKIE_SECURE=false
+COOKIE_PATH=/somtop
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_USER=somtop_app
+DB_PASSWORD=replace-with-real-database-password
+DB_NAME=somtop_db
+JWT_SECRET=replace-with-unique-random-secret-of-at-least-32-characters
+```
+
+`APP_BASE_PATH` ต้องตรงกับ path ใน `APP_URL`; `FRONTEND_URL` คือ origin โดยไม่มี `/somtop` หากใช้ HTTPS ให้เปลี่ยน URL ทั้งสองเป็น `https://` และตั้ง `COOKIE_SECURE=true` ค่า `MYSQL_ROOT_PASSWORD` ใน `.env.example` ใช้กับ Docker Compose ไม่ใช่รหัสผ่าน MySQL ของ XAMPP; อย่า commit `.env` หรือคัดลอก secret จากเครื่องทดสอบ
+
+สร้าง `JWT_SECRET` ที่ไม่ซ้ำบนเครื่องเซิร์ฟเวอร์ได้ด้วย `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"` แล้วนำผลลัพธ์ไปใส่ `.env`
+
+ถ้าใช้ Google Calendar ให้ย้าย `backend\src\config\google-service-account.json` จากระบบเดิมและตรวจสิทธิ์ Google ของบัญชีนั้น ไฟล์นี้ถูก ignore โดย Git
+
+## 4. Build และติดตั้ง Apache proxy
+
+เปิด PowerShell แบบ Administrator ที่ root โปรเจกต์ แล้วรัน:
 
 ```powershell
-cd backend
-node server.js
+powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy_xampp.ps1 -ConfigureApache
 ```
 
-สำหรับใช้งานจริงให้รัน API ต่อเนื่องด้วย PM2 หรือ Windows service โดยให้ working directory เป็น `backend` และตั้งให้เริ่มหลัง reboot สคริปต์ `update_somtop.bat` จะ build/deploy และ restart PM2 ถ้ามี PM2 อยู่
+สคริปต์ติดตั้ง dependency, build frontend จาก `.env`, คัดลอกไฟล์ไป `C:\xampp\htdocs\somtop`, สร้าง `.htaccess` และ config proxy ที่ `C:\xampp\apache\conf\extra\somtop.conf` แล้วเพิ่ม `Include` ใน `httpd.conf` โดยสำรองไฟล์เดิมและตรวจด้วย `httpd.exe -t` จากนั้น **restart Apache** ผ่าน XAMPP Control Panel ไม่ต้องแก้ `.htaccess` ด้วยมือ เพราะสคริปต์จะสร้างใหม่ในการ deploy ครั้งถัดไป
 
-หากฐานข้อมูลยังไม่มี ให้นำเข้า `somtop_db.sql` ก่อน แล้วตรวจ migration ใน `backend/migrations` ตามลำดับ สำรองฐานข้อมูลเดิมก่อนปรับ schema เครื่องที่มี `somtop_db` อยู่แล้วไม่ควรนำเข้า SQL ทับ
+## 5. เริ่ม API และตั้งให้รันต่อ
 
-## ตรวจผล
+```powershell
+cd C:\apps\somtop-project\backend
+pm2 start server.js --name somtop-api
+pm2 save
+pm2 status
+```
 
-1. เปิด URL ใน `APP_URL` จากเครื่องลูกข่าย หน้าเว็บและ CSS/JS ต้องโหลดครบ
-2. เปิด `${APP_URL}/dashboard` โดยตรง ต้องได้หน้าเว็บ ไม่ใช่ Apache 404
-3. เข้าสู่ระบบและเปิดรูป/ไฟล์แนบ เพื่อตรวจ proxy API และ cookie
-4. พอร์ต Node (`PORT`) ควรฟังแค่ `127.0.0.1`; เปิดให้เครื่องลูกข่ายเข้าถึงเฉพาะพอร์ต Apache
+ให้ PM2 รันด้วย Windows account เดียวกับที่ใช้ `pm2 save` และตั้ง Task Scheduler ให้รัน `pm2.cmd resurrect` หลังเครื่องบูต (`pm2 save` อย่างเดียวไม่ทำให้ PM2 เริ่มเองบน Windows) working directory ของแอปต้องเป็นโฟลเดอร์ `backend`
+
+## 6. ตรวจผล
+
+1. จากเครื่องลูกข่าย เปิด `http://10.37.64.1/somtop/` หน้าเว็บและ CSS/JS ต้องโหลดครบ
+2. เปิด `http://10.37.64.1/somtop/dashboard` ตรง ๆ ต้องได้หน้าเว็บ ไม่ใช่ Apache 404
+3. ก่อนล็อกอิน ลอง `http://10.37.64.1/somtop/api/auth/me` ต้องได้ HTTP 401 จาก API ไม่ใช่ HTML ของ Vue
+4. ล็อกอินด้วยบัญชีจริง แล้วทดสอบรูปและไฟล์แนบผ่าน `/somtop/uploads/`
+5. ตรวจ `pm2 status` ว่า `somtop-api` เป็น `online` และดู `C:\xampp\apache\logs\error.log` ถ้า proxy ไม่ทำงาน
+
+## อัปเดตในครั้งต่อไป
+
+สำรองฐานข้อมูลและ `backend\uploads` ก่อนอัปเดต จาก root โปรเจกต์รัน `git pull --ff-only origin main` แล้ว `update_somtop.bat` สคริปต์จะ build และ restart PM2; หากเปลี่ยน `APP_URL`, `APP_BASE_PATH` หรือ `PORT` ให้ restart Apache หลังอัปเดตด้วย
 
 HTTP ภายใน LAN ส่งรหัสผ่านและข้อมูลส่วนบุคคลแบบไม่เข้ารหัส ควรจำกัดเครือข่ายที่เข้าถึงและใช้ HTTPS เมื่อพร้อม
