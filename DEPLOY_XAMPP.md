@@ -4,8 +4,8 @@ Apache ให้บริการหน้าเว็บ Vue และส่�
 
 ## 1. เตรียมเครื่องเซิร์ฟเวอร์
 
-1. ให้เครื่องมี IP ที่ผู้ใช้เข้าถึงได้ เช่น `10.37.64.1` ติดตั้ง XAMPP ที่ `C:\xampp` และติดตั้ง Node.js `^22.18.0` หรือ `>=24.12.0`, Git, npm และ PM2 (`npm install -g pm2`)
-2. ตั้ง Apache ให้ฟังพอร์ต 80 ใน `C:\xampp\apache\conf\httpd.conf` (`Listen 80`) เพราะ URL `http://10.37.64.1/somtop` ไม่ระบุพอร์ต หากต้องใช้พอร์ตอื่น ต้องใส่พอร์ตใน `APP_URL` และ `FRONTEND_URL` ด้วย
+1. ให้เครื่องมี IP ที่ผู้ใช้เข้าถึงได้ เช่น `10.xx.xx.xx` ติดตั้ง XAMPP ที่ `C:\xampp` และติดตั้ง Node.js `^22.18.0` หรือ `>=24.12.0`, Git, npm และ PM2 (`npm install -g pm2`) ทุกจุดที่ใช้ `10.xx.xx.xx` ในเอกสารเป็นตัวอย่าง ให้แทนด้วย IP ของเซิร์ฟเวอร์จริงก่อนตั้งค่า `.env` หรือทดสอบ URL
+2. ตั้ง Apache ให้ฟังพอร์ต 80 ใน `C:\xampp\apache\conf\httpd.conf` (`Listen 80`) เพราะ URL `http://10.xx.xx.xx/somtop` ไม่ระบุพอร์ต หากต้องใช้พอร์ตอื่น ต้องใส่พอร์ตใน `APP_URL` และ `FRONTEND_URL` ด้วย
 3. เปิด Apache และ MySQL ผ่าน XAMPP Control Panel; ตั้งทั้งสองให้เริ่มเมื่อ Windows บูต เปิด Windows Firewall ขาเข้าเฉพาะพอร์ต Apache สำหรับ LAN ไม่เปิดพอร์ต Node (`8088`) ให้เครื่องลูกข่าย
 4. ถ้า Apache ใช้ `D:\www` ให้ตั้ง `DocumentRoot "D:/www"` ใน `httpd.conf` ก่อน และตรวจว่าโฟลเดอร์นี้มีอยู่จริง โคลน `main` ไปที่ตำแหน่งถาวรนอก DocumentRoot เช่น `C:\apps\somtop-project`:
 
@@ -34,9 +34,9 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON somtop_db.* TO 'somtop_app'@'127.0.0.1';
 คัดลอก `.env.example` เป็น `.env` แล้วใส่ค่าของเครื่องจริง ตัวอย่างสำหรับ URL ที่ต้องการ:
 
 ```dotenv
-APP_URL=http://10.37.64.1/somtop
+APP_URL=http://10.xx.xx.xx/somtop
 APP_BASE_PATH=/somtop/
-FRONTEND_URL=http://10.37.64.1
+FRONTEND_URL=http://10.xx.xx.xx
 XAMPP_ROOT=C:/xampp
 APACHE_DOCUMENT_ROOT=D:/www
 HOST=127.0.0.1
@@ -81,15 +81,15 @@ pm2 status
 
 ## 6. ตรวจผล
 
-1. จากเครื่องลูกข่าย เปิด `http://10.37.64.1/somtop/` หน้าเว็บและ CSS/JS ต้องโหลดครบ
-2. เปิด `http://10.37.64.1/somtop/dashboard` ตรง ๆ ต้องได้หน้าเว็บ ไม่ใช่ Apache 404
-3. ก่อนล็อกอิน ลอง `http://10.37.64.1/somtop/api/auth/me` ต้องได้ HTTP 401 จาก API ไม่ใช่ HTML ของ Vue
+1. จากเครื่องลูกข่าย เปิด `http://10.xx.xx.xx/somtop/` หน้าเว็บและ CSS/JS ต้องโหลดครบ
+2. เปิด `http://10.xx.xx.xx/somtop/dashboard` ตรง ๆ ต้องได้หน้าเว็บ ไม่ใช่ Apache 404
+3. ก่อนล็อกอิน ลอง `http://10.xx.xx.xx/somtop/api/auth/me` ต้องได้ HTTP 401 จาก API ไม่ใช่ HTML ของ Vue
 4. ล็อกอินด้วยบัญชีจริง แล้วทดสอบรูปและไฟล์แนบผ่าน `/somtop/uploads/`
 5. ตรวจ `pm2 status` ว่า `somtop-api` เป็น `online` และดู `C:\xampp\apache\logs\error.log` ถ้า proxy ไม่ทำงาน
 
-ถ้าเครื่องลูกข่ายยังเรียก `http://10.37.64.1:8000/api/...` แสดงว่าโหลด JavaScript build เก่า ให้ดึง `main` ล่าสุด รัน `update_somtop.bat` บนเซิร์ฟเวอร์ และกด `Ctrl+Shift+R` ที่เครื่องลูกข่าย คำขอใหม่ต้องเป็น `http://10.37.64.1/somtop/api/...` ถ้าเป็น URL นี้แล้วได้ 502 ให้ตรวจ `pm2 status` กับ Apache proxy config
+ถ้าเครื่องลูกข่ายยังเรียก `http://10.xx.xx.xx:8000/api/...` แสดงว่าโหลด JavaScript build เก่า ให้ดึง `main` ล่าสุด รัน `update_somtop.bat` บนเซิร์ฟเวอร์ และกด `Ctrl+Shift+R` ที่เครื่องลูกข่าย คำขอใหม่ต้องเป็น `http://10.xx.xx.xx/somtop/api/...` ถ้าเป็น URL นี้แล้วได้ 502 ให้ตรวจ `pm2 status` กับ Apache proxy config
 
-ถ้า `/somtop/api/auth/me` ได้ **404 เป็นหน้า HTML ของ Apache** แสดงว่า Apache ยังไม่ส่ง `/somtop/api/` ไป Node ให้ตรวจว่า `C:\xampp\apache\conf\httpd.conf` มี `Include "C:/xampp/apache/conf/extra/somtop.conf"` และในไฟล์ที่ include มี `ProxyPass "/somtop/api/" "http://127.0.0.1:8088/api/"` จากนั้นรัน `C:\xampp\apache\bin\httpd.exe -t` แล้ว restart Apache ใน XAMPP หากใช้ VirtualHost ให้ตรวจด้วย `httpd.exe -S` ว่า config proxy ถูกใช้กับ VirtualHost ของ `10.37.64.1:80` ด้วย บนเซิร์ฟเวอร์ให้ลอง `http://127.0.0.1:8088/api/auth/me` โดยตรงก่อน ซึ่งควรตอบ 401 เป็น JSON หากเชื่อมต่อไม่ได้ ให้ตรวจ `pm2 status` และ `pm2 logs somtop-api`
+ถ้า `/somtop/api/auth/me` ได้ **404 เป็นหน้า HTML ของ Apache** แสดงว่า Apache ยังไม่ส่ง `/somtop/api/` ไป Node ให้ตรวจว่า `C:\xampp\apache\conf\httpd.conf` มี `Include "C:/xampp/apache/conf/extra/somtop.conf"` และในไฟล์ที่ include มี `ProxyPass "/somtop/api/" "http://127.0.0.1:8088/api/"` จากนั้นรัน `C:\xampp\apache\bin\httpd.exe -t` แล้ว restart Apache ใน XAMPP หากใช้ VirtualHost ให้ตรวจด้วย `httpd.exe -S` ว่า config proxy ถูกใช้กับ VirtualHost ของ `10.xx.xx.xx:80` ด้วย บนเซิร์ฟเวอร์ให้ลอง `http://127.0.0.1:8088/api/auth/me` โดยตรงก่อน ซึ่งควรตอบ 401 เป็น JSON หากเชื่อมต่อไม่ได้ ให้ตรวจ `pm2 status` และ `pm2 logs somtop-api`
 
 ## อัปเดตในครั้งต่อไป
 
