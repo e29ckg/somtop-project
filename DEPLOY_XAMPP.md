@@ -87,6 +87,10 @@ pm2 status
 4. ล็อกอินด้วยบัญชีจริง แล้วทดสอบรูปและไฟล์แนบผ่าน `/somtop/uploads/`
 5. ตรวจ `pm2 status` ว่า `somtop-api` เป็น `online` และดู `C:\xampp\apache\logs\error.log` ถ้า proxy ไม่ทำงาน
 
+ถ้าเครื่องลูกข่ายยังเรียก `http://10.37.64.1:8000/api/...` แสดงว่าโหลด JavaScript build เก่า ให้ดึง `main` ล่าสุด รัน `update_somtop.bat` บนเซิร์ฟเวอร์ และกด `Ctrl+Shift+R` ที่เครื่องลูกข่าย คำขอใหม่ต้องเป็น `http://10.37.64.1/somtop/api/...` ถ้าเป็น URL นี้แล้วได้ 502 ให้ตรวจ `pm2 status` กับ Apache proxy config
+
+ถ้า `/somtop/api/auth/me` ได้ **404 เป็นหน้า HTML ของ Apache** แสดงว่า Apache ยังไม่ส่ง `/somtop/api/` ไป Node ให้ตรวจว่า `C:\xampp\apache\conf\httpd.conf` มี `Include "C:/xampp/apache/conf/extra/somtop.conf"` และในไฟล์ที่ include มี `ProxyPass "/somtop/api/" "http://127.0.0.1:8088/api/"` จากนั้นรัน `C:\xampp\apache\bin\httpd.exe -t` แล้ว restart Apache ใน XAMPP หากใช้ VirtualHost ให้ตรวจด้วย `httpd.exe -S` ว่า config proxy ถูกใช้กับ VirtualHost ของ `10.37.64.1:80` ด้วย บนเซิร์ฟเวอร์ให้ลอง `http://127.0.0.1:8088/api/auth/me` โดยตรงก่อน ซึ่งควรตอบ 401 เป็น JSON หากเชื่อมต่อไม่ได้ ให้ตรวจ `pm2 status` และ `pm2 logs somtop-api`
+
 ## อัปเดตในครั้งต่อไป
 
 สำรองฐานข้อมูลและ `backend\uploads` ก่อนอัปเดต จาก root โปรเจกต์รัน `git pull --ff-only origin main` แล้ว `update_somtop.bat` สคริปต์จะ build และ restart PM2; หากเปลี่ยน `APP_URL`, `APP_BASE_PATH` หรือ `PORT` ให้ restart Apache หลังอัปเดตด้วย

@@ -53,6 +53,11 @@ $dist = Join-Path $project 'frontend/dist'
 
 $htaccess = @"
 Options -Indexes
+<IfModule mod_headers.c>
+    <Files "index.html">
+        Header always set Cache-Control "no-cache, must-revalidate"
+    </Files>
+</IfModule>
 RewriteEngine On
 RewriteBase $base
 RewriteRule ^(api|uploads)(/|`$) - [END]
@@ -115,4 +120,5 @@ Copy-Item -Path (Join-Path $dist '*') -Destination $destination -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $dist '.htaccess') -Destination $destination -Force
 Write-Host "Deployed frontend to $destination"
 Write-Host "URL: $($appUrl.TrimEnd('/'))/"
+if ($ConfigureApache) { Write-Host 'Restart Apache now to activate or refresh the Somtop proxy routes.' }
 if (-not $ConfigureApache) { Write-Host 'Run with -ConfigureApache to install the generated proxy config, then restart Apache.' }
