@@ -1,13 +1,13 @@
 # Deploy ผ่าน XAMPP ในเครือข่ายภายใน
 
-Apache ให้บริการหน้าเว็บ Vue และส่ง `/somtop/api/` กับ `/somtop/uploads/` ไปยัง Node.js ที่ฟังเฉพาะ `127.0.0.1` ส่วน MySQL ใช้ของ XAMPP วางโปรเจกต์ **นอก** `htdocs` เพื่อไม่ให้ `.env`, ซอร์ส backend และไฟล์อัปโหลดถูกเสิร์ฟตรง ๆ
+Apache ให้บริการหน้าเว็บ Vue และส่ง `/somtop/api/` กับ `/somtop/uploads/` ไปยัง Node.js ที่ฟังเฉพาะ `127.0.0.1` ส่วน MySQL ใช้ของ XAMPP วางโปรเจกต์ **นอก** Apache DocumentRoot เพื่อไม่ให้ `.env`, ซอร์ส backend และไฟล์อัปโหลดถูกเสิร์ฟตรง ๆ
 
 ## 1. เตรียมเครื่องเซิร์ฟเวอร์
 
 1. ให้เครื่องมี IP ที่ผู้ใช้เข้าถึงได้ เช่น `10.37.64.1` ติดตั้ง XAMPP ที่ `C:\xampp` และติดตั้ง Node.js `^22.18.0` หรือ `>=24.12.0`, Git, npm และ PM2 (`npm install -g pm2`)
 2. ตั้ง Apache ให้ฟังพอร์ต 80 ใน `C:\xampp\apache\conf\httpd.conf` (`Listen 80`) เพราะ URL `http://10.37.64.1/somtop` ไม่ระบุพอร์ต หากต้องใช้พอร์ตอื่น ต้องใส่พอร์ตใน `APP_URL` และ `FRONTEND_URL` ด้วย
 3. เปิด Apache และ MySQL ผ่าน XAMPP Control Panel; ตั้งทั้งสองให้เริ่มเมื่อ Windows บูต เปิด Windows Firewall ขาเข้าเฉพาะพอร์ต Apache สำหรับ LAN ไม่เปิดพอร์ต Node (`8088`) ให้เครื่องลูกข่าย
-4. โคลน `main` ไปที่ตำแหน่งถาวรนอก `htdocs` เช่น `C:\apps\somtop-project`:
+4. ถ้า Apache ใช้ `D:\www` ให้ตั้ง `DocumentRoot "D:/www"` ใน `httpd.conf` ก่อน และตรวจว่าโฟลเดอร์นี้มีอยู่จริง โคลน `main` ไปที่ตำแหน่งถาวรนอก DocumentRoot เช่น `C:\apps\somtop-project`:
 
 ```powershell
 git clone --branch main https://github.com/e29ckg/somtop-project.git C:\apps\somtop-project
@@ -38,6 +38,7 @@ APP_URL=http://10.37.64.1/somtop
 APP_BASE_PATH=/somtop/
 FRONTEND_URL=http://10.37.64.1
 XAMPP_ROOT=C:/xampp
+APACHE_DOCUMENT_ROOT=D:/www
 HOST=127.0.0.1
 PORT=8088
 APP_ENV=production
@@ -51,7 +52,7 @@ DB_NAME=somtop_db
 JWT_SECRET=replace-with-unique-random-secret-of-at-least-32-characters
 ```
 
-`APP_BASE_PATH` ต้องตรงกับ path ใน `APP_URL`; `FRONTEND_URL` คือ origin โดยไม่มี `/somtop` หากใช้ HTTPS ให้เปลี่ยน URL ทั้งสองเป็น `https://` และตั้ง `COOKIE_SECURE=true` ค่า `MYSQL_ROOT_PASSWORD` ใน `.env.example` ใช้กับ Docker Compose ไม่ใช่รหัสผ่าน MySQL ของ XAMPP; อย่า commit `.env` หรือคัดลอก secret จากเครื่องทดสอบ
+`APP_BASE_PATH` ต้องตรงกับ path ใน `APP_URL`; `FRONTEND_URL` คือ origin โดยไม่มี `/somtop` ส่วน `APACHE_DOCUMENT_ROOT` ต้องตรงกับ `DocumentRoot` ใน `httpd.conf` หากใช้ HTTPS ให้เปลี่ยน URL ทั้งสองเป็น `https://` และตั้ง `COOKIE_SECURE=true` ค่า `MYSQL_ROOT_PASSWORD` ใน `.env.example` ใช้กับ Docker Compose ไม่ใช่รหัสผ่าน MySQL ของ XAMPP; อย่า commit `.env` หรือคัดลอก secret จากเครื่องทดสอบ
 
 สร้าง `JWT_SECRET` ที่ไม่ซ้ำบนเครื่องเซิร์ฟเวอร์ได้ด้วย `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"` แล้วนำผลลัพธ์ไปใส่ `.env`
 
@@ -65,7 +66,7 @@ JWT_SECRET=replace-with-unique-random-secret-of-at-least-32-characters
 powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy_xampp.ps1 -ConfigureApache
 ```
 
-สคริปต์ติดตั้ง dependency, build frontend จาก `.env`, คัดลอกไฟล์ไป `C:\xampp\htdocs\somtop`, สร้าง `.htaccess` และ config proxy ที่ `C:\xampp\apache\conf\extra\somtop.conf` แล้วเพิ่ม `Include` ใน `httpd.conf` โดยสำรองไฟล์เดิมและตรวจด้วย `httpd.exe -t` จากนั้น **restart Apache** ผ่าน XAMPP Control Panel ไม่ต้องแก้ `.htaccess` ด้วยมือ เพราะสคริปต์จะสร้างใหม่ในการ deploy ครั้งถัดไป
+สคริปต์ติดตั้ง dependency, build frontend จาก `.env`, คัดลอกไฟล์ไป `D:\www\somtop` ตาม `APACHE_DOCUMENT_ROOT`, สร้าง `.htaccess` และ config proxy ที่ `C:\xampp\apache\conf\extra\somtop.conf` แล้วเพิ่ม `Include` ใน `httpd.conf` โดยสำรองไฟล์เดิมและตรวจด้วย `httpd.exe -t` จากนั้น **restart Apache** ผ่าน XAMPP Control Panel ไม่ต้องแก้ `.htaccess` ด้วยมือ เพราะสคริปต์จะสร้างใหม่ในการ deploy ครั้งถัดไป
 
 ## 5. เริ่ม API และตั้งให้รันต่อ
 

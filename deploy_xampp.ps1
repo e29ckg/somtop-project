@@ -21,6 +21,7 @@ foreach ($line in [System.IO.File]::ReadAllLines($envFile)) {
 $base = $values['APP_BASE_PATH']
 $port = $values['PORT']
 $xampp = $values['XAMPP_ROOT']
+$documentRoot = $values['APACHE_DOCUMENT_ROOT']
 $appUrl = $values['APP_URL']
 if ($base -notmatch '^/[A-Za-z0-9/_-]+/$' -or $base -match '\.\.') { throw 'APP_BASE_PATH must be a safe absolute directory path ending in /.' }
 if ($port -notmatch '^\d{1,5}$' -or [int]$port -lt 1 -or [int]$port -gt 65535) { throw 'PORT must be a valid TCP port.' }
@@ -28,13 +29,16 @@ $publicUrl = $null
 if (-not [Uri]::TryCreate($appUrl, [UriKind]::Absolute, [ref]$publicUrl)) { throw 'APP_URL must be an absolute URL.' }
 if ($publicUrl.AbsolutePath.TrimEnd('/') -ne $base.TrimEnd('/')) { throw 'APP_URL path must match APP_BASE_PATH.' }
 if (-not (Test-Path -LiteralPath $xampp -PathType Container)) { throw "XAMPP_ROOT does not exist: $xampp" }
+if (-not $documentRoot) { $documentRoot = Join-Path $xampp 'htdocs' }
+if (-not [System.IO.Path]::IsPathRooted($documentRoot)) { throw 'APACHE_DOCUMENT_ROOT must be an absolute path.' }
+if (-not (Test-Path -LiteralPath $documentRoot -PathType Container)) { throw "APACHE_DOCUMENT_ROOT does not exist: $documentRoot" }
 
 $httpdConf = Join-Path $xampp 'apache/conf/httpd.conf'
 $httpdExe = Join-Path $xampp 'apache/bin/httpd.exe'
-$htdocs = [System.IO.Path]::GetFullPath((Join-Path $xampp 'htdocs'))
+$documentRoot = [System.IO.Path]::GetFullPath($documentRoot)
 $relativeBase = $base.Trim('/') -replace '/', [System.IO.Path]::DirectorySeparatorChar
-$destination = [System.IO.Path]::GetFullPath((Join-Path $htdocs $relativeBase))
-if (-not $destination.StartsWith($htdocs.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Deploy destination must be inside htdocs.' }
+$destination = [System.IO.Path]::GetFullPath((Join-Path $documentRoot $relativeBase))
+if (-not $destination.StartsWith($documentRoot.TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Deploy destination must be inside APACHE_DOCUMENT_ROOT.' }
 
 if (-not $SkipInstall) {
     & $npm --prefix $backendDir ci --offline=false --no-audit --no-fund
