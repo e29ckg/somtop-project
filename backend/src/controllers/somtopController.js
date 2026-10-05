@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 const publicFileUrl = require('../utils/publicFileUrl');
+const normalizePublicUploadUrl = require('../utils/normalizePublicUploadUrl');
 const { logActivity } = require('../utils/logger');
 
 const deletePhysicalFile = (relativePath) => {
@@ -337,6 +338,7 @@ exports.getSomtopHistory = async (req, res) => {
             } else {
                 row.file_paths = [];
             }
+            row.file_paths = row.file_paths.map(filePath => normalizePublicUploadUrl(req, filePath));
             return row;
         });
         

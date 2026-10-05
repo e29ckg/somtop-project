@@ -1,6 +1,7 @@
 const pool = require('../config/db');
 const { logActivity } = require('../utils/logger');
 const publicFileUrl = require('../utils/publicFileUrl');
+const normalizePublicUploadUrl = require('../utils/normalizePublicUploadUrl');
 const path = require('path');
 const fs = require('fs');
 
@@ -52,7 +53,14 @@ exports.getAllTerms = async (req, res) => {
             [courtCode]
         );
 
-        res.status(200).json({ records: rows });
+        const records = rows.map(row => ({
+            ...row,
+            file_paths: row.file_paths
+                ? JSON.stringify(parseFilePaths(row.file_paths).map(filePath => normalizePublicUploadUrl(req, filePath)))
+                : row.file_paths
+        }));
+
+        res.status(200).json({ records });
     } catch (error) {
         console.error('Error fetching working terms:', error);
         res.status(500).json({ message: 'เกิดข้อผิดพลาดในการดึงข้อมูลวาระการทำงาน' });
@@ -194,7 +202,10 @@ exports.deleteTermFile = async (req, res) => {
 
         deletePhysicalFiles(JSON.stringify([file_url]));
         logActivity(req, 'ลบไฟล์', 'จัดการวาระการทำงาน', `ลบไฟล์แนบจากวาระ ID: ${id}`);
-        res.status(200).json({ message: 'ลบไฟล์แนบสำเร็จ', file_paths: updatedPaths });
+        res.status(200).json({
+            message: 'ลบไฟล์แนบสำเร็จ',
+            file_paths: updatedPaths.map(filePath => normalizePublicUploadUrl(req, filePath))
+        });
     } catch (error) {
         console.error('Error deleting working-term file:', error);
         res.status(400).json({ message: 'ไม่สามารถลบไฟล์แนบได้' });
