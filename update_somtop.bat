@@ -3,8 +3,24 @@ setlocal EnableExtensions
 chcp 65001 > nul
 cd /d "%~dp0"
 
+set "SOMTOP_PM2_MANAGED=0"
+where pm2 > nul 2>&1
+if not errorlevel 1 (
+  pm2 describe somtop-api > nul 2>&1
+  if not errorlevel 1 (
+    echo [INFO] Stopping somtop-api before npm replaces backend dependencies.
+    pm2 stop somtop-api
+    if errorlevel 1 exit /b 1
+    set "SOMTOP_PM2_MANAGED=1"
+  )
+)
+
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0deploy_xampp.ps1" -ConfigureApache
-if errorlevel 1 exit /b 1
+if errorlevel 1 (
+  echo [ERROR] Deployment failed.
+  if "%SOMTOP_PM2_MANAGED%"=="1" pm2 restart somtop-api --update-env
+  exit /b 1
+)
 
 where pm2 > nul 2>&1
 if errorlevel 1 (
