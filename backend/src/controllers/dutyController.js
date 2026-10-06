@@ -11,6 +11,21 @@ const validMonth = value => /^\d{4}-\d{2}$/.test(String(value || ''));
 const validDate = value => /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''));
 const inScope = (courtCode, alias = '') => courtCode ? ` AND ${alias}court_code = ?` : '';
 const scopeParams = (courtCode, values = []) => courtCode ? [...values, courtCode] : values;
+const getHolidayDatesForMonth = async (month, courtCode) => {
+    const firstDay = `${month}-01`;
+    try {
+        const [rows] = await pool.query(`
+            SELECT DISTINCT DATE_FORMAT(holiday_date, '%Y-%m-%d') AS holiday_date
+            FROM holidays
+            WHERE holiday_date >= ? AND holiday_date < DATE_ADD(?, INTERVAL 1 MONTH)
+              AND status = 'ใช้งาน' AND (court_code IS NULL OR court_code = ?)
+        `, [firstDay, firstDay, courtCode]);
+        return rows.map(row => row.holiday_date);
+    } catch (error) {
+        if (error.code === 'ER_NO_SUCH_TABLE') return [];
+        throw error;
+    }
+};
 const uploadsRoot = path.resolve(__dirname, '../../uploads');
 
 const removeDutyOrderFile = filePath => {
@@ -169,11 +184,12 @@ exports.getCalendar = async (req, res) => {
             ORDER BY ds.duty_date, s.first_name, s.last_name
         `, scopeParams(courtCode, params));
         const [types] = await pool.query("SELECT id, name FROM duty_types WHERE status = 'ใช้งาน' ORDER BY id");
+        const holidayDates = await getHolidayDatesForMonth(month, courtCode);
         const safeOrders = orders.map(({ signed_order_file_path: filePath, ...order }) => ({
             ...order,
             has_signed_order_pdf: Boolean(filePath)
         }));
-        res.json({ orders: safeOrders, schedules, duty_types: types });
+        res.json({ orders: safeOrders, schedules, duty_types: types, holiday_dates: holidayDates });
     } catch (error) {
         console.error('Duty calendar error:', error);
         res.status(500).json({ message: 'ไม่สามารถโหลดปฏิทินเวรได้' });
@@ -544,6 +560,7 @@ exports.exportPaymentExcel = async (req, res) => {
     const orderMonth = String(orders[0].order_month).slice(0, 7);
     const [year, monthNumber] = orderMonth.split('-').map(Number);
     const dates = Array.from({ length: new Date(year, monthNumber, 0).getDate() }, (_, index) => `${orderMonth}-${String(index + 1).padStart(2, '0')}`);
+    const holidayDates = new Set(await getHolidayDatesForMonth(orderMonth, req.user.court_code));
     const people = [...records.reduce((map, row) => { const key = row.somtop_id; if (!map.has(key)) map.set(key, { name: row.full_name, dates: new Set() }); map.get(key).dates.add(String(row.duty_date).slice(0, 10)); return map; }, new Map()).values()];
     const workbook = new ExcelJS.Workbook(); const sheet = workbook.addWorksheet('หลักฐานการรับเงิน');
     const lastColumn = dates.length + 8;
@@ -583,7 +600,7 @@ exports.exportPaymentExcel = async (req, res) => {
     dates.forEach((date, index) => {
         const column = sheet.getColumn(dayStartColumn + index);
         column.width = 4;
-        if ([0, 6].includes(new Date(`${date}T12:00:00Z`).getUTCDay())) {
+        if ([0, 6].includes(new Date(`${date}T12:00:00Z`).getUTCDay()) || holidayDates.has(date)) {
             for (let rowNumber = 4; rowNumber < totalRow.number; rowNumber++) sheet.getCell(rowNumber, dayStartColumn + index).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF999999' } };
         }
     });

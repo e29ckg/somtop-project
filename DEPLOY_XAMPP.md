@@ -95,6 +95,8 @@ pm2 status
 
 สำรองฐานข้อมูลและ `backend\uploads` ก่อนอัปเดต จาก root โปรเจกต์รัน `git pull --ff-only origin main` แล้ว `update_somtop.bat` สคริปต์จะ build และ restart PM2; หากเปลี่ยน `APP_URL`, `APP_BASE_PATH` หรือ `PORT` ให้ restart Apache หลังอัปเดตด้วย
 
+สีวันหยุดในหลักฐานการรับเงินอ่านจากตาราง `holidays` เฉพาะรายการสถานะ `ใช้งาน` ที่เป็นวันหยุดทั่วประเทศ (`court_code` เป็น `NULL`) หรือของศาลผู้ใช้ หากฐานข้อมูลเดิมยังไม่มีตารางนี้ ให้สำรองฐานข้อมูลแล้วนำเข้า `backend/migrations/011_holidays.sql` ผ่าน phpMyAdmin หนึ่งครั้ง จากนั้นเพิ่มวันที่ต้องการในตาราง `holidays` การ deploy โค้ดอย่างเดียวไม่ได้เพิ่มวันหยุดให้โดยอัตโนมัติ
+
 หากต้องอัปเดตเฉพาะหน้าเว็บ ให้รัน `git pull --ff-only origin main` แล้ว `update_somtop_frontend.bat` จาก root โปรเจกต์ สคริปต์จะติดตั้ง dependency ของ frontend, build ด้วยค่าใน `.env` และคัดลอกผลลัพธ์ไปยัง `APACHE_DOCUMENT_ROOT\somtop` โดยไม่ติดตั้ง backend, ไม่แตะ PM2 และไม่แก้ config Apache หลังเสร็จให้ผู้ใช้กด `Ctrl+Shift+R` เพื่อโหลดไฟล์ JavaScript ใหม่
 
 ระหว่างอัปเดต สคริปต์จะหยุด `somtop-api` ก่อน `npm ci` เพื่อให้ Windows ปล่อยไฟล์ native เช่น `bcrypt_lib.node` แล้วเริ่มบริการใหม่หลัง deploy หาก deploy ล้มเหลว สคริปต์จะพยายามเริ่มบริการเดิมกลับ หากยังพบ `EPERM` ให้ตรวจโปรเซส Node อื่นหรือโปรแกรมสแกนไวรัสที่กำลังเปิดไฟล์นั้นก่อนลองใหม่

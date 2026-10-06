@@ -32,9 +32,9 @@ import { ref, watch, onMounted } from 'vue'
 import api from '../services/api'
 import { swalError, swalSuccess } from '../utils/swal'
 import { thaiBahtText } from '../utils/thaiBahtText'
-const now = new Date(); const thaiMonths=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม']; const month = ref(`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`); const monthOptions = Array.from({length:24},(_,i)=>{const d=new Date(now.getFullYear(),now.getMonth()-i,1);const value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;return {value,label:`${thaiMonths[d.getMonth()]} ${d.getFullYear()+543}`}}); const orders = ref([]); const orderId = ref(''); const schedules = ref([]); const court = ref({}); const previewOpen = ref(false); const html = ref('');
+const now = new Date(); const thaiMonths=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม']; const month = ref(`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`); const monthOptions = Array.from({length:24},(_,i)=>{const d=new Date(now.getFullYear(),now.getMonth()-i,1);const value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;return {value,label:`${thaiMonths[d.getMonth()]} ${d.getFullYear()+543}`}}); const orders = ref([]); const orderId = ref(''); const schedules = ref([]); const holidayDates = ref(new Set()); const court = ref({}); const previewOpen = ref(false); const html = ref('');
 const form = ref({ title:'หลักฐานการจ่ายเงินค่าป่วยการและค่าตอบแทนของผู้พิพากษาสมทบ', paymentDate:'', financeName:'', financePosition:'เจ้าหน้าที่การเงิน', directorName:'', directorPosition:'ผู้อำนวยการ' })
-const load = async () => { try { const r = await api.get('/duties/calendar', { params:{ month:month.value } }); orders.value=r.data.orders||[]; schedules.value=r.data.schedules||[]; if (orderId.value && !orders.value.some(o=>String(o.id)===orderId.value)) orderId.value=''; if (previewOpen.value) build() } catch(e){ swalError('โหลดข้อมูลไม่สำเร็จ',e.response?.data?.message||'ไม่สามารถโหลดข้อมูลได้') } }
+const load = async () => { try { const r = await api.get('/duties/calendar', { params:{ month:month.value } }); orders.value=r.data.orders||[]; schedules.value=r.data.schedules||[]; holidayDates.value=new Set(r.data.holiday_dates||[]); if (orderId.value && !orders.value.some(o=>String(o.id)===orderId.value)) orderId.value=''; if (previewOpen.value) build() } catch(e){ swalError('โหลดข้อมูลไม่สำเร็จ',e.response?.data?.message||'ไม่สามารถโหลดข้อมูลได้') } }
 const escape = v => String(v ?? '').replace(/&/g,'&amp;').replace(new RegExp(String.fromCharCode(60),'g'),'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); const money = v => Number(v).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})
 const documentSubtitle = (courtInfo, orderMonth) => {
   const [year, monthNumber] = String(orderMonth).split('-').map(Number)
@@ -79,7 +79,7 @@ const build = () => {
   const rate = 1250
   const total = people.reduce((sum, person) => sum + person.dates.size * rate, 0)
   const transferDate = escape(formatThaiTransferDate(form.value.paymentDate))
-  const dayClass = date => ` class="day-column${isWeekend(date) ? ' weekend' : ''}"`
+  const dayClass = date => ` class="day-column${isWeekend(date) || holidayDates.value.has(date) ? ' weekend' : ''}"`
   const dayHeaders = dates.map((date, index) => tag('th', index + 1, dayClass(date))).join('')
   const mainHeaders = [
     tag('th', 'ลำดับ', ' rowspan="2"'),
