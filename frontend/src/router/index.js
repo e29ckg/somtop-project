@@ -20,6 +20,7 @@ import ParticipationReportView from '../views/ParticipationReportView.vue'
 import DutyScheduleView from '../views/DutyScheduleView.vue'
 import PerformanceEvaluationView from '../views/PerformanceEvaluationView.vue'
 import PaymentEvidenceView from '../views/PaymentEvidenceView.vue'
+import ManageHolidayView from '../views/ManageHolidayView.vue'
 import api from '../services/api'
 import { currentUser, isSessionVerified, setSessionUser, clearSession } from '../services/session'
 
@@ -138,6 +139,12 @@ const router = createRouter({
           path: 'manage-terms',
           name: 'manage-terms',
           component: ManageTermView,
+          meta: { requiresAdmin: true }
+        },
+        {
+          path: 'manage-holidays',
+          name: 'manage-holidays',
+          component: ManageHolidayView,
           meta: { requiresAdmin: true }
         }
       ]

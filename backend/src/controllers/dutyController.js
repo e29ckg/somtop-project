@@ -9,6 +9,8 @@ const { thaiBahtText } = require('../utils/thaiBahtText');
 
 const validMonth = value => /^\d{4}-\d{2}$/.test(String(value || ''));
 const validDate = value => /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''));
+const validCalendarDate = value => validDate(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) &&
+    new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
 const inScope = (courtCode, alias = '') => courtCode ? ` AND ${alias}court_code = ?` : '';
 const scopeParams = (courtCode, values = []) => courtCode ? [...values, courtCode] : values;
 const getHolidayDatesForMonth = async (month, courtCode) => {
@@ -25,6 +27,56 @@ const getHolidayDatesForMonth = async (month, courtCode) => {
         if (error.code === 'ER_NO_SUCH_TABLE') return [];
         throw error;
     }
+};
+
+exports.getHolidays = async (req, res) => {
+    const courtCode = req.user.court_code || null;
+    const [rows] = await pool.query(`
+        SELECT id, name, DATE_FORMAT(holiday_date, '%Y-%m-%d') AS holiday_date, court_code, status
+        FROM holidays
+        WHERE court_code IS NULL OR court_code = ?
+        ORDER BY holiday_date DESC, id DESC
+    `, [courtCode]);
+    res.json({ records: rows.map(row => ({ ...row, editable: row.court_code === courtCode })) });
+};
+
+exports.createHoliday = async (req, res) => {
+    const name = String(req.body?.name || '').trim();
+    const date = req.body?.holiday_date;
+    const status = req.body?.status || 'ใช้งาน';
+    if (!name || name.length > 255 || !validCalendarDate(date) || !['ใช้งาน', 'ระงับ'].includes(status)) {
+        return res.status(400).json({ message: 'กรุณาระบุชื่อ วันที่ และสถานะวันหยุดให้ถูกต้อง' });
+    }
+    const [result] = await pool.query(
+        'INSERT INTO holidays (name, holiday_date, court_code, status) VALUES (?, ?, ?, ?)',
+        [name, date, req.user.court_code || null, status]
+    );
+    logActivity(req, 'เพิ่มข้อมูล', 'วันหยุดพิเศษ', `เพิ่มวันหยุด ID: ${result.insertId}`);
+    res.status(201).json({ message: 'เพิ่มวันหยุดสำเร็จ', id: result.insertId });
+};
+
+exports.updateHoliday = async (req, res) => {
+    const name = String(req.body?.name || '').trim();
+    const date = req.body?.holiday_date;
+    const status = req.body?.status;
+    if (!name || name.length > 255 || !validCalendarDate(date) || !['ใช้งาน', 'ระงับ'].includes(status)) {
+        return res.status(400).json({ message: 'กรุณาระบุชื่อ วันที่ และสถานะวันหยุดให้ถูกต้อง' });
+    }
+    const [result] = await pool.query(
+        'UPDATE holidays SET name = ?, holiday_date = ?, status = ? WHERE id = ? AND court_code <=> ?',
+        [name, date, status, req.params.id, req.user.court_code || null]
+    );
+    if (!result.affectedRows) return res.status(404).json({ message: 'ไม่พบวันหยุดที่แก้ไขได้' });
+    logActivity(req, 'อัปเดตข้อมูล', 'วันหยุดพิเศษ', `แก้ไขวันหยุด ID: ${req.params.id}`);
+    res.json({ message: 'แก้ไขวันหยุดสำเร็จ' });
+};
+
+exports.deleteHoliday = async (req, res) => {
+    const [result] = await pool.query('DELETE FROM holidays WHERE id = ? AND court_code <=> ?',
+        [req.params.id, req.user.court_code || null]);
+    if (!result.affectedRows) return res.status(404).json({ message: 'ไม่พบวันหยุดที่ลบได้' });
+    logActivity(req, 'ลบข้อมูล', 'วันหยุดพิเศษ', `ลบวันหยุด ID: ${req.params.id}`);
+    res.json({ message: 'ลบวันหยุดสำเร็จ' });
 };
 const uploadsRoot = path.resolve(__dirname, '../../uploads');
 
