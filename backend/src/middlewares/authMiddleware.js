@@ -1,10 +1,20 @@
 const jwt = require('jsonwebtoken');
+const pool = require('../config/db');
 require('dotenv').config();
+
+const courtScopedPaths = [
+    '/api/somtop', '/api/leaves', '/api/events', '/api/term-history',
+    '/api/working-terms', '/api/performance-reports'
+];
+const needsCourtContext = path => courtScopedPaths.some(prefix => path === prefix || path.startsWith(`${prefix}/`)) ||
+    ((path === '/api/duties' || path.startsWith('/api/duties/')) && !path.startsWith('/api/duties/holidays')) ||
+    ((path === '/api/decorations' || path.startsWith('/api/decorations/')) &&
+        !path.startsWith('/api/decorations/admin') && !path.startsWith('/api/decorations/master'));
 
 // ==========================================
 // 1. ตรวจสอบว่าเข้าสู่ระบบหรือยัง (Verify Token)
 // ==========================================
-const verifyToken = (req, res, next) => {
+const verifyToken = async (req, res, next) => {
     // ดึง Token จาก HttpOnly Cookie ที่ชื่อ 'jwt'
     const token = req.cookies.jwt;
 
@@ -20,15 +30,42 @@ const verifyToken = (req, res, next) => {
             issuer: 'somtop-api',
             audience: 'somtop-web'
         });
+        if (!Number.isSafeInteger(decoded.data?.id)) {
+            return res.status(401).json({ message: 'เซสชันไม่ถูกต้อง กรุณาเข้าสู่ระบบใหม่' });
+        }
         
-        // นำข้อมูล Payload (id, username, full_name, role, court_code) ไปแปะไว้ที่ req.user
-        req.user = decoded.data;
+        // อ่านสิทธิ์ล่าสุดจากฐานข้อมูล เพื่อให้การเปลี่ยนสิทธิ์หรือการลบบัญชีมีผลทันที
+        const [rows] = await pool.query(
+            'SELECT id, username, full_name, role, court_code FROM users WHERE id = ? LIMIT 1',
+            [decoded.data.id]
+        );
+        if (!rows.length) return res.status(401).json({ message: 'ไม่พบบัญชีผู้ใช้งาน กรุณาเข้าสู่ระบบใหม่' });
+        req.user = { ...rows[0] };
+        if (req.user.role === 'central_admin' && req.user.court_code) {
+            return res.status(403).json({ message: 'บัญชีผู้ดูแลส่วนกลางต้องไม่สังกัดศาล' });
+        }
+        if (req.user.role === 'central_admin' && !req.originalUrl.startsWith('/api/auth/')) {
+            const selectedCourt = req.get('X-Court-Code');
+            if (selectedCourt && !/^[a-z0-9_-]{1,50}$/i.test(selectedCourt)) {
+                return res.status(400).json({ message: 'รหัสศาลที่เลือกไม่ถูกต้อง' });
+            }
+            if (selectedCourt) {
+                const [courts] = await pool.query('SELECT court_code FROM courts WHERE court_code = ? LIMIT 1', [selectedCourt]);
+                if (!courts.length) return res.status(400).json({ message: 'ไม่พบศาลที่เลือก' });
+            }
+            if (!selectedCourt && needsCourtContext(req.originalUrl.split('?')[0])) {
+                return res.status(400).json({ message: 'กรุณาเลือกศาลก่อนเข้าใช้งานเมนูนี้' });
+            }
+            req.user.court_code = selectedCourt || null;
+        }
         
         // ปล่อยให้ไปทำงานที่ Controller ถัดไป
         next();
     } catch (error) {
-        // กรณี Token ถูกแก้ไข (Invalid) หรือหมดอายุ (Expired)
-        return res.status(401).json({ message: 'เซสชันหมดอายุหรือไม่ได้รับสิทธิ์ กรุณาเข้าสู่ระบบใหม่' });
+        if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError' || error.name === 'NotBeforeError') {
+            return res.status(401).json({ message: 'เซสชันหมดอายุหรือไม่ได้รับสิทธิ์ กรุณาเข้าสู่ระบบใหม่' });
+        }
+        return next(error);
     }
 };
 
@@ -37,14 +74,20 @@ const verifyToken = (req, res, next) => {
 // ==========================================
 const verifyAdmin = (req, res, next) => {
     // ต้องให้ผ่าน verifyToken มาก่อน ถึงจะมี req.user
-    if (req.user && req.user.role === 'admin') {
+    if (req.user && ['admin', 'central_admin'].includes(req.user.role)) {
         next(); // อนุญาตให้ผ่านได้
     } else {
         return res.status(403).json({ message: 'ไม่มีสิทธิ์เข้าถึง (สำหรับผู้ดูแลระบบเท่านั้น)' });
     }
 };
 
+const verifyCentralAdmin = (req, res, next) => {
+    if (req.user?.role === 'central_admin') return next();
+    return res.status(403).json({ message: 'สำหรับผู้ดูแลส่วนกลางเท่านั้น' });
+};
+
 module.exports = {
     verifyToken,
-    verifyAdmin
+    verifyAdmin,
+    verifyCentralAdmin
 };

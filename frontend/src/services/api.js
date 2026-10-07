@@ -1,11 +1,16 @@
 import axios from 'axios'
 import swal from 'sweetalert2' // นำเข้า SweetAlert2 สำหรับแสดง Alert
-import { clearSession, setSessionUser } from './session'
+import { activeCourtCode, clearSession, isCentralAdmin, setSessionUser } from './session'
 
 // เรียก API ผ่าน Apache ภายใต้ path เดียวกับหน้าเว็บ
 const api = axios.create({
   baseURL: `${import.meta.env.BASE_URL}api`,
   withCredentials: true
+})
+
+api.interceptors.request.use((config) => {
+  if (isCentralAdmin.value && activeCourtCode.value) config.headers['X-Court-Code'] = activeCourtCode.value
+  return config
 })
 
 // HttpOnly cookie เป็นแหล่งยืนยันตัวตนเพียงแหล่งเดียว

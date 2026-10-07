@@ -6,7 +6,7 @@
         <h1 class="page-title">จัดการข้อมูลศาล</h1>
         <p class="page-subtitle">เพิ่ม ลบ แก้ไข ข้อมูลหน่วยงานศาลในระบบ (เฉพาะผู้ดูแลระบบ)</p>
       </div>
-      <button class="btn-primary" @click="openAddModal">
+      <button v-if="isCentralAdmin" class="btn-primary" @click="openAddModal">
         + เพิ่มข้อมูลศาล
       </button>
     </div>
@@ -78,7 +78,7 @@
                 <td class="no-print">
                   <div class="action-buttons">
                     <button class="btn-icon edit" @click="openEditModal(court)" title="แก้ไข">✏️</button>
-                    <button class="btn-icon delete" @click="deleteData(court.id)" title="ลบ">🗑️</button>
+                    <button v-if="isCentralAdmin" class="btn-icon delete" @click="deleteData(court.id)" title="ลบ">🗑️</button>
                   </div>
                 </td>
               </tr>
@@ -123,7 +123,7 @@
           
           <div class="input-group">
             <label>รหัสศาล (Court Code)</label>
-            <input type="text" v-model="formData.court_code" required placeholder="เช่น pkkjc" class="font-mono" />
+            <input type="text" v-model="formData.court_code" required :disabled="!isCentralAdmin" placeholder="เช่น pkkjc" class="font-mono" />
           </div>
 
           <div class="input-group">
@@ -200,6 +200,7 @@
 </template>
 
 <script setup>
+import { isCentralAdmin } from '../services/session'
 import { ref, computed, onMounted, watch } from 'vue'
 import api from '../services/api' 
 import { swalSuccess, swalError, swalConfirm } from '../utils/swal'

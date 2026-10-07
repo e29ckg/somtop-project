@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const leaveTypeController = require('../controllers/leaveTypeController');
-const { verifyToken, verifyAdmin } = require('../middlewares/authMiddleware');
+const { verifyToken, verifyCentralAdmin } = require('../middlewares/authMiddleware');
 
 // บังคับ Login ทุกเส้นทางในไฟล์นี้
 router.use(verifyToken);
@@ -10,9 +10,9 @@ router.use(verifyToken);
 router.get('/', leaveTypeController.getAllActive); 
 
 // สำหรับ Admin
-router.get('/admin', verifyAdmin, leaveTypeController.getAllAdmin);
-router.post('/admin', verifyAdmin, leaveTypeController.createLeaveType);
-router.put('/admin', verifyAdmin, leaveTypeController.updateLeaveType);
-router.delete('/admin/:id', verifyAdmin, leaveTypeController.deleteLeaveType);
+router.get('/admin', verifyCentralAdmin, leaveTypeController.getAllAdmin);
+router.post('/admin', verifyCentralAdmin, leaveTypeController.createLeaveType);
+router.put('/admin', verifyCentralAdmin, leaveTypeController.updateLeaveType);
+router.delete('/admin/:id', verifyCentralAdmin, leaveTypeController.deleteLeaveType);
 
 module.exports = router;

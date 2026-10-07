@@ -37,19 +37,28 @@ exports.getHolidays = async (req, res) => {
         WHERE court_code IS NULL OR court_code = ?
         ORDER BY holiday_date DESC, id DESC
     `, [courtCode]);
-    res.json({ records: rows.map(row => ({ ...row, editable: row.court_code === courtCode })) });
+    res.json({ records: rows.map(row => ({ ...row, editable: req.user.role === 'central_admin' || row.court_code === courtCode })) });
+};
+
+const holidayCourtCode = (req, scope) => {
+    if (scope === 'national') return req.user.role === 'central_admin' ? null : undefined;
+    if (scope === 'court') return req.user.court_code || undefined;
+    return undefined;
 };
 
 exports.createHoliday = async (req, res) => {
     const name = String(req.body?.name || '').trim();
     const date = req.body?.holiday_date;
     const status = req.body?.status || 'ใช้งาน';
+    const scope = req.body?.scope || (req.user.role === 'central_admin' ? 'national' : 'court');
+    const courtCode = holidayCourtCode(req, scope);
     if (!name || name.length > 255 || !validCalendarDate(date) || !['ใช้งาน', 'ระงับ'].includes(status)) {
         return res.status(400).json({ message: 'กรุณาระบุชื่อ วันที่ และสถานะวันหยุดให้ถูกต้อง' });
     }
+    if (courtCode === undefined) return res.status(403).json({ message: 'ไม่มีสิทธิ์กำหนดขอบเขตวันหยุดนี้' });
     const [result] = await pool.query(
         'INSERT INTO holidays (name, holiday_date, court_code, status) VALUES (?, ?, ?, ?)',
-        [name, date, req.user.court_code || null, status]
+        [name, date, courtCode, status]
     );
     logActivity(req, 'เพิ่มข้อมูล', 'วันหยุดพิเศษ', `เพิ่มวันหยุด ID: ${result.insertId}`);
     res.status(201).json({ message: 'เพิ่มวันหยุดสำเร็จ', id: result.insertId });
@@ -62,9 +71,17 @@ exports.updateHoliday = async (req, res) => {
     if (!name || name.length > 255 || !validCalendarDate(date) || !['ใช้งาน', 'ระงับ'].includes(status)) {
         return res.status(400).json({ message: 'กรุณาระบุชื่อ วันที่ และสถานะวันหยุดให้ถูกต้อง' });
     }
+    const [existing] = await pool.query('SELECT court_code FROM holidays WHERE id = ? LIMIT 1', [req.params.id]);
+    if (!existing.length) return res.status(404).json({ message: 'ไม่พบวันหยุดที่แก้ไขได้' });
+    if (req.user.role !== 'central_admin' && existing[0].court_code !== req.user.court_code) {
+        return res.status(403).json({ message: 'ไม่มีสิทธิ์แก้ไขวันหยุดทั่วประเทศหรือของศาลอื่น' });
+    }
+    const scope = req.body?.scope || (existing[0].court_code ? 'court' : 'national');
+    const courtCode = holidayCourtCode(req, scope);
+    if (courtCode === undefined) return res.status(403).json({ message: 'ไม่มีสิทธิ์กำหนดขอบเขตวันหยุดนี้' });
     const [result] = await pool.query(
-        'UPDATE holidays SET name = ?, holiday_date = ?, status = ? WHERE id = ? AND court_code <=> ?',
-        [name, date, status, req.params.id, req.user.court_code || null]
+        'UPDATE holidays SET name = ?, holiday_date = ?, status = ?, court_code = ? WHERE id = ?',
+        [name, date, status, courtCode, req.params.id]
     );
     if (!result.affectedRows) return res.status(404).json({ message: 'ไม่พบวันหยุดที่แก้ไขได้' });
     logActivity(req, 'อัปเดตข้อมูล', 'วันหยุดพิเศษ', `แก้ไขวันหยุด ID: ${req.params.id}`);
@@ -72,8 +89,12 @@ exports.updateHoliday = async (req, res) => {
 };
 
 exports.deleteHoliday = async (req, res) => {
-    const [result] = await pool.query('DELETE FROM holidays WHERE id = ? AND court_code <=> ?',
-        [req.params.id, req.user.court_code || null]);
+    const [existing] = await pool.query('SELECT court_code FROM holidays WHERE id = ? LIMIT 1', [req.params.id]);
+    if (!existing.length) return res.status(404).json({ message: 'ไม่พบวันหยุดที่ลบได้' });
+    if (req.user.role !== 'central_admin' && existing[0].court_code !== req.user.court_code) {
+        return res.status(403).json({ message: 'ไม่มีสิทธิ์ลบวันหยุดทั่วประเทศหรือของศาลอื่น' });
+    }
+    const [result] = await pool.query('DELETE FROM holidays WHERE id = ?', [req.params.id]);
     if (!result.affectedRows) return res.status(404).json({ message: 'ไม่พบวันหยุดที่ลบได้' });
     logActivity(req, 'ลบข้อมูล', 'วันหยุดพิเศษ', `ลบวันหยุด ID: ${req.params.id}`);
     res.json({ message: 'ลบวันหยุดสำเร็จ' });

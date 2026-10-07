@@ -7,7 +7,7 @@
         <p class="page-subtitle">จัดการข้อมูลกิจกรรม และรายชื่อผู้พิพากษาสมทบที่เข้าร่วม</p>
       </div>
       <div v-if="isAdmin" class="header-actions">
-        <button class="btn-secondary" @click="openEventTypeManager">⚙️ จัดการประเภทกิจกรรม</button>
+        <button v-if="isCentralAdmin" class="btn-secondary" @click="openEventTypeManager">⚙️ จัดการประเภทกิจกรรม</button>
         <button class="btn-primary" @click="openAddModal">+ สร้างกิจกรรมใหม่</button>
       </div>
     </div>
@@ -481,7 +481,7 @@
     </div>
 
     <!-- Modal จัดการประเภทกิจกรรม -->
-    <div v-if="isAdmin && isEventTypeManagerOpen" class="modal-overlay no-print">
+    <div v-if="isCentralAdmin && isEventTypeManagerOpen" class="modal-overlay no-print">
       <div class="modal-card event-type-manager-modal">
         <div class="modal-header">
           <div><h2>จัดการประเภทกิจกรรม</h2><small>เพิ่ม แก้ไข ระงับ หรือลบประเภทกิจกรรม</small></div>
@@ -509,7 +509,7 @@
     </div>
 
     <!-- Modal เพิ่ม/แก้ไขประเภทกิจกรรม -->
-    <div v-if="isAdmin && isEventTypeFormOpen" class="modal-overlay nested-modal no-print">
+    <div v-if="isCentralAdmin && isEventTypeFormOpen" class="modal-overlay nested-modal no-print">
       <div class="modal-card event-type-form-modal">
         <div class="modal-header"><h2>{{ eventTypeForm.id ? 'แก้ไขประเภทกิจกรรม' : 'เพิ่มประเภทกิจกรรม' }}</h2><button class="close-btn" @click="closeEventTypeFormModal">✕</button></div>
         <form class="form-grid" @submit.prevent="saveEventType">
@@ -526,7 +526,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import api from '../services/api' 
-import { isAdmin } from '../services/session'
+import { isAdmin, isCentralAdmin } from '../services/session'
 import { createProtectedFileUrl, revokeProtectedFileUrl } from '../services/protectedFiles'
 import { swalSuccess, swalError, swalConfirm } from '../utils/swal'
 
