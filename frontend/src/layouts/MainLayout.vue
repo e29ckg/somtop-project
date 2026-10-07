@@ -41,14 +41,14 @@
         <router-link to="/performance-evaluation" class="nav-item">
            <span class="nav-icon">📝</span><span class="sidebar-text">ประเมินผลงานรอบปี</span>
         </router-link>
-        <router-link v-if="['admin', 'finance'].includes(userRole)" to="/payment-evidence" class="nav-item">
+        <router-link v-if="['admin', 'central_admin', 'finance'].includes(userRole)" to="/payment-evidence" class="nav-item">
            <span class="nav-icon">🧾</span><span class="sidebar-text">ตรวจสอบหลักฐานการรับเงิน</span>
         </router-link>
         <!-- ⭐️ ซ่อน/แสดงเมนูตั้งค่า เฉพาะผู้ที่มี Role = admin เท่านั้น -->
-        <div v-if="userRole === 'admin'">
+        <div v-if="['admin', 'central_admin'].includes(userRole)">
           <div class="menu-category">ตั้งค่าระบบ</div>
           <!-- เมนูจัดการ Google Calendar -->
-          <router-link to="/manage-calendar-sync" class="nav-item">
+          <router-link v-if="isCentralAdmin" to="/manage-calendar-sync" class="nav-item">
              <span class="nav-icon">📅</span>
              <span class="sidebar-text">ตั้งค่า Google Calendar</span>
           </router-link>
@@ -60,11 +60,11 @@
              <span class="nav-icon">⚙️</span>
              <span class="sidebar-text">ผู้ใช้งานระบบ</span>
           </router-link>
-          <router-link to="/manage-titles" class="nav-item">
+          <router-link v-if="isCentralAdmin" to="/manage-titles" class="nav-item">
              <span class="nav-icon">🏷️</span>
              <span class="sidebar-text">คำนำหน้าชื่อ</span>
           </router-link>
-          <router-link to="/manage-positions" class="nav-item">
+          <router-link v-if="isCentralAdmin" to="/manage-positions" class="nav-item">
              <span class="nav-icon">🏅</span>
              <span class="sidebar-text">จัดการตำแหน่ง</span>
           </router-link>
@@ -76,15 +76,15 @@
             <span class="nav-icon">🗓️</span>
             <span class="sidebar-text">จัดการวันหยุดพิเศษ</span>
           </router-link>
-          <router-link to="/manage-decorations" class="nav-item">
+          <router-link v-if="isCentralAdmin" to="/manage-decorations" class="nav-item">
              <span class="nav-icon">🎖️</span>
              <span class="sidebar-text">ชั้นตราเครื่องราชฯ</span>
           </router-link>
-          <router-link to="/manage-templates" class="nav-item">
+          <router-link v-if="isCentralAdmin" to="/manage-templates" class="nav-item">
             <span class="nav-icon">📄</span>
             <span class="sidebar-text">จัดการเทมเพลตเอกสาร</span>
         </router-link>
-          <router-link to="/activity-logs" class="nav-item">
+          <router-link v-if="isCentralAdmin" to="/activity-logs" class="nav-item">
              <span class="nav-icon">📋</span>
              <span class="sidebar-text">ประวัติการใช้งาน</span>
           </router-link>
@@ -102,13 +102,20 @@
           <div class="breadcrumb">
             หน้าหลัก > {{ currentRouteName }}
           </div>
+          <div v-if="isCentralAdmin" class="court-context">
+            <label for="central-court">ศาลที่จัดการ</label>
+            <select id="central-court" v-model="selectedCourt" @change="changeCourt">
+              <option value="">-- เลือกศาล --</option>
+              <option v-for="court in courtOptions" :key="court.court_code" :value="court.court_code">{{ court.court_name }}</option>
+            </select>
+          </div>
         </div>
         
         <div class="topbar-right" style="display: flex; gap: 16px; align-items: center;">
           <!-- แสดงชื่อและสิทธิ์ของผู้ใช้งานที่ล็อกอินเข้ามา -->
           <div style="font-size: 14px; text-align: right;">
             <div style="font-weight: 600; color: #111827;">{{ userName }}</div>
-            <div style="font-size: 12px; color: #6B7280; text-transform: capitalize;">{{ userRole }}</div>
+            <div style="font-size: 12px; color: #6B7280;">{{ userRole === 'central_admin' ? 'ผู้ดูแลส่วนกลาง' : userRole === 'admin' ? 'ผู้ดูแลศาล' : userRole }}</div>
           </div>
           
           <div style="display: flex; gap: 8px;">
@@ -142,12 +149,12 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, watchEffect } from 'vue'
+import { ref, computed, onMounted, watch, watchEffect } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { swalConfirm } from '../utils/swal' // ⭐️ นำเข้า SweetAlert สำหรับยืนยันการลบ
 import api from '../services/api' // ⭐️ นำเข้า Axios instance สำหรับเรียก API
 import { useCounterStore } from '@/stores/counter'
-import { currentUser, clearSession } from '../services/session'
+import { activeCourtCode, currentUser, clearSession, isCentralAdmin, setSelectedCourtCode } from '../services/session'
 
 const router = useRouter()
 const route = useRoute()
@@ -156,13 +163,34 @@ const isCollapsed = ref(false)
 const userRole = ref('viewer') // ค่าเริ่มต้น
 const userName = ref('ผู้ใช้งาน')
 const userCourtCode = ref('')
+const courtOptions = ref([])
+const selectedCourt = ref(activeCourtCode.value)
 
 watchEffect(() => {
   const user = currentUser.value
   userRole.value = user?.role || 'viewer'
   userName.value = user?.full_name || 'ผู้ใช้งาน'
-  userCourtCode.value = user?.court_code || ''
+  userCourtCode.value = activeCourtCode.value || ''
 })
+
+onMounted(async () => {
+  if (!isCentralAdmin.value) return
+  try {
+    const response = await api.get('/courts')
+    courtOptions.value = response.data.records || []
+    if (selectedCourt.value && !courtOptions.value.some(c => c.court_code === selectedCourt.value)) {
+      selectedCourt.value = ''
+      setSelectedCourtCode('')
+    }
+  } catch (error) {
+    console.error('โหลดรายชื่อศาลไม่สำเร็จ', error)
+  }
+})
+
+const changeCourt = () => {
+  setSelectedCourtCode(selectedCourt.value)
+  window.location.assign(`${import.meta.env.BASE_URL}dashboard`)
+}
 
 const toggleSidebar = () => {
   isCollapsed.value = !isCollapsed.value
@@ -226,3 +254,9 @@ watch(() => route.path, () => {
   }
 })
 </script>
+
+<style scoped>
+.court-context { display: flex; align-items: center; gap: 8px; margin-left: 16px; font-size: 13px; }
+.court-context select { max-width: 240px; padding: 7px 10px; border: 1px solid #d1d5db; border-radius: 6px; background: #fff; }
+@media (max-width: 900px) { .court-context { margin-left: 0; } .court-context label { display: none; } .court-context select { max-width: 160px; } }
+</style>

@@ -47,10 +47,10 @@
                   🔒 ระงับการใช้งาน
                 </span>
               </td>
-              <td class="font-mono font-bold">{{ user.court_code ? user.court_code.toUpperCase() : '-' }}</td>
+              <td class="font-mono font-bold">{{ user.court_code ? user.court_code.toUpperCase() : 'ส่วนกลาง' }}</td>
               <td>
-                <span class="status-badge" :class="user.role === 'admin' ? 'active' : 'warning'">
-                  {{ user.role === 'admin' ? 'ผู้ดูแลระบบ (Admin)' : user.role === 'finance' ? 'เจ้าหน้าที่การเงิน' : 'ผู้ใช้งาน (Viewer)' }}
+                <span class="status-badge" :class="['admin', 'central_admin'].includes(user.role) ? 'active' : 'warning'">
+                  {{ user.role === 'central_admin' ? 'ผู้ดูแลส่วนกลาง' : user.role === 'admin' ? 'ผู้ดูแลศาล' : user.role === 'finance' ? 'เจ้าหน้าที่การเงิน' : 'ผู้ใช้งานทั่วไป' }}
                 </span>
               </td>
               <td class="text-muted">{{ user.last_login || '-' }}</td>
@@ -65,7 +65,7 @@
                     🔓
                   </button>
                   <button class="btn-icon edit" @click="openEditModal(user)" title="แก้ไข">✏️</button>
-                  <button class="btn-icon delete" @click="deleteData(user.id)" title="ลบ">🗑️</button>
+                  <button v-if="user.id !== currentUser?.id" class="btn-icon delete" @click="deleteData(user.id)" title="ลบ">🗑️</button>
                 </div>
               </td>
             </tr>
@@ -119,26 +119,25 @@
             <label>สิทธิ์การใช้งาน (Role)</label>
             <select v-model="formData.role">
               <option value="viewer">ผู้ใช้งานทั่วไป (Viewer) - จัดการข้อมูล พ.สมทบได้</option>
-              <option value="admin">ผู้ดูแลระบบ (Admin) - ดูแลระบบและจัดการผู้ใช้งานได้</option>
+              <option value="admin">ผู้ดูแลศาล (Admin)</option>
+              <option v-if="isCentralAdmin" value="central_admin">ผู้ดูแลส่วนกลาง - จัดการได้ทุกศาล</option>
               <option value="finance">เจ้าหน้าที่การเงิน - ตรวจสอบและพิมพ์หลักฐานการรับเงิน</option>
             </select>
           </div>
 
-          <div class="input-group searchable-select">
+          <div v-if="formData.role !== 'central_admin'" class="input-group searchable-select">
             <label>รหัสศาล (Court Code) <span style="color: #DC2626;">*</span></label>
             <input 
               type="text" 
               v-model="courtSearchQuery" 
-              @focus="isCourtDropdownOpen = true" 
+              @focus="isCourtDropdownOpen = isCentralAdmin"
               @blur="closeCourtDropdown" 
               placeholder="พิมพ์ค้นหารหัส หรือชื่อศาล..." 
               class="font-mono"
+              :disabled="!isCentralAdmin"
               required
             />
-            <ul v-if="isCourtDropdownOpen" class="search-dropdown">
-              <li @mousedown.prevent="selectCourt(null)" class="text-muted">
-                -- ไม่ระบุ (เว้นว่าง) --
-              </li>
+            <ul v-if="isCentralAdmin && isCourtDropdownOpen" class="search-dropdown">
               <li 
                 v-for="court in filteredCourtList" 
                 :key="court.id" 
@@ -165,6 +164,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import api from '../services/api' 
+import { currentUser, isCentralAdmin } from '../services/session'
 import { swalSuccess, swalError, swalConfirm } from '../utils/swal'
 
 const dataList = ref([])
@@ -257,7 +257,7 @@ const fetchData = async () => {
 }
 
 const saveData = async () => {
-  if (!formData.value.court_code) {
+  if (formData.value.role !== 'central_admin' && !formData.value.court_code) {
     swalError('ข้อมูลไม่ครบถ้วน', 'กรุณาพิมพ์ค้นหาและคลิกเลือกรหัสศาลจากรายการที่ปรากฏขึ้นมา');
     return;
   }
@@ -309,8 +309,10 @@ const unlockAccount = async (id) => {
 
 const openAddModal = () => {
   isEditing.value = false;
-  courtSearchQuery.value = ''; 
-  formData.value = { id: null, username: '', password: '', full_name: '', role: 'viewer', court_code: '' };
+  const courtCode = isCentralAdmin.value ? '' : (currentUser.value?.court_code || '')
+  const court = courtList.value.find(c => c.court_code === courtCode)
+  courtSearchQuery.value = court ? `${court.court_code.toUpperCase()} - ${court.court_name}` : courtCode
+  formData.value = { id: null, username: '', password: '', full_name: '', role: 'viewer', court_code: courtCode };
   isModalOpen.value = true;
 }
 
@@ -331,6 +333,13 @@ const openEditModal = (item) => {
 }
 
 const closeModal = () => isModalOpen.value = false
+
+watch(() => formData.value.role, (role) => {
+  if (role === 'central_admin') {
+    formData.value.court_code = ''
+    courtSearchQuery.value = ''
+  }
+})
 
 const isUserLocked = (lockoutUntil) => {
   if (!lockoutUntil) return false;

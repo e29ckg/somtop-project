@@ -1,6 +1,14 @@
 const pool = require('../config/db');
 const bcrypt = require('bcrypt');
 const { logActivity } = require('../utils/logger');
+const isCentral = req => req.user.role === 'central_admin';
+const normalizedCourt = value => String(value || '').trim().toLowerCase() || null;
+const validRoles = ['viewer', 'finance', 'admin', 'central_admin'];
+const canManage = (req, target) => isCentral(req) ||
+    (req.user.court_code && target.court_code === req.user.court_code && target.role !== 'central_admin');
+const validAssignment = (req, role, courtCode) => validRoles.includes(role) &&
+    (role === 'central_admin' ? isCentral(req) && !courtCode : Boolean(courtCode)) &&
+    (isCentral(req) || (role !== 'central_admin' && courtCode === req.user.court_code));
 
 // ==========================================
 // 1. ดึงข้อมูลผู้ใช้งานทั้งหมด (GET)
@@ -18,8 +26,10 @@ exports.getAllUsers = async (req, res) => {
                 DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') AS created_at, 
                 failed_login_attempts, 
                 DATE_FORMAT(lockout_until, '%Y-%m-%d %H:%i:%s') AS lockout_until 
-             FROM users 
-             ORDER BY created_at DESC`
+             FROM users
+             ${isCentral(req) ? '' : 'WHERE court_code = ?'}
+             ORDER BY created_at DESC`,
+            isCentral(req) ? [] : [req.user.court_code]
         );
         res.status(200).json({ records: rows });
     } catch (error) {
@@ -33,10 +43,19 @@ exports.getAllUsers = async (req, res) => {
 // ==========================================
 exports.createUser = async (req, res) => {
     try {
-        const { username, password, full_name, role, court_code } = req.body;
+        const { username, password, full_name } = req.body;
+        const role = req.body.role || 'viewer';
+        const courtCode = normalizedCourt(req.body.court_code);
 
         if (!username || !password || !full_name) {
             return res.status(400).json({ message: 'กรุณากรอกข้อมูลให้ครบถ้วน' });
+        }
+        if (!validAssignment(req, role, courtCode)) {
+            return res.status(403).json({ message: 'ไม่มีสิทธิ์กำหนดบทบาทหรือศาลนี้' });
+        }
+        if (courtCode) {
+            const [courts] = await pool.query('SELECT id FROM courts WHERE court_code = ? LIMIT 1', [courtCode]);
+            if (!courts.length) return res.status(400).json({ message: 'ไม่พบศาลที่เลือก' });
         }
 
         // เช็กชื่อผู้ใช้ซ้ำ
@@ -53,7 +72,7 @@ exports.createUser = async (req, res) => {
         await pool.query(
             `INSERT INTO users (username, password_hash, full_name, role, court_code) 
              VALUES (?, ?, ?, ?, ?)`,
-            [username, password_hash, full_name, role || 'viewer', court_code || null]
+            [username, password_hash, full_name, role, courtCode]
         );
         logActivity(req, 'เพิ่มข้อมูล', 'จัดการผู้ใช้งาน', `เพิ่มผู้ใช้งาน: ${username}`);
         res.status(201).json({ message: 'เพิ่มผู้ใช้งานสำเร็จ' });
@@ -68,14 +87,32 @@ exports.createUser = async (req, res) => {
 // ==========================================
 exports.updateUser = async (req, res) => {
     try {
-        const { id, full_name, role, court_code, password } = req.body;
+        const { id, full_name, password } = req.body;
+        const role = req.body.role || 'viewer';
+        const courtCode = normalizedCourt(req.body.court_code);
 
         if (!id || !full_name) {
             return res.status(400).json({ message: 'ข้อมูลไม่ครบถ้วน' });
         }
+        const [targets] = await pool.query('SELECT id, role, court_code FROM users WHERE id = ? LIMIT 1', [id]);
+        if (!targets.length) return res.status(404).json({ message: 'ไม่พบข้อมูลผู้ใช้งาน' });
+        if (!canManage(req, targets[0]) || !validAssignment(req, role, courtCode)) {
+            return res.status(403).json({ message: 'ไม่มีสิทธิ์แก้ไขผู้ใช้งานหรือศาลนี้' });
+        }
+        if (Number(id) === Number(req.user.id) && role !== targets[0].role) {
+            return res.status(400).json({ message: 'ไม่สามารถเปลี่ยนบทบาทของตนเองได้' });
+        }
+        if (targets[0].role === 'central_admin' && role !== 'central_admin') {
+            const [count] = await pool.query("SELECT COUNT(*) AS total FROM users WHERE role = 'central_admin'");
+            if (count[0].total <= 1) return res.status(400).json({ message: 'ต้องมีผู้ดูแลส่วนกลางอย่างน้อยหนึ่งบัญชี' });
+        }
+        if (courtCode) {
+            const [courts] = await pool.query('SELECT id FROM courts WHERE court_code = ? LIMIT 1', [courtCode]);
+            if (!courts.length) return res.status(400).json({ message: 'ไม่พบศาลที่เลือก' });
+        }
 
         let query = 'UPDATE users SET full_name = ?, role = ?, court_code = ?';
-        let params = [full_name, role || 'viewer', court_code || null];
+        let params = [full_name, role, courtCode];
 
         // ถ้ามีการส่งรหัสผ่านใหม่มาด้วย ให้เข้ารหัสและอัปเดต
         if (password) {
@@ -112,6 +149,14 @@ exports.deleteUser = async (req, res) => {
         if (!id) {
             return res.status(400).json({ message: 'ไม่ได้ระบุ ID ที่ต้องการลบ' });
         }
+        const [targets] = await pool.query('SELECT id, role, court_code FROM users WHERE id = ? LIMIT 1', [id]);
+        if (!targets.length) return res.status(404).json({ message: 'ไม่พบข้อมูลผู้ใช้งาน' });
+        if (!canManage(req, targets[0])) return res.status(403).json({ message: 'ไม่มีสิทธิ์ลบบัญชีนี้' });
+        if (Number(id) === Number(req.user.id)) return res.status(400).json({ message: 'ไม่สามารถลบบัญชีตนเองได้' });
+        if (targets[0].role === 'central_admin') {
+            const [count] = await pool.query("SELECT COUNT(*) AS total FROM users WHERE role = 'central_admin'");
+            if (count[0].total <= 1) return res.status(400).json({ message: 'ต้องมีผู้ดูแลส่วนกลางอย่างน้อยหนึ่งบัญชี' });
+        }
 
         const [result] = await pool.query('DELETE FROM users WHERE id = ?', [id]);
 
@@ -135,6 +180,9 @@ exports.unlockUser = async (req, res) => {
         const { id } = req.body; // หรือรับจาก req.params ขึ้นอยู่กับการออกแบบ Route
 
         if (!id) return res.status(400).json({ message: 'ไม่ได้ระบุ ID ผู้ใช้งาน' });
+        const [targets] = await pool.query('SELECT id, role, court_code FROM users WHERE id = ? LIMIT 1', [id]);
+        if (!targets.length) return res.status(404).json({ message: 'ไม่พบผู้ใช้งาน' });
+        if (!canManage(req, targets[0])) return res.status(403).json({ message: 'ไม่มีสิทธิ์ปลดล็อกบัญชีนี้' });
 
         const [result] = await pool.query(
             'UPDATE users SET failed_login_attempts = 0, lockout_until = NULL WHERE id = ?', 

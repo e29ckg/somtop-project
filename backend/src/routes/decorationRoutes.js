@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const decorationController = require('../controllers/decorationController');
-const { verifyToken, verifyAdmin } = require('../middlewares/authMiddleware');
+const { verifyToken, verifyAdmin, verifyCentralAdmin } = require('../middlewares/authMiddleware');
 
 // สมมติว่ามี upload middleware ที่ตั้งค่าให้เก็บไฟล์ลงโฟลเดอร์ decorations
 const { uploadDecoration } = require('../middlewares/uploadMiddleware'); 
@@ -12,10 +12,10 @@ router.use(verifyToken);
 router.get('/master', decorationController.getMasterDecorations);
 
 // Endpoints สำหรับผู้ดูแลระบบจัดการ Master Data
-router.get('/admin', verifyAdmin, decorationController.getAllAdmin);
-router.post('/admin', verifyAdmin, decorationController.createMasterDecoration);
-router.put('/admin', verifyAdmin, decorationController.updateMasterDecoration);
-router.delete('/admin', verifyAdmin, decorationController.deleteMasterDecoration);
+router.get('/admin', verifyCentralAdmin, decorationController.getAllAdmin);
+router.post('/admin', verifyCentralAdmin, decorationController.createMasterDecoration);
+router.put('/admin', verifyCentralAdmin, decorationController.updateMasterDecoration);
+router.delete('/admin', verifyCentralAdmin, decorationController.deleteMasterDecoration);
 
 // Endpoints สำหรับประวัติรายบุคคล
 router.get('/:somtop_id', decorationController.getSomtopDecorations);

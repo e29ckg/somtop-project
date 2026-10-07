@@ -31,7 +31,7 @@
 
         <div class="input-group">
           <label>สิทธิ์การใช้งาน</label>
-          <input type="text" :value="userInfo.role === 'admin' ? 'ผู้ดูแลระบบ (Admin)' : 'ผู้ใช้งานทั่วไป (Viewer)'" disabled style="background-color: #F3F4F6;" />
+          <input type="text" :value="userInfo.role === 'central_admin' ? 'ผู้ดูแลส่วนกลาง' : userInfo.role === 'admin' ? 'ผู้ดูแลศาล' : userInfo.role === 'finance' ? 'เจ้าหน้าที่การเงิน' : 'ผู้ใช้งานทั่วไป'" disabled style="background-color: #F3F4F6;" />
         </div>
 
         <div class="input-group">

@@ -4,7 +4,10 @@ const { logActivity } = require('../utils/logger');
 // ดึงข้อมูลศาลทั้งหมด
 exports.getAllCourts = async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT * FROM courts ORDER BY created_at DESC');
+        const [rows] = await pool.query(
+            `SELECT * FROM courts ${req.user.role === 'central_admin' ? '' : 'WHERE court_code = ?'} ORDER BY created_at DESC`,
+            req.user.role === 'central_admin' ? [] : [req.user.court_code]
+        );
         res.status(200).json({ records: rows });
     } catch (error) {
         console.error('Error fetching courts:', error);
@@ -60,6 +63,12 @@ exports.updateCourt = async (req, res) => {
 
         if (!id || !court_code || !court_name) {
             return res.status(400).json({ message: 'ข้อมูลไม่ครบถ้วน' });
+        }
+        if (req.user.role !== 'central_admin') {
+            const [ownCourt] = await pool.query('SELECT court_code FROM courts WHERE id = ? LIMIT 1', [id]);
+            if (!ownCourt.length || ownCourt[0].court_code !== req.user.court_code || court_code.toLowerCase() !== req.user.court_code) {
+                return res.status(403).json({ message: 'แก้ไขข้อมูลได้เฉพาะศาลของตนเอง และเปลี่ยนรหัสศาลไม่ได้' });
+            }
         }
 
         const query = `

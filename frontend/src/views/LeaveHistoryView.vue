@@ -7,7 +7,7 @@
         <p class="page-subtitle">ข้อมูลการขอลาพักปฏิบัติหน้าที่ของผู้พิพากษาสมทบ</p>
       </div>
       <div v-if="isAdmin" class="header-actions">
-        <button class="btn-secondary" @click="openLeaveTypeManager">⚙️ จัดการประเภทการลา</button>
+        <button v-if="isCentralAdmin" class="btn-secondary" @click="openLeaveTypeManager">⚙️ จัดการประเภทการลา</button>
         <button class="btn-primary" @click="openAddModal">+ ยื่นเรื่องขอลา</button>
       </div>
     </div>
@@ -177,7 +177,7 @@
     </div>
 
     <!-- จัดการประเภทการลาในหน้าประวัติการลา -->
-    <div v-if="isAdmin && isLeaveTypeManagerOpen" class="modal-overlay no-print">
+    <div v-if="isCentralAdmin && isLeaveTypeManagerOpen" class="modal-overlay no-print">
       <div class="modal-card leave-type-modal">
         <div class="modal-header">
           <div><h2>จัดการประเภทการลา</h2><small>เพิ่ม แก้ไข ระงับ หรือลบประเภทการลา</small></div>
@@ -204,7 +204,7 @@
       </div>
     </div>
 
-    <div v-if="isAdmin && isLeaveTypeFormOpen" class="modal-overlay nested-modal no-print">
+    <div v-if="isCentralAdmin && isLeaveTypeFormOpen" class="modal-overlay nested-modal no-print">
       <div class="modal-card leave-type-form-modal">
         <div class="modal-header">
           <h2>{{ leaveTypeForm.id ? 'แก้ไขประเภทการลา' : 'เพิ่มประเภทการลา' }}</h2>
@@ -396,7 +396,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import api from '../services/api'
-import { isAdmin } from '../services/session'
+import { isAdmin, isCentralAdmin } from '../services/session'
 import { createProtectedFileUrl, revokeProtectedFileUrl } from '../services/protectedFiles'
 import { swalSuccess, swalError, swalConfirm } from '../utils/swal'
 

@@ -22,7 +22,7 @@ import PerformanceEvaluationView from '../views/PerformanceEvaluationView.vue'
 import PaymentEvidenceView from '../views/PaymentEvidenceView.vue'
 import ManageHolidayView from '../views/ManageHolidayView.vue'
 import api from '../services/api'
-import { currentUser, isSessionVerified, setSessionUser, clearSession } from '../services/session'
+import { activeCourtCode, currentUser, isSessionVerified, setSessionUser, clearSession } from '../services/session'
 
 // 1. สร้าง router ขึ้นมาก่อน
 const router = createRouter({
@@ -41,7 +41,8 @@ const router = createRouter({
         {
           path: 'dashboard',
           name: 'dashboard',
-          component: DashboardView
+          component: DashboardView,
+          meta: { requiresCourt: true }
         },
         {
           path: 'profile',
@@ -51,12 +52,14 @@ const router = createRouter({
         {
           path: 'manage-somtop',
           name: 'manage-somtop',
-          component: ManageSomtopView
+          component: ManageSomtopView,
+          meta: { requiresCourt: true }
         },
         {
           path: 'leave-history', 
           name: 'leave-history',
-          component: LeaveHistoryView
+          component: LeaveHistoryView,
+          meta: { requiresCourt: true }
         },
         {
           path: 'manage-users', 
@@ -74,72 +77,75 @@ const router = createRouter({
           path: 'activity-logs',
           name: 'activity-logs',
           component: ActivityLogsView,
-          meta: { requiresAdmin: true }
+          meta: { requiresCentral: true }
         },
         {
           path: 'manage-titles',
           name: 'manage-titles',
           component: ManageTitleView,
-          meta: { requiresAdmin: true }
+          meta: { requiresCentral: true }
         },
         {
           path: 'manage-events',
           name: 'manage-events',
-          component: ManageEventView
+          component: ManageEventView,
+          meta: { requiresCourt: true }
         },
         {
           path: 'participation-report',
           name: 'participation-report',
-          component: ParticipationReportView
+          component: ParticipationReportView,
+          meta: { requiresCourt: true }
         },
         {
           path: 'duty-schedule',
           name: 'duty-schedule',
-          component: DutyScheduleView
+          component: DutyScheduleView,
+          meta: { requiresCourt: true }
         },
-        { path: 'performance-evaluation', name: 'performance-evaluation', component: PerformanceEvaluationView },
-        { path: 'payment-evidence', name: 'payment-evidence', component: PaymentEvidenceView, meta: { requiresFinance: true } },
+        { path: 'performance-evaluation', name: 'performance-evaluation', component: PerformanceEvaluationView, meta: { requiresCourt: true } },
+        { path: 'payment-evidence', name: 'payment-evidence', component: PaymentEvidenceView, meta: { requiresFinance: true, requiresCourt: true } },
         {
           path: 'manage-event-types',
           name: 'manage-event-types',
           redirect: '/manage-events',
-          meta: { requiresAdmin: true }
+          meta: { requiresCentral: true }
         },
         {
           path: 'manage-positions',
           name: 'manage-positions',
           component: ManagePositionView,
-          meta: { requiresAdmin: true }
+          meta: { requiresCentral: true }
         },
         {
           path: 'manage-decorations',
           name: 'manage-decorations',
           component: ManageDecorationView,
-          meta: { requiresAdmin: true }
+          meta: { requiresCentral: true }
         },
         {
           path: 'manage-leave-types',
           name: 'manage-leave-types',
           redirect: '/leave-history',
-          meta: { requiresAdmin: true }
+          meta: { requiresCentral: true }
         },
         {
           path: 'manage-templates',
           name: 'manage-templates',
           component: ManageTemplateView,
-          meta: { requiresAdmin: true }
+          meta: { requiresCentral: true }
         },
         {
           path: 'manage-calendar-sync',
           name: 'manage-calendar-sync',
           component: ManageGoogleCalendarView,
-          meta: { requiresAdmin: true }
+          meta: { requiresCentral: true }
         },
         {
           path: 'manage-terms',
           name: 'manage-terms',
           component: ManageTermView,
-          meta: { requiresAdmin: true }
+          meta: { requiresAdmin: true, requiresCourt: true }
         },
         {
           path: 'manage-holidays',
@@ -169,9 +175,13 @@ router.beforeEach(async (to) => {
   }
 
   if (to.meta.requiresAuth && !currentUser.value) return '/'
-  if (to.meta.requiresAdmin && currentUser.value?.role !== 'admin') return '/dashboard'
-  if (to.meta.requiresFinance && !['admin', 'finance'].includes(currentUser.value?.role)) return '/dashboard'
-  if (to.path === '/' && currentUser.value) return '/dashboard'
+  const role = currentUser.value?.role
+  const fallback = role === 'central_admin' && !activeCourtCode.value ? '/manage-courts' : '/dashboard'
+  if (to.meta.requiresAdmin && !['admin', 'central_admin'].includes(role)) return fallback
+  if (to.meta.requiresCentral && role !== 'central_admin') return fallback
+  if (to.meta.requiresFinance && !['admin', 'central_admin', 'finance'].includes(role)) return fallback
+  if (to.meta.requiresCourt && role === 'central_admin' && !activeCourtCode.value) return '/manage-courts'
+  if (to.path === '/' && currentUser.value) return fallback
 
   return true
 })

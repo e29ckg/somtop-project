@@ -97,6 +97,8 @@ pm2 status
 
 สีวันหยุดในหลักฐานการรับเงินอ่านจากตาราง `holidays` เฉพาะรายการสถานะ `ใช้งาน` ที่เป็นวันหยุดทั่วประเทศ (`court_code` เป็น `NULL`) หรือของศาลผู้ใช้ หากฐานข้อมูลเดิมยังไม่มีตารางนี้ ให้สำรองฐานข้อมูลแล้วนำเข้า `backend/migrations/011_holidays.sql` ผ่าน phpMyAdmin หนึ่งครั้ง จากนั้นเพิ่มวันที่ต้องการในตาราง `holidays` การ deploy โค้ดอย่างเดียวไม่ได้เพิ่มวันหยุดให้โดยอัตโนมัติ
 
+สิทธิ์ผู้ดูแลส่วนกลางต้องใช้ `backend/migrations/012_central_admin.sql` ให้ผู้ดูแลฐานข้อมูลรัน migration ก่อนอัปเดตโค้ด จากนั้นตรวจด้วย `node backend/scripts/check_production_update.js admin` และเลื่อนสิทธิ์บัญชี `admin` หลัง API รุ่นใหม่เริ่มทำงานแล้ว ตาม `PRODUCTION_UPDATE_2026-10-07.md` สคริปต์เลื่อนสิทธิ์ไม่ต้องใช้สิทธิ์ ALTER ของฐานข้อมูล
+
 หากต้องอัปเดตเฉพาะหน้าเว็บ ให้รัน `git pull --ff-only origin main` แล้ว `update_somtop_frontend.bat` จาก root โปรเจกต์ สคริปต์จะติดตั้ง dependency ของ frontend, build ด้วยค่าใน `.env` และคัดลอกผลลัพธ์ไปยัง `APACHE_DOCUMENT_ROOT\somtop` โดยไม่ติดตั้ง backend, ไม่แตะ PM2 และไม่แก้ config Apache หลังเสร็จให้ผู้ใช้กด `Ctrl+Shift+R` เพื่อโหลดไฟล์ JavaScript ใหม่
 
 ระหว่างอัปเดต สคริปต์จะหยุด `somtop-api` ก่อน `npm ci` เพื่อให้ Windows ปล่อยไฟล์ native เช่น `bcrypt_lib.node` แล้วเริ่มบริการใหม่หลัง deploy หาก deploy ล้มเหลว สคริปต์จะพยายามเริ่มบริการเดิมกลับ หากยังพบ `EPERM` ให้ตรวจโปรเซส Node อื่นหรือโปรแกรมสแกนไวรัสที่กำลังเปิดไฟล์นั้นก่อนลองใหม่

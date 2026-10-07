@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const positionController = require('../controllers/positionController');
-const { verifyToken, verifyAdmin } = require('../middlewares/authMiddleware');
+const { verifyToken, verifyCentralAdmin } = require('../middlewares/authMiddleware');
 
 // บังคับว่าต้อง Login (มี Token)
 router.use(verifyToken);
@@ -10,9 +10,9 @@ router.use(verifyToken);
 router.get('/', positionController.getAllActive);
 
 // Endpoints สำหรับ Admin จัดการตำแหน่ง
-router.get('/admin', verifyAdmin, positionController.getAllAdmin);
-router.post('/admin', verifyAdmin, positionController.createPosition);
-router.put('/admin', verifyAdmin, positionController.updatePosition);
-router.delete('/admin/:id', verifyAdmin, positionController.deletePosition);
+router.get('/admin', verifyCentralAdmin, positionController.getAllAdmin);
+router.post('/admin', verifyCentralAdmin, positionController.createPosition);
+router.put('/admin', verifyCentralAdmin, positionController.updatePosition);
+router.delete('/admin/:id', verifyCentralAdmin, positionController.deletePosition);
 
 module.exports = router;

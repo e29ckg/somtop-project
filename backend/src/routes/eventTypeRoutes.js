@@ -1,13 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const eventTypeController = require('../controllers/eventTypeController');
-const { verifyToken, verifyAdmin } = require('../middlewares/authMiddleware');
+const { verifyToken, verifyCentralAdmin } = require('../middlewares/authMiddleware');
 
 // บังคับว่าต้อง Login (มี Token) ถึงจะดึงข้อมูลนี้ได้
 router.use(verifyToken);
 
 // บังคับว่าต้องเป็น Admin ถึงจะสามารถเข้าถึง Endpoint นี้ได้
-router.use('/admin', verifyAdmin);
+router.use('/admin', verifyCentralAdmin);
 
 // Endpoint ที่จะได้คือ: GET /api/event-types
 router.get('/', eventTypeController.getAllEventTypes);
