@@ -1,6 +1,11 @@
 const pool = require('../config/db');
 const bcrypt = require('bcrypt');
 const { logActivity } = require('../utils/logger');
+const validRoles = new Set(['admin', 'view']);
+const resolveRole = role => {
+    const value = role || 'view';
+    return validRoles.has(value) ? value : null;
+};
 
 // ==========================================
 // 1. ดึงข้อมูลผู้ใช้งานทั้งหมด (GET)
@@ -38,6 +43,8 @@ exports.createUser = async (req, res) => {
         if (!username || !password || !full_name) {
             return res.status(400).json({ message: 'กรุณากรอกข้อมูลให้ครบถ้วน' });
         }
+        const normalizedRole = resolveRole(role);
+        if (!normalizedRole) return res.status(400).json({ message: 'สิทธิ์ต้องเป็น view หรือ admin เท่านั้น' });
 
         // เช็กชื่อผู้ใช้ซ้ำ
         const [existing] = await pool.query('SELECT id FROM users WHERE username = ? LIMIT 1', [username]);
@@ -53,7 +60,7 @@ exports.createUser = async (req, res) => {
         await pool.query(
             `INSERT INTO users (username, password_hash, full_name, role, court_code) 
              VALUES (?, ?, ?, ?, ?)`,
-            [username, password_hash, full_name, role || 'viewer', court_code || null]
+            [username, password_hash, full_name, normalizedRole, court_code || null]
         );
         logActivity(req, 'เพิ่มข้อมูล', 'จัดการผู้ใช้งาน', `เพิ่มผู้ใช้งาน: ${username}`);
         res.status(201).json({ message: 'เพิ่มผู้ใช้งานสำเร็จ' });
@@ -73,9 +80,11 @@ exports.updateUser = async (req, res) => {
         if (!id || !full_name) {
             return res.status(400).json({ message: 'ข้อมูลไม่ครบถ้วน' });
         }
+        const normalizedRole = resolveRole(role);
+        if (!normalizedRole) return res.status(400).json({ message: 'สิทธิ์ต้องเป็น view หรือ admin เท่านั้น' });
 
         let query = 'UPDATE users SET full_name = ?, role = ?, court_code = ?';
-        let params = [full_name, role || 'viewer', court_code || null];
+        let params = [full_name, normalizedRole, court_code || null];
 
         // ถ้ามีการส่งรหัสผ่านใหม่มาด้วย ให้เข้ารหัสและอัปเดต
         if (password) {

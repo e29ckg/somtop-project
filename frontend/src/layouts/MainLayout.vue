@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="app-wrapper" :class="{ 'collapsed': isCollapsed }">
     
     <!-- Sidebar -->
@@ -41,7 +41,10 @@
         <router-link to="/performance-evaluation" class="nav-item">
            <span class="nav-icon">📝</span><span class="sidebar-text">ประเมินผลงานรอบปี</span>
         </router-link>
-        <router-link v-if="['admin', 'finance'].includes(userRole)" to="/payment-evidence" class="nav-item">
+        <router-link to="/updates" class="nav-item">
+           <span class="nav-icon">📣</span><span class="sidebar-text">การอัพเดท</span>
+        </router-link>
+        <router-link v-if="userRole === 'admin'" to="/payment-evidence" class="nav-item">
            <span class="nav-icon">🧾</span><span class="sidebar-text">ตรวจสอบหลักฐานการรับเงิน</span>
         </router-link>
         <!-- ⭐️ ซ่อน/แสดงเมนูตั้งค่า เฉพาะผู้ที่มี Role = admin เท่านั้น -->
@@ -153,13 +156,13 @@ const router = useRouter()
 const route = useRoute()
 
 const isCollapsed = ref(false)
-const userRole = ref('viewer') // ค่าเริ่มต้น
+const userRole = ref('view') // ค่าเริ่มต้น
 const userName = ref('ผู้ใช้งาน')
 const userCourtCode = ref('')
 
 watchEffect(() => {
   const user = currentUser.value
-  userRole.value = user?.role || 'viewer'
+  userRole.value = user?.role || 'view'
   userName.value = user?.full_name || 'ผู้ใช้งาน'
   userCourtCode.value = user?.court_code || ''
 })
@@ -176,6 +179,7 @@ const currentRouteName = computed(() => {
   if (route.path === '/manage-events') return 'จัดการกิจกรรม'
   if (route.path === '/participation-report') return 'รายงานการเข้าร่วมกิจกรรม'
   if (route.path === '/performance-evaluation') return 'ประเมินผลงานรอบปี'
+  if (route.path === '/updates') return 'การอัพเดท'
   if (route.path === '/duty-schedule') return 'เวรปฏิบัติหน้าที่'
   if (route.path === '/manage-users') return 'จัดการผู้ใช้งานระบบ'
   if (route.path === '/manage-courts') return 'จัดการข้อมูลศาล'

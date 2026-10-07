@@ -7,19 +7,99 @@
     <section v-else-if="record" class="profile-report card">
       <div class="profile-hero"><div class="profile-avatar">{{ initials(record.full_name) }}</div><div class="profile-identity"><h2>{{ record.full_name }}</h2><p>{{ record.position_name || 'ผู้พิพากษาสมทบ' }} · {{ record.occupation || 'ไม่ระบุอาชีพ' }}</p><span>{{ yearLabel(year) }}</span></div></div>
       <div class="report-heading"><div><h2>สรุปผลการปฏิบัติหน้าที่</h2><p>ข้อมูลประกอบการประเมินผลการปฏิบัติหน้าที่</p></div></div>
-      <div class="metric-grid"><div class="metric-card blue"><span>ปฏิบัติหน้าที่ตามเวร</span><strong>{{ record.duty_days }}</strong><small>วัน</small></div><div class="metric-card green"><span>หน้าที่อื่น / กิจกรรม</span><strong>{{ record.activity_count }}</strong><small>ครั้ง</small></div><div class="metric-card amber"><span>ผู้ขอเปลี่ยนเวร</span><strong>{{ record.swap_count }}</strong><small>ครั้ง</small></div></div>
+      <div class="metric-grid">
+        <div class="metric-card blue"><span>ปฏิบัติหน้าที่ตามเวร</span><strong>{{ record.duty_days }}</strong><small>วัน</small><button class="detail-button" @click="openDetails('duty')">แสดงรายละเอียด</button></div>
+        <div class="metric-card green"><span>หน้าที่อื่น / กิจกรรม</span><strong>{{ record.activity_count }}</strong><small>ครั้ง</small><button class="detail-button" @click="openDetails('activity')">แสดงรายละเอียด</button></div>
+        <div class="metric-card amber"><span>ผู้ขอเปลี่ยนเวร</span><strong>{{ record.swap_count }}</strong><small>ครั้ง</small><button class="detail-button" @click="openDetails('swap')">แสดงรายละเอียด</button></div>
+      </div>
       <div class="detail-section"><h3>ข้อมูลการลา</h3><div class="leave-summary">{{ leaveSummary(record) }}</div></div>
     </section>
+    <div v-if="selectedCategory" class="modal-overlay no-print" @click.self="closeDetails">
+      <div class="modal-card performance-detail-modal" role="dialog" aria-modal="true" aria-labelledby="performance-detail-title">
+        <div class="modal-header"><div><h2 id="performance-detail-title">{{ detailTitles[selectedCategory] }}</h2><small>{{ record?.full_name }} · {{ yearLabel(year) }}</small></div><button type="button" class="close-btn" aria-label="ปิดรายละเอียด" @click="closeDetails">✕</button></div>
+        <div v-if="detailsLoading" class="detail-message">กำลังโหลดรายละเอียด...</div>
+        <div v-else-if="!details.length" class="detail-message">ไม่มีรายการในรอบปีนี้</div>
+        <div v-else class="detail-list">
+          <article v-for="(item, index) in details" :key="item.id" class="detail-item">
+            <div class="detail-item-title"><span class="detail-index">{{ index + 1 }}</span><strong>{{ selectedCategory === 'activity' ? item.title : formatThaiDate(selectedCategory === 'swap' ? item.request_date : item.duty_date) }}</strong></div>
+            <template v-if="selectedCategory === 'duty'">
+              <p>ประเภทเวร: {{ item.duty_type_name || '-' }}</p>
+              <p>คำสั่ง: {{ item.order_number || '-' }}{{ item.order_title ? ` · ${item.order_title}` : '' }}</p>
+              <p>สถานะ: {{ item.status || '-' }}</p>
+              <p v-if="item.note">หมายเหตุ: {{ item.note }}</p>
+            </template>
+            <template v-else-if="selectedCategory === 'activity'">
+              <p>วันที่: {{ formatThaiDateTime(item.start_date) }}{{ item.end_date ? ` – ${formatThaiDateTime(item.end_date)}` : '' }}</p>
+              <p>ประเภท: {{ item.event_type_name || '-' }}</p>
+              <p>สถานที่: {{ item.location || '-' }}</p>
+              <p>สถานะ: {{ item.status || '-' }}</p>
+              <p v-if="item.description">รายละเอียด: {{ item.description }}</p>
+            </template>
+            <template v-else>
+              <p>วันที่เข้าเวร: {{ formatThaiDate(item.duty_date) }}</p>
+              <p>ผู้ปฏิบัติหน้าที่แทน: {{ item.replacement_name || '-' }}</p>
+              <p>เหตุผล: {{ item.reason || '-' }}</p>
+            </template>
+          </article>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'; import api from '../services/api'; import { swalError } from '../utils/swal'
+import { ref, onMounted, watch } from 'vue'; import api from '../services/api'; import { swalError } from '../utils/swal'
 const now = new Date(); const currentAnnualYear = now.getMonth() < 3 ? now.getFullYear() - 1 : now.getFullYear(); const year = ref(String(currentAnnualYear)); const person = ref(''); const filters = ref({ people: [] }); const record = ref(null); const loading = ref(false); const exporting = ref(false); const years = Array.from({ length: 15 }, (_, index) => currentAnnualYear - index)
 const yearLabel = value => { const buddhist = Number(value) + 543; return `รอบปี ${buddhist} (1 เม.ย. ${String(buddhist).slice(-2)} - 31 มี.ค. ${String(buddhist + 1).slice(-2)})` }
 const leaveSummary = row => { const leaves = row?.leaves || {}; const personal = ['ลากิจส่วนตัว', 'ลากิจ', 'ลาพักผ่อน'].reduce((sum, key) => sum + Number(leaves[key]?.days || 0), 0); return `ลากิจ/ลาพักผ่อน ${personal || '-'} วัน · ลาป่วย ${leaves['ลาป่วย']?.count || '-'} ครั้ง · ขาด - วัน (ไม่ลา)` }
 const initials = name => String(name || '-').replace(/^(นาย|นางสาว|นาง|คุณ)/, '').trim().slice(0, 2)
+const detailTitles = { duty: 'ปฏิบัติหน้าที่ตามเวร', activity: 'หน้าที่อื่น / กิจกรรม', swap: 'ผู้ขอเปลี่ยนเวร' }
+const selectedCategory = ref('')
+const details = ref([])
+const detailsLoading = ref(false)
+let detailRequest = 0
+const formatThaiDate = value => {
+  if (!value) return '-'
+  const [date] = String(value).split(' ')
+  const [yearPart, month, day] = date.split('-').map(Number)
+  return yearPart && month && day ? day + '/' + month + '/' + (yearPart + 543) : '-'
+}
+const formatThaiDateTime = value => value ? formatThaiDate(value) + (String(value).includes(' ') ? ' ' + String(value).split(' ')[1] + ' น.' : '') : '-'
+const closeDetails = () => { detailRequest++; selectedCategory.value = ''; details.value = []; detailsLoading.value = false }
+const openDetails = async category => {
+  const request = ++detailRequest
+  selectedCategory.value = category
+  details.value = []
+  detailsLoading.value = true
+  try {
+    const response = await api.get('/performance-reports/details', { params: { year: year.value, somtop_id: person.value, category } })
+    if (request === detailRequest) details.value = response.data.records || []
+  } catch (error) {
+    if (request === detailRequest) {
+      closeDetails()
+      swalError('โหลดรายละเอียดไม่สำเร็จ', error.response?.data?.message || 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้')
+    }
+  } finally {
+    if (request === detailRequest) detailsLoading.value = false
+  }
+}
 const load = async () => { loading.value = true; try { const r = await api.get('/performance-reports', { params: { year: year.value, somtop_id: person.value || undefined } }); filters.value = r.data.filters || { people: [] }; record.value = r.data.records?.find(item => String(item.id) === String(person.value)) || null } catch (e) { record.value = null; swalError('โหลดข้อมูลไม่สำเร็จ', e.response?.data?.message || 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้') } finally { loading.value = false } }
 const exportWord = async () => { exporting.value = true; try { const r = await api.get('/performance-reports/export-word', { params: { year: year.value, somtop_id: person.value }, responseType: 'blob' }); const u = URL.createObjectURL(r.data); const a = document.createElement('a'); a.href = u; a.download = `ประเมินผลงาน_${year.value}.docx`; a.click(); URL.revokeObjectURL(u) } catch (e) { swalError('สร้างไฟล์ไม่สำเร็จ', e.response?.data?.message || 'ไม่สามารถสร้างไฟล์ Word ได้') } finally { exporting.value = false } }
-watch([year, person], load); onMounted(load)
+watch([year, person], () => { closeDetails(); load() }); onMounted(load)
 </script>
 <style scoped>.performance-page{color:var(--color-text)}.filter-controls{display:flex;gap:20px}.filter-group{min-width:280px}.profile-report{max-width:900px;margin:24px auto;padding:0;overflow:hidden}.profile-hero{display:flex;align-items:center;gap:18px;padding:28px;background:linear-gradient(135deg,#eff6ff,#f8fafc);border-bottom:1px solid #dbeafe}.profile-avatar{display:grid;place-items:center;width:72px;height:72px;border-radius:50%;background:#2563eb;color:white;font-size:24px;font-weight:800}.profile-identity h2{margin:0 0 6px;font-size:22px}.profile-identity p{margin:0 0 8px;color:#64748b}.profile-identity span{font-size:13px;color:#1d4ed8;font-weight:700}.report-heading{padding:22px 28px 10px}.report-heading h2{margin:0}.report-heading p{margin:6px 0;color:#64748b;font-size:13px}.metric-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:12px 28px 24px}.metric-card{display:grid;gap:5px;padding:18px;border:1px solid #e5e7eb;border-top:4px solid;border-radius:10px;background:#fff}.metric-card span,.metric-card small{color:#64748b;font-size:13px}.metric-card strong{font-size:30px;line-height:1.1}.metric-card.blue{border-top-color:#2563eb}.metric-card.blue strong{color:#1d4ed8}.metric-card.green{border-top-color:#16a34a}.metric-card.green strong{color:#15803d}.metric-card.amber{border-top-color:#d97706}.metric-card.amber strong{color:#b45309}.detail-section{margin:0 28px 28px;padding-top:20px;border-top:1px solid #e5e7eb}.detail-section h3{margin:0 0 12px;font-size:16px}.leave-summary{padding:14px 16px;border-radius:8px;background:#f8fafc;color:#374151;line-height:1.8}@media(max-width:700px){.filter-controls{flex-direction:column}.filter-group{min-width:0}.page-header{gap:12px;flex-direction:column;align-items:stretch}.profile-hero{align-items:flex-start}.metric-grid{grid-template-columns:1fr;padding:12px 20px 20px}.report-heading,.detail-section{margin-left:0;margin-right:0;padding-left:20px;padding-right:20px}}</style>
+<style scoped>
+.metric-card{display:flex;flex-direction:column;align-items:flex-start}
+.detail-button{margin-top:12px;padding:7px 10px;border:1px solid #cbd5e1;border-radius:7px;background:#fff;color:#1e40af;cursor:pointer;font:inherit;font-size:13px}
+.detail-button:hover{background:#eff6ff}
+.detail-button:focus-visible{outline:2px solid #2563eb;outline-offset:2px}
+.performance-detail-modal{box-sizing:border-box;width:min(720px,calc(100vw - 32px));max-width:720px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden}
+.performance-detail-modal .modal-header{flex-shrink:0}
+.performance-detail-modal .modal-header small{color:#64748b}
+.detail-list{overflow-y:auto;padding:4px 0}
+.detail-message{padding:28px;text-align:center;color:#64748b}
+.detail-item{padding:16px 4px;border-bottom:1px solid #e5e7eb}
+.detail-item:last-child{border-bottom:0}
+.detail-item-title{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.detail-index{display:grid;place-items:center;min-width:25px;height:25px;padding:0 4px;border-radius:50%;background:#eff6ff;color:#1d4ed8;font-size:12px;font-weight:700}
+.detail-item p{margin:4px 0 4px 35px;color:#475569;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+</style>

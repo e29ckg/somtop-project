@@ -6,8 +6,7 @@ const upload = require('../middlewares/uploadMiddleware');
 
 // ดักจับทุก Route ต้องผ่านการ Verify Token (ต้องล็อกอิน)
 router.use(verifyToken);
-// และต้องเป็น Admin เท่านั้น ถึงจะจัดการ พ.สมทบ ได้ (หากต้องการให้ Viewer ดูได้อย่างเดียว ให้นำออกแล้วไปใส่เฉพาะ Route POST/PUT/DELETE)
-// router.use(verifyAdmin);
+// ทั้ง view และ admin อ่านข้อมูลได้ แต่การเพิ่ม แก้ไข และลบต้องเป็น admin
 
 // Endpoint: /api/somtop
 router.get('/', somtopController.getAllSomtop);

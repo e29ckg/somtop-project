@@ -25,6 +25,57 @@ exports.getReport = async (req, res) => {
   } catch (error) { console.error('Performance report error:', error); res.status(500).json({ message: 'ไม่สามารถจัดทำรายงานประเมินผลงานได้' }); }
 };
 
+exports.getDetails = async (req, res) => {
+  try {
+    const year = Number(req.query.year);
+    const person = Number(req.query.somtop_id);
+    const category = req.query.category;
+    if (!Number.isInteger(year) || year < 1900 || year > 3000 || !Number.isInteger(person) || person <= 0 || !['duty', 'activity', 'swap'].includes(category)) {
+      return res.status(400).json({ message: 'กรุณาระบุรอบปี บุคคล และประเภทรายละเอียดให้ถูกต้อง' });
+    }
+    const [people] = await pool.query(`SELECT id FROM somtop WHERE id = ? AND status = 'ใช้งาน'${scope(req.user.court_code)}`, params(req.user.court_code, [person]));
+    if (!people.length) return res.status(404).json({ message: 'ไม่พบข้อมูลบุคคล' });
+
+    const { start, end } = range(year);
+    let sql;
+    if (category === 'duty') {
+      sql = `SELECT ds.id, DATE_FORMAT(ds.duty_date, '%Y-%m-%d') AS duty_date,
+        dt.name AS duty_type_name, dor.order_number, dor.title AS order_title, ds.status, ds.note
+        FROM duty_schedules ds
+        LEFT JOIN duty_types dt ON dt.id = ds.duty_type_id
+        LEFT JOIN duty_orders dor ON dor.id = ds.order_id
+        WHERE ds.somtop_id = ? AND ds.duty_date >= ? AND ds.duty_date < ?${scope(req.user.court_code, 'ds.')}
+        ORDER BY ds.duty_date, ds.id`;
+    } else if (category === 'activity') {
+      sql = `SELECT ep.id, e.title, e.description, et.name AS event_type_name,
+        DATE_FORMAT(e.start_date, '%Y-%m-%d %H:%i') AS start_date,
+        DATE_FORMAT(e.end_date, '%Y-%m-%d %H:%i') AS end_date,
+        e.location, ep.status
+        FROM event_participants ep
+        JOIN events e ON e.id = ep.event_id
+        LEFT JOIN event_types et ON et.id = e.event_type_id
+        WHERE ep.somtop_id = ? AND e.start_date >= ? AND e.start_date < ?
+          AND ep.status IN ('เข้าร่วม', 'ยืนยันเข้าร่วม')${scope(req.user.court_code, 'e.')}
+        ORDER BY e.start_date, ep.id`;
+    } else {
+      sql = `SELECT sw.id, DATE_FORMAT(sw.request_date, '%Y-%m-%d') AS request_date,
+        DATE_FORMAT(ds.duty_date, '%Y-%m-%d') AS duty_date,
+        CONCAT(s.title, s.first_name, ' ', s.last_name) AS replacement_name,
+        sw.reason
+        FROM duty_swaps sw
+        LEFT JOIN duty_schedules ds ON ds.id = sw.schedule_id
+        LEFT JOIN somtop s ON s.id = sw.replacement_somtop_id
+        WHERE sw.requester_somtop_id = ? AND sw.request_date >= ? AND sw.request_date < ?${scope(req.user.court_code, 'sw.')}
+        ORDER BY sw.request_date, sw.id`;
+    }
+    const [records] = await pool.query(sql, params(req.user.court_code, [person, start, end]));
+    res.json({ records });
+  } catch (error) {
+    console.error('Performance details error:', error);
+    res.status(500).json({ message: 'ไม่สามารถโหลดรายละเอียดผลการปฏิบัติหน้าที่ได้' });
+  }
+};
+
 exports.exportWord = async (req, res) => {
   try {
     const year = Number(req.query.year); const person = Number(req.query.somtop_id); if (!year || !person) return res.status(400).json({ message: 'กรุณาเลือกรอบปีและบุคคล' });

@@ -353,14 +353,14 @@
               </div>
             </div>
 
-            <div v-if="isFinance" class="detail-item">
+            <div v-if="isAdmin" class="detail-item">
               <span class="detail-icon">🏦</span>
               <div class="detail-content">
                 <label>เลขบัญชีธนาคาร</label>
                 <p>{{ selectedSomtopToView.bank_account_number || '-' }}</p>
               </div>
             </div>
-            <div v-if="isFinance" class="detail-item">
+            <div v-if="isAdmin" class="detail-item">
               <span class="detail-icon">🏦</span>
               <div class="detail-content">
                 <label>สาขา</label>
@@ -767,7 +767,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import api from '../services/api' 
 import { fetchProtectedFile } from '../services/protectedFiles'
-import { isAdmin, isFinance } from '../services/session'
+import { isAdmin } from '../services/session'
 import { swalSuccess, swalError, swalConfirm } from '../utils/swal'
 
 const isSaving = ref(false)

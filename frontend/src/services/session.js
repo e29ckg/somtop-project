@@ -14,7 +14,6 @@ let verified = false
 
 export const currentUser = computed(() => user.value)
 export const isAdmin = computed(() => user.value?.role === 'admin')
-export const isFinance = computed(() => ['admin', 'finance'].includes(user.value?.role))
 
 export const setSessionUser = (value) => {
   user.value = value || null

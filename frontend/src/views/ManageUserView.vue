@@ -50,7 +50,7 @@
               <td class="font-mono font-bold">{{ user.court_code ? user.court_code.toUpperCase() : '-' }}</td>
               <td>
                 <span class="status-badge" :class="user.role === 'admin' ? 'active' : 'warning'">
-                  {{ user.role === 'admin' ? 'ผู้ดูแลระบบ (Admin)' : user.role === 'finance' ? 'เจ้าหน้าที่การเงิน' : 'ผู้ใช้งาน (Viewer)' }}
+                  {{ user.role === 'admin' ? 'ผู้ดูแลระบบ (Admin)' : 'ดูข้อมูล (View)' }}
                 </span>
               </td>
               <td class="text-muted">{{ user.last_login || '-' }}</td>
@@ -118,9 +118,8 @@
           <div class="input-group">
             <label>สิทธิ์การใช้งาน (Role)</label>
             <select v-model="formData.role">
-              <option value="viewer">ผู้ใช้งานทั่วไป (Viewer) - จัดการข้อมูล พ.สมทบได้</option>
+              <option value="view">ดูข้อมูล (View) - จัดการข้อมูลระบบไม่ได้</option>
               <option value="admin">ผู้ดูแลระบบ (Admin) - ดูแลระบบและจัดการผู้ใช้งานได้</option>
-              <option value="finance">เจ้าหน้าที่การเงิน - ตรวจสอบและพิมพ์หลักฐานการรับเงิน</option>
             </select>
           </div>
 
@@ -222,7 +221,7 @@ const closeCourtDropdown = () => {
 }
 
 const formData = ref({
-  id: null, username: '', password: '', full_name: '', role: 'viewer', court_code: ''
+  id: null, username: '', password: '', full_name: '', role: 'view', court_code: ''
 })
 
 const searchQuery = ref('')
@@ -310,7 +309,7 @@ const unlockAccount = async (id) => {
 const openAddModal = () => {
   isEditing.value = false;
   courtSearchQuery.value = ''; 
-  formData.value = { id: null, username: '', password: '', full_name: '', role: 'viewer', court_code: '' };
+  formData.value = { id: null, username: '', password: '', full_name: '', role: 'view', court_code: '' };
   isModalOpen.value = true;
 }
 
@@ -325,7 +324,7 @@ const openEditModal = (item) => {
   }
 
   formData.value = { 
-    id: item.id, username: item.username, password: '', full_name: item.full_name, role: item.role, court_code: item.court_code || '' 
+    id: item.id, username: item.username, password: '', full_name: item.full_name, role: item.role === 'admin' ? 'admin' : 'view', court_code: item.court_code || ''
   };
   isModalOpen.value = true;
 }

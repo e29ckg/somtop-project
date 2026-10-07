@@ -21,7 +21,7 @@ const deletePhysicalFile = (relativePath) => {
 exports.getAllSomtop = async (req, res) => {
     try {
         const courtCode = req.user.court_code; 
-        const bankFields = ['admin', 'finance'].includes(req.user.role)
+        const bankFields = req.user.role === 'admin'
             ? ', s.bank_account_number, s.bank_branch'
             : '';
         
