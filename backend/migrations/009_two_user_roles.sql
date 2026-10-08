@@ -1,6 +1,11 @@
 -- Keep only the admin and view roles.
 -- Existing finance and viewer accounts become view accounts.
 -- The legacy central_admin account maps to admin.
+-- Repair enum index-zero values before ALTER tries to convert existing rows.
+UPDATE users
+SET role = DEFAULT(role)
+WHERE (role = '' OR role IS NULL) AND DEFAULT(role) IN ('viewer', 'view');
+
 ALTER TABLE users
     MODIFY COLUMN role ENUM('admin', 'viewer', 'finance', 'central_admin', 'view') DEFAULT 'view';
 
