@@ -49,7 +49,7 @@ if (-not $SkipInstall) {
         if ($LASTEXITCODE -ne 0) { throw 'Backend npm install failed.' }
     }
     Write-Output '[SOMTOP_STEP:install_frontend]'
-    & $npm --prefix $frontendDir ci --offline=false --no-audit --no-fund
+    & $npm --prefix $frontendDir ci --include=dev --offline=false --no-audit --no-fund
     if ($LASTEXITCODE -ne 0) { throw 'Frontend npm install failed.' }
 }
 

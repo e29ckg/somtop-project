@@ -9,7 +9,7 @@ const projectRoot = path.resolve(__dirname, '../../..');
 const stateDir = path.join(projectRoot, 'backend', '.system-update');
 const store = createStore(projectRoot);
 const lockFile = path.join(stateDir, 'update.lock');
-const workerFile = path.join(projectRoot, 'backend', 'scripts', 'run_system_update.js');
+const workerFile = path.join(projectRoot, 'backend', 'scripts', 'launch_system_update.js');
 const expectedRemote = 'https://github.com/e29ckg/somtop-project.git';
 
 const enabled = () => process.platform === 'win32' && process.env.APP_ENV === 'production' &&
