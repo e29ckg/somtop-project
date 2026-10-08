@@ -25,3 +25,5 @@ backup/*
 mysql-data/*
 somtop-project-source.zip
 
+
+backend/.system-update/

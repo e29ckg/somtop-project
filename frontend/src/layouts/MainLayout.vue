@@ -44,11 +44,11 @@
         <router-link to="/updates" class="nav-item">
            <span class="nav-icon">📣</span><span class="sidebar-text">การอัพเดท</span>
         </router-link>
-        <router-link v-if="userRole === 'admin'" to="/payment-evidence" class="nav-item">
+        <router-link v-if="isAdmin" to="/payment-evidence" class="nav-item">
            <span class="nav-icon">🧾</span><span class="sidebar-text">ตรวจสอบหลักฐานการรับเงิน</span>
         </router-link>
         <!-- ⭐️ ซ่อน/แสดงเมนูตั้งค่า เฉพาะผู้ที่มี Role = admin เท่านั้น -->
-        <div v-if="userRole === 'admin'">
+        <div v-if="isAdmin">
           <div class="menu-category">ตั้งค่าระบบ</div>
           <!-- เมนูจัดการ Google Calendar -->
           <router-link to="/manage-calendar-sync" class="nav-item">
@@ -90,6 +90,10 @@
           <router-link to="/activity-logs" class="nav-item">
              <span class="nav-icon">📋</span>
              <span class="sidebar-text">ประวัติการใช้งาน</span>
+          </router-link>
+          <router-link to="/manage-system-update" class="nav-item">
+             <span class="nav-icon">🔄</span>
+             <span class="sidebar-text">อัปเดตโปรเจกต์</span>
           </router-link>
         </div>
       </nav>
@@ -150,7 +154,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { swalConfirm } from '../utils/swal' // ⭐️ นำเข้า SweetAlert สำหรับยืนยันการลบ
 import api from '../services/api' // ⭐️ นำเข้า Axios instance สำหรับเรียก API
 import { useCounterStore } from '@/stores/counter'
-import { currentUser, clearSession } from '../services/session'
+import { currentUser, isAdmin, clearSession } from '../services/session'
 
 const router = useRouter()
 const route = useRoute()
@@ -189,6 +193,7 @@ const currentRouteName = computed(() => {
   if (route.path === '/manage-decorations') return 'จัดการชั้นตราเครื่องราชฯ'
   if (route.path === '/manage-templates') return 'จัดการเทมเพลตเอกสาร'
   if (route.path === '/manage-calendar-sync') return 'ตั้งค่า Google Calendar'
+  if (route.path === '/manage-system-update') return 'อัปเดตโปรเจกต์'
   if (route.path === '/manage-terms') return 'จัดการวาระการทำงาน'
   if (route.path === '/manage-holidays') return 'จัดการวันหยุดพิเศษ'
   return 'รายละเอียด'

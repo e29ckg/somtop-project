@@ -22,8 +22,9 @@ import PerformanceEvaluationView from '../views/PerformanceEvaluationView.vue'
 import PaymentEvidenceView from '../views/PaymentEvidenceView.vue'
 import ManageHolidayView from '../views/ManageHolidayView.vue'
 import UpdatesView from '../views/UpdatesView.vue'
+import ManageSystemUpdateView from '../views/ManageSystemUpdateView.vue'
 import api from '../services/api'
-import { currentUser, isSessionVerified, setSessionUser, clearSession } from '../services/session'
+import { currentUser, isAdmin, isSessionVerified, setSessionUser, clearSession } from '../services/session'
 
 // 1. สร้าง router ขึ้นมาก่อน
 const router = createRouter({
@@ -99,6 +100,7 @@ const router = createRouter({
           component: DutyScheduleView
         },
         { path: 'performance-evaluation', name: 'performance-evaluation', component: PerformanceEvaluationView },
+        { path: 'manage-system-update', name: 'manage-system-update', component: ManageSystemUpdateView, meta: { requiresAdmin: true } },
         { path: 'updates', name: 'updates', component: UpdatesView },
         { path: 'payment-evidence', name: 'payment-evidence', component: PaymentEvidenceView, meta: { requiresAdmin: true } },
         {
@@ -171,7 +173,7 @@ router.beforeEach(async (to) => {
   }
 
   if (to.meta.requiresAuth && !currentUser.value) return '/'
-  if (to.meta.requiresAdmin && currentUser.value?.role !== 'admin') return '/dashboard'
+  if (to.meta.requiresAdmin && !isAdmin.value) return '/dashboard'
   if (to.path === '/' && currentUser.value) return '/dashboard'
 
   return true
