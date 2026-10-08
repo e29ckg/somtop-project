@@ -24,6 +24,7 @@ import ManageHolidayView from '../views/ManageHolidayView.vue'
 import UpdatesView from '../views/UpdatesView.vue'
 import ManageSystemUpdateView from '../views/ManageSystemUpdateView.vue'
 import api from '../services/api'
+import { readActiveUpdate } from '../services/updateProgress'
 import { currentUser, isAdmin, isSessionVerified, setSessionUser, clearSession } from '../services/session'
 
 // 1. สร้าง router ขึ้นมาก่อน
@@ -167,8 +168,10 @@ router.beforeEach(async (to) => {
     try {
       const response = await api.get('/auth/me')
       setSessionUser(response.data.user)
-    } catch {
-      clearSession()
+    } catch (error) {
+      const canResume = error.response?.status !== 401 && currentUser.value?.role === 'admin' &&
+        to.name === 'manage-system-update' && readActiveUpdate()
+      if (!canResume) clearSession()
     }
   }
 

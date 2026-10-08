@@ -44,13 +44,16 @@ if (-not $destination.StartsWith($documentRoot.TrimEnd('\', '/') + [System.IO.Pa
 
 if (-not $SkipInstall) {
     if (-not $FrontendOnly) {
+        Write-Output '[SOMTOP_STEP:install_backend]'
         & $npm --prefix $backendDir ci --offline=false --no-audit --no-fund
         if ($LASTEXITCODE -ne 0) { throw 'Backend npm install failed.' }
     }
+    Write-Output '[SOMTOP_STEP:install_frontend]'
     & $npm --prefix $frontendDir ci --offline=false --no-audit --no-fund
     if ($LASTEXITCODE -ne 0) { throw 'Frontend npm install failed.' }
 }
 
+Write-Output '[SOMTOP_STEP:building]'
 & $npm --prefix $frontendDir run build
 if ($LASTEXITCODE -ne 0) { throw 'Frontend build failed.' }
 $dist = Join-Path $project 'frontend/dist'
@@ -72,7 +75,8 @@ RewriteRule ^ index.html [END]
 [System.IO.File]::WriteAllText((Join-Path $dist '.htaccess'), $htaccess)
 
 if ($FrontendOnly) {
-    New-Item -ItemType Directory -Path $destination -Force | Out-Null
+Write-Output '[SOMTOP_STEP:publish_frontend]'
+New-Item -ItemType Directory -Path $destination -Force | Out-Null
     Copy-Item -Path (Join-Path $dist '*') -Destination $destination -Recurse -Force
     Copy-Item -LiteralPath (Join-Path $dist '.htaccess') -Destination $destination -Force
     Write-Host "Deployed frontend to $destination"
@@ -105,6 +109,7 @@ New-Item -ItemType Directory -Path (Split-Path $generatedConf) -Force | Out-Null
 [System.IO.File]::WriteAllText($generatedConf, $apacheConfig)
 
 if ($ConfigureApache) {
+    Write-Output '[SOMTOP_STEP:configure_apache]'
     if (-not (Test-Path -LiteralPath $httpdConf)) { throw "Missing Apache config: $httpdConf" }
     $activeConf = Join-Path $xampp 'apache/conf/extra/somtop.conf'
     $includeLine = 'Include "' + $activeConf.Replace('\', '/') + '"'
@@ -128,6 +133,7 @@ if ($ConfigureApache) {
     }
 }
 
+Write-Output '[SOMTOP_STEP:publish_frontend]'
 New-Item -ItemType Directory -Path $destination -Force | Out-Null
 Copy-Item -Path (Join-Path $dist '*') -Destination $destination -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $dist '.htaccess') -Destination $destination -Force

@@ -2,10 +2,11 @@ const fs = require('fs');
 const path = require('path');
 const { spawn, execFileSync } = require('child_process');
 const { logActivity } = require('../utils/logger');
+const { createStore } = require('../../scripts/system_update_state');
 
 const projectRoot = path.resolve(__dirname, '../../..');
 const stateDir = path.join(projectRoot, 'backend', '.system-update');
-const stateFile = path.join(stateDir, 'state.json');
+const store = createStore(projectRoot);
 const lockFile = path.join(stateDir, 'update.lock');
 const workerFile = path.join(projectRoot, 'backend', 'scripts', 'run_system_update.js');
 const expectedRemote = 'https://github.com/e29ckg/somtop-project.git';
@@ -16,19 +17,7 @@ const git = (...args) => execFileSync('git', ['-C', projectRoot, ...args], {
     encoding: 'utf8', timeout: 10000, windowsHide: true
 }).trim();
 
-const readState = () => {
-    try { return JSON.parse(fs.readFileSync(stateFile, 'utf8')); }
-    catch (error) {
-        if (error.code === 'ENOENT') return null;
-        throw error;
-    }
-};
-const writeState = state => {
-    fs.mkdirSync(stateDir, { recursive: true });
-    const temp = `${stateFile}.${process.pid}.tmp`;
-    fs.writeFileSync(temp, JSON.stringify(state, null, 2));
-    fs.renameSync(temp, stateFile);
-};
+const readState = () => store.read();
 
 exports.getStatus = (req, res, next) => {
     try {
@@ -43,8 +32,8 @@ exports.startUpdate = (req, res, next) => {
     try { expectedOrigin = new URL(process.env.APP_URL).origin; }
     catch { return res.status(503).json({ message: 'APP_URL ของเซิร์ฟเวอร์ไม่ถูกต้อง' }); }
     if (req.get('Origin') !== expectedOrigin) return res.status(403).json({ message: 'คำขอไม่ได้มาจากหน้าเว็บของระบบ' });
-    if (req.body?.confirmation !== 'UPDATE' || req.body?.backup_confirmed !== true) {
-        return res.status(400).json({ message: 'กรุณายืนยันการสำรองข้อมูลและพิมพ์ UPDATE ก่อนดำเนินการ' });
+    if (req.body?.confirmation !== 'UPDATE' || !(req.body?.maintenance_confirmed === true || req.body?.backup_confirmed === true)) {
+        return res.status(400).json({ message: 'กรุณายืนยันการอัปเดตและพิมพ์ UPDATE ก่อนดำเนินการ' });
     }
 
     let lockAcquired = false;
@@ -70,19 +59,17 @@ exports.startUpdate = (req, res, next) => {
             if (error.code === 'EEXIST') return res.status(409).json({ message: 'มีการอัปเดตอยู่แล้ว ตรวจสถานะก่อนเริ่มใหม่' });
             throw error;
         }
-        const state = {
-            id: `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`,
-            status: 'running', phase: 'queued', started_at: new Date().toISOString(),
+        const state = store.create({
+            id: `${Date.now()}-${Math.random().toString(16).slice(2, 12)}`,
             previous_commit: git('rev-parse', '--short', 'HEAD'), requested_by: req.user.username
-        };
-        writeState(state);
+        });
         const child = spawn(process.execPath, [workerFile], {
             cwd: projectRoot, detached: true, windowsHide: true, stdio: 'ignore',
             env: { ...process.env, SYSTEM_UPDATE_ID: state.id }
         });
         child.once('error', error => {
             try {
-                writeState({ ...state, status: 'failed', phase: 'launch', finished_at: new Date().toISOString(), message: 'เริ่มกระบวนการอัปเดตไม่สำเร็จ' });
+                store.fail(state.id, 'เริ่มกระบวนการอัปเดตไม่สำเร็จ');
             } catch (stateError) { console.error('Could not write update status:', stateError); }
             try { fs.rmSync(lockFile, { force: true }); } catch (lockError) { console.error('Could not clear update lock:', lockError); }
             if (!res.headersSent) next(error);

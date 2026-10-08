@@ -9,6 +9,7 @@ if not errorlevel 1 (
   call pm2 describe somtop-api > nul 2>&1
   if not errorlevel 1 (
     echo [INFO] Stopping somtop-api before npm replaces backend dependencies.
+    echo [SOMTOP_STEP:stop_api]
     call pm2 stop somtop-api
     if errorlevel 1 exit /b 1
     set "SOMTOP_PM2_MANAGED=1"
@@ -29,6 +30,7 @@ if errorlevel 1 (
   exit /b 0
 )
 
+echo [SOMTOP_STEP:start_api]
 cd /d "%~dp0backend"
 call pm2 restart somtop-api --update-env
 if errorlevel 1 (

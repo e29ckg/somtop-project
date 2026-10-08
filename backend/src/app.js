@@ -61,6 +61,15 @@ app.use('/uploads', verifyToken, authorizeUpload, express.static(path.join(__dir
     }
 }));
 
+// Readiness check for the detached updater; exposes no account or database details.
+app.get('/api/health', async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    try {
+        await require('./config/db').query('SELECT 1');
+        res.json({ status: 'ok' });
+    } catch { res.status(503).json({ status: 'unavailable' }); }
+});
+
 // 3. ผูก Routes เข้ากับ URL ของระบบ
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
