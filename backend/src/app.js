@@ -4,6 +4,7 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const path = require('path');
 const { verifyToken } = require('./middlewares/authMiddleware');
+const authorizeUpload = require('./middlewares/authorizeUpload');
 
 // 1. นำเข้า Routes ต่างๆ
 const authRoutes = require('./routes/authRoutes'); // (เตรียมไว้สำหรับอนาคต)
@@ -31,7 +32,7 @@ const app = express();
 
 // 2. ตั้งค่า Middlewares ระดับแอปพลิเคชัน
 app.disable('x-powered-by');
-app.set('trust proxy', 1);
+app.set('trust proxy', 'loopback');
 app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
@@ -49,7 +50,7 @@ app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false, limit: '1mb' }));
 
 // ไฟล์แนบอาจมีข้อมูลส่วนบุคคล จึงต้องผ่านการยืนยันตัวตนเสมอ
-app.use('/uploads', verifyToken, express.static(path.join(__dirname, '../uploads'), {
+app.use('/uploads', verifyToken, authorizeUpload, express.static(path.join(__dirname, '../uploads'), {
     dotfiles: 'deny',
     fallthrough: false,
     setHeaders: (res, filePath) => {

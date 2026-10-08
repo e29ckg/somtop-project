@@ -111,3 +111,6 @@ HTTP ภายใน LAN ส่งรหัสผ่านและข้อม�
 ผู้ดูแลระบบ (`admin`) เข้าได้ทุกเมนู รวมถึง **อัปเดตโปรเจกต์** การอัปเดตผ่านหน้าเว็บต้องตั้ง `APP_ENV=production` และ `ENABLE_WEB_UPDATE=true` ใน `.env` บน Windows แล้วรีสตาร์ต PM2 บริการต้องทำงานจาก checkout ที่ branch `main` มี origin ตรงกับ repository ของโปรเจกต์ และไม่มีไฟล์โค้ดที่ยังไม่ได้ commit
 
 ก่อนเริ่มอัปเดต ให้สำรองฐานข้อมูล ไฟล์อัปโหลด เทมเพลต และค่าเซิร์ฟเวอร์ แล้วตรวจ migration ที่จำเป็น หน้าเว็บจะให้ยืนยันการสำรองข้อมูลและพิมพ์ UPDATE ก่อนดึง `origin/main` แบบ fast-forward และรัน `update_somtop.bat` สถานะและ log เก็บที่ `backend/.system-update/` โดยไม่อยู่ใน Git
+
+
+ก่อน deploy รุ่นที่ตรวจเซสชันล่าสุด ให้รัน `backend/migrations/013_auth_version.sql` และ `backend/migrations/014_login_rate_limits.sql` หนึ่งครั้ง หากเซิร์ฟเวอร์มีคอลัมน์และตารางนี้อยู่แล้ว migration จะไม่สร้างซ้ำ การ deploy ใช้โค้ดและ environment จาก checkout เดียวที่เป็น branch `main` โดย PM2 ต้องรัน `backend/server.js` ของ checkout นั้น

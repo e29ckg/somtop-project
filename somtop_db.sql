@@ -85,6 +85,7 @@ CREATE TABLE users (
     full_name VARCHAR(100) NOT NULL,
     court_code VARCHAR(50) DEFAULT NULL COMMENT 'รหัสหน่วยงาน เช่น pkk',
     role ENUM('admin', 'view') DEFAULT 'view',
+    auth_version INT UNSIGNED NOT NULL DEFAULT 0,
     last_login DATETIME NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -453,3 +454,10 @@ CREATE TABLE somtop_decorations (
 
 ---------------------------------------------------
 ALTER TABLE working_terms ADD file_paths TEXT NULL COMMENT 'เก็บ path ไฟล์แนบแบบ Array JSON เช่น ["order1.pdf", "announce.jpg"]';
+
+CREATE TABLE IF NOT EXISTS login_rate_limits (
+    ip_hash BINARY(32) NOT NULL PRIMARY KEY,
+    attempt_count INT UNSIGNED NOT NULL,
+    reset_at DATETIME(3) NOT NULL,
+    INDEX idx_login_rate_limits_reset_at (reset_at)
+);

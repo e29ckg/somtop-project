@@ -83,7 +83,7 @@ exports.updateUser = async (req, res) => {
         const normalizedRole = resolveRole(role);
         if (!normalizedRole) return res.status(400).json({ message: 'สิทธิ์ต้องเป็น view หรือ admin เท่านั้น' });
 
-        let query = 'UPDATE users SET full_name = ?, role = ?, court_code = ?';
+        let query = 'UPDATE users SET full_name = ?, role = ?, court_code = ?, auth_version = auth_version + 1';
         let params = [full_name, normalizedRole, court_code || null];
 
         // ถ้ามีการส่งรหัสผ่านใหม่มาด้วย ให้เข้ารหัสและอัปเดต
@@ -202,7 +202,7 @@ exports.updateProfile = async (req, res) => {
 
             // อัปเดตทั้งชื่อและรหัสผ่านใหม่
             await pool.query(
-                'UPDATE users SET full_name = ?, password_hash = ? WHERE id = ?',
+                'UPDATE users SET full_name = ?, password_hash = ?, auth_version = auth_version + 1 WHERE id = ?',
                 [full_name, hashedNewPassword, id]
             );
 
@@ -214,6 +214,9 @@ exports.updateProfile = async (req, res) => {
             );
         }
 
+        if (new_password) {
+            res.clearCookie('jwt', { httpOnly: true, secure: process.env.COOKIE_SECURE === 'false' ? false : process.env.NODE_ENV === 'production', sameSite: 'strict', path: process.env.COOKIE_PATH || '/' });
+        }
         res.status(200).json({ message: 'อัปเดตข้อมูลโปรไฟล์เรียบร้อยแล้ว' });
 
     } catch (error) {

@@ -6,7 +6,7 @@ ALTER TABLE users
 
 UPDATE users
 SET role = 'view'
-WHERE role IN ('viewer', 'finance') OR role IS NULL;
+WHERE role IN ('viewer', 'finance') OR role IS NULL OR role = '';
 
 UPDATE users
 SET role = 'admin'

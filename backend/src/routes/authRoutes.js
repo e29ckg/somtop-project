@@ -18,7 +18,7 @@ router.post('/login', loginRateLimit, authController.login);
 // สั่งลบ HttpOnly Cookie ทิ้ง
 // ==========================================
 // Endpoint ที่ได้: POST /api/auth/logout
-router.post('/logout', authController.logout);
+router.post('/logout', verifyToken, authController.logout);
 router.get('/me', verifyToken, authController.me);
 
 module.exports = router;

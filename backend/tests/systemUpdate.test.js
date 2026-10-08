@@ -12,7 +12,7 @@ let role = 'admin';
 const dbPath = require.resolve('../src/config/db');
 require.cache[dbPath] = {
     id: dbPath, filename: dbPath, loaded: true,
-    exports: { query: async () => [[{ id: 1, username: 'admin', role, court_code: role === 'central_admin' ? null : 'court-a' }]] }
+    exports: { query: async () => [[{ id: 1, username: 'admin', role, court_code: 'court-a', auth_version: 0 }]] }
 };
 const routes = require('../src/routes/systemUpdateRoutes');
 
@@ -25,7 +25,7 @@ test('system update requires admin role, origin and explicit confirmation', asyn
     await new Promise(resolve => server.once('listening', resolve));
     const base = `http://127.0.0.1:${server.address().port}`;
     process.env.APP_URL = `${base}/somtop`;
-    const headers = () => ({ Cookie: 'jwt=' + jwt.sign({ data: { id: 1, role } }, process.env.JWT_SECRET, { algorithm: 'HS256', issuer: 'somtop-api', audience: 'somtop-web' }), 'Content-Type': 'application/json' });
+    const headers = () => ({ Cookie: 'jwt=' + jwt.sign({ auth_version: 0, data: { id: 1, role } }, process.env.JWT_SECRET, { algorithm: 'HS256', issuer: 'somtop-api', audience: 'somtop-web' }), 'Content-Type': 'application/json' });
     try {
         let response = await fetch(`${base}/api/system-update`);
         assert.equal(response.status, 401);
@@ -37,7 +37,7 @@ test('system update requires admin role, origin and explicit confirmation', asyn
         for (const deniedRole of ['view', 'viewer', 'finance', 'central_admin']) {
             role = deniedRole;
             response = await fetch(`${base}/api/system-update`, { headers: headers() });
-            assert.equal(response.status, 403);
+            assert.equal(response.status, deniedRole === 'view' ? 403 : 401);
         }
 
         role = 'admin';
