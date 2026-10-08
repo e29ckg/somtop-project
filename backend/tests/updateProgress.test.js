@@ -32,6 +32,21 @@ const fakeGit = same => (...args) => {
     throw new Error('Unexpected git command: ' + args);
 };
 
+test('a new update cleans expired public progress only, preserving backup data and unrelated files', () => {
+    const fx = fixture();
+    const expired = path.join(path.dirname(fx.publicFile), 'a'.repeat(64) + '.json');
+    const unrelated = path.join(path.dirname(fx.publicFile), 'keep.json');
+    const privateBackup = path.join(fx.store.directory, 'backups', 'keep.sql');
+    fs.mkdirSync(path.dirname(privateBackup), { recursive: true });
+    for (const file of [expired, unrelated, privateBackup]) fs.writeFileSync(file, 'keep');
+    const old = new Date(Date.now() - 48 * 60 * 60 * 1000);
+    fs.utimesSync(expired, old, old);
+    fx.store.create({ id: Date.now() + '-new123abc', requested_by: 'admin', previous_commit: 'old' });
+    assert.equal(fs.existsSync(expired), false);
+    assert.equal(fs.existsSync(unrelated), true);
+    assert.equal(fs.existsSync(privateBackup), true);
+});
+
 test('progress continues through Apache feed while the API is offline; every deployment stage completes', async () => {
     const fx = fixture();
     const app = express();

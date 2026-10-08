@@ -100,10 +100,19 @@ const createStore = (projectRoot, env = process.env) => {
         directory, stateFile, read, update, startStep, completeStep,
         create({ id, requested_by, previous_commit }) {
             const progress_token = crypto.randomBytes(32).toString('hex');
-            return write({ id, requested_by, previous_commit, status: 'running', phase: 'queued', started_at: iso(),
+            const state = write({ id, requested_by, previous_commit, status: 'running', phase: 'queued', started_at: iso(),
                 progress_token, progress_url: (env.APP_BASE_PATH || '/somtop/') + '.update-status/' + progress_token + '.json',
                 steps: STEPS.map(([key, label]) => ({ key, label, status: 'pending' })),
                 events: [{ at: iso(), message: 'ได้รับคำสั่งเริ่มสำรองข้อมูลและอัปเดต', level: 'info' }] });
+            const publicDirectory = path.dirname(feedPath(state));
+            for (const name of fs.readdirSync(publicDirectory)) {
+                if (!/^[a-f0-9]{64}\.json$/.test(name) || name === progress_token + '.json') continue;
+                const file = path.join(publicDirectory, name);
+                try {
+                    if (fs.statSync(file).mtimeMs < Date.now() - 24 * 60 * 60 * 1000) fs.unlinkSync(file);
+                } catch { /* Retention cleanup must not prevent a new job. */ }
+            }
+            return state;
         },
         detail(jobId, key, detail) {
             return update(jobId, state => { const step = state.steps.find(step => step.key === key); if (step) step.detail = detail; return state; });

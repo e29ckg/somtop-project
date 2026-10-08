@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('node:crypto');
 const { spawn, execFileSync } = require('child_process');
 const { logActivity } = require('../utils/logger');
 const { createStore } = require('../../scripts/system_update_state');
@@ -60,7 +61,7 @@ exports.startUpdate = (req, res, next) => {
             throw error;
         }
         const state = store.create({
-            id: `${Date.now()}-${Math.random().toString(16).slice(2, 12)}`,
+            id: `${Date.now()}-${crypto.randomBytes(6).toString('hex')}`,
             previous_commit: git('rev-parse', '--short', 'HEAD'), requested_by: req.user.username
         });
         const child = spawn(process.execPath, [workerFile], {
