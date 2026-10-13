@@ -33,6 +33,7 @@ router.post('/teams', verifyAdmin, asyncHandler(dutyController.createTeam));
 router.put('/teams/:id', verifyAdmin, asyncHandler(dutyController.updateTeam));
 router.delete('/teams/:id', verifyAdmin, asyncHandler(dutyController.deleteTeam));
 router.post('/swaps', verifyAdmin, asyncHandler(dutyController.createSwap));
+router.get('/swaps', asyncHandler(dutyController.getSwaps));
 router.get('/swaps/:id/export-word', asyncHandler(dutyController.exportSwapWord));
 
 module.exports = router;

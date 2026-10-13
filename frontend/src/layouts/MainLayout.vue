@@ -24,6 +24,10 @@
            <span class="nav-icon">🗓️</span>
            <span class="sidebar-text">เวรปฏิบัติหน้าที่</span>
         </router-link>
+        <router-link to="/duty-swap-history" class="nav-item">
+           <span class="nav-icon">🔄</span>
+           <span class="sidebar-text">ประวัติการเปลี่ยนเวร</span>
+        </router-link>
         
         <router-link to="/leave-history" class="nav-item">
            <span class="nav-icon">📅</span>
@@ -185,6 +189,7 @@ const currentRouteName = computed(() => {
   if (route.path === '/performance-evaluation') return 'ประเมินผลงานรอบปี'
   if (route.path === '/updates') return 'การอัพเดท'
   if (route.path === '/duty-schedule') return 'เวรปฏิบัติหน้าที่'
+  if (route.path === '/duty-swap-history') return 'ประวัติการเปลี่ยนเวร'
   if (route.path === '/manage-users') return 'จัดการผู้ใช้งานระบบ'
   if (route.path === '/manage-courts') return 'จัดการข้อมูลศาล'
   if (route.path === '/manage-titles') return 'จัดการคำนำหน้า'

@@ -514,6 +514,32 @@ exports.createSwap = async (req, res) => {
     }
 };
 
+exports.getSwaps = async (req, res) => {
+    const { month } = req.query;
+    if (!validMonth(month) || Number(month.slice(5)) < 1 || Number(month.slice(5)) > 12) {
+        return res.status(400).json({ message: 'กรุณาระบุเดือนในรูปแบบ YYYY-MM' });
+    }
+    const firstDay = `${month}-01`;
+    const [rows] = await pool.query(`
+        SELECT sw.id, sw.reason, DATE_FORMAT(sw.request_date, '%Y-%m-%d') AS request_date,
+            DATE_FORMAT(ds.duty_date, '%Y-%m-%d') AS duty_date,
+            dor.order_number, dt.name AS duty_type_name, c.court_name,
+            CONCAT(a.title, a.first_name, ' ', a.last_name) AS requester_name,
+            CONCAT(b.title, b.first_name, ' ', b.last_name) AS replacement_name
+        FROM duty_swaps sw
+        JOIN duty_schedules ds ON sw.schedule_id = ds.id
+        LEFT JOIN duty_orders dor ON ds.order_id = dor.id
+        LEFT JOIN duty_types dt ON ds.duty_type_id = dt.id
+        LEFT JOIN courts c ON sw.court_code = c.court_code
+        JOIN somtop a ON sw.requester_somtop_id = a.id
+        JOIN somtop b ON sw.replacement_somtop_id = b.id
+        WHERE ds.duty_date >= ? AND ds.duty_date < DATE_ADD(?, INTERVAL 1 MONTH)
+            ${inScope(req.user.court_code, 'sw.')}
+        ORDER BY ds.duty_date, sw.id
+    `, scopeParams(req.user.court_code, [firstDay, firstDay]));
+    res.json({ records: rows });
+};
+
 exports.exportSwapWord = async (req, res) => {
     try {
         const [rows] = await pool.query(`

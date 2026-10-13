@@ -18,6 +18,7 @@ import ManageTermView from '../views/ManageTermView.vue'
 import ProfileView from '../views/ProfileView.vue'
 import ParticipationReportView from '../views/ParticipationReportView.vue'
 import DutyScheduleView from '../views/DutyScheduleView.vue'
+import DutySwapHistoryView from '../views/DutySwapHistoryView.vue'
 import PerformanceEvaluationView from '../views/PerformanceEvaluationView.vue'
 import PaymentEvidenceView from '../views/PaymentEvidenceView.vue'
 import ManageHolidayView from '../views/ManageHolidayView.vue'
@@ -99,6 +100,11 @@ const router = createRouter({
           path: 'duty-schedule',
           name: 'duty-schedule',
           component: DutyScheduleView
+        },
+        {
+          path: 'duty-swap-history',
+          name: 'duty-swap-history',
+          component: DutySwapHistoryView
         },
         { path: 'performance-evaluation', name: 'performance-evaluation', component: PerformanceEvaluationView },
         { path: 'manage-system-update', name: 'manage-system-update', component: ManageSystemUpdateView, meta: { requiresAdmin: true } },
