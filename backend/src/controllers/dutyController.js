@@ -703,7 +703,7 @@ exports.exportOrderWord = async (req, res) => {
         if (!orders.length) return res.status(404).json({ message: 'ไม่พบคำสั่ง' });
 
         const [records] = await pool.query(`
-            SELECT ds.duty_date, dt.name AS duty_type_name, t.team_name,
+            SELECT ds.duty_date, dt.name AS duty_type_name, t.team_name, s.is_meeting_coordinator,
                 CONCAT(s.title, s.first_name, ' ', s.last_name) AS full_name
             FROM duty_schedules ds
             JOIN somtop s ON ds.somtop_id = s.id
@@ -732,7 +732,7 @@ exports.exportOrderWord = async (req, res) => {
             const entry = result.get(item.duty_date) || { duty_date: item.duty_date, types: new Set(), teams: new Set(), names: [] };
             entry.types.add(item.duty_type_name);
             if (item.team_name) entry.teams.add(item.team_name);
-            entry.names.push(item.full_name);
+            entry.names.push(`${item.full_name}${Number(item.is_meeting_coordinator) === 1 ? '*' : ''}`);
             result.set(item.duty_date, entry);
             return result;
         }, new Map());
