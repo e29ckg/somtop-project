@@ -56,6 +56,12 @@ if (-not $SkipInstall) {
 Write-Output '[SOMTOP_STEP:building]'
 & $npm --prefix $frontendDir run build
 if ($LASTEXITCODE -ne 0) { throw 'Frontend build failed.' }
+if (-not $FrontendOnly) {
+    Write-Output '[INFO] Checking somtop meeting coordinator database column.'
+    $node = (Get-Command node.exe -ErrorAction Stop).Source
+    & $node (Join-Path $backendDir 'scripts/migrate_somtop_coordinator.js')
+    if ($LASTEXITCODE -ne 0) { throw 'Somtop meeting coordinator migration failed; deployment stopped.' }
+}
 $dist = Join-Path $project 'frontend/dist'
 
 $htaccess = @"

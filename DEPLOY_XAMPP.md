@@ -115,6 +115,10 @@ HTTP ภายใน LAN ส่งรหัสผ่านและข้อม�
 
 ก่อน deploy รุ่นที่ตรวจเซสชันล่าสุด ให้รัน `backend/migrations/013_auth_version.sql` และ `backend/migrations/014_login_rate_limits.sql` หนึ่งครั้ง หากเซิร์ฟเวอร์มีคอลัมน์และตารางนี้อยู่แล้ว migration จะไม่สร้างซ้ำ การ deploy ใช้โค้ดและ environment จาก checkout เดียวที่เป็น branch `main` โดย PM2 ต้องรัน `backend/server.js` ของ checkout นั้น
 
+สำหรับ checkbox ผู้ประสานการประชุมฯ `deploy_xampp.ps1` จะตรวจและเพิ่มคอลัมน์ `somtop.is_meeting_coordinator` ที่ขาดโดยอัตโนมัติหลัง build และก่อนเผยแพร่หน้าเว็บ (ยกเว้น `-FrontendOnly`) หากมีคอลัมน์แล้วจะไม่แก้ค่าเดิม หากเพิ่มไม่ได้จะหยุด deploy และแสดงข้อผิดพลาด บัญชีฐานข้อมูลที่ใช้ deploy ต้องมีสิทธิ์ `ALTER` ตาราง `somtop`
+
+หาก deploy รุ่นก่อนหน้านี้แล้วหน้า พ.สมทบ ไม่แสดงข้อมูล และ log API แจ้ง `Unknown column 's.is_meeting_coordinator'` ให้สำรองฐานข้อมูลแล้วรัน `node backend/scripts/migrate_somtop_coordinator.js` จากโฟลเดอร์โปรเจกต์บนเซิร์ฟเวอร์ จากนั้นรีเฟรชหน้าเว็บ สคริปต์อ่านค่าฐานข้อมูลจาก `.env` แบบเดียวกับ API และรันซ้ำได้ สำหรับ checkout ที่ยังไม่มีสคริปต์นี้ ให้นำเข้า `backend/migrations/015_somtop_meeting_coordinator.sql` หนึ่งครั้งผ่าน phpMyAdmin โดยตรวจว่าคอลัมน์ยังไม่มีอยู่ก่อน
+
 
 ## ขั้นตอนอัปเดตและการสำรองอัตโนมัติ
 
