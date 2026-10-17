@@ -116,6 +116,7 @@ CREATE TABLE IF NOT EXISTS somtop (
   phone varchar(50) DEFAULT NULL COMMENT 'เบอร์โทร',
   bank_account_number varchar(30) DEFAULT NULL COMMENT 'เลขบัญชีธนาคาร',
   bank_branch varchar(255) DEFAULT NULL COMMENT 'สาขาธนาคาร',
+  is_meeting_coordinator tinyint(1) NOT NULL DEFAULT 0 COMMENT 'ผ่านการอบรมและจดแจ้งเป็นผู้ประสานการประชุมฯ',
   status varchar(50) DEFAULT 'ใช้งาน' COMMENT 'สถานะ',
   note text DEFAULT NULL COMMENT 'หมายเหตุ',
   photo_path varchar(255) DEFAULT NULL COMMENT 'ฟิลด์เก็บ Path ของรูปภาพ',

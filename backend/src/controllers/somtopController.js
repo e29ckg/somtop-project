@@ -6,6 +6,9 @@ const publicFileUrl = require('../utils/publicFileUrl');
 const normalizePublicUploadUrl = require('../utils/normalizePublicUploadUrl');
 const { logActivity } = require('../utils/logger');
 
+// Multipart form fields arrive as strings; "0" and "false" must remain unchecked.
+const coordinatorFlag = value => [true, 1, '1', 'true'].includes(value) ? 1 : 0;
+
 const deletePhysicalFile = (relativePath) => {
     if (relativePath) {
         const fullPath = path.join(__dirname, '../../', relativePath);
@@ -28,7 +31,7 @@ exports.getAllSomtop = async (req, res) => {
         let query = `
             SELECT 
                 s.id, s.title, s.first_name, s.last_name, s.id_card, s.court_code, 
-                s.occupation, 
+                s.occupation, s.is_meeting_coordinator,
                 DATE_FORMAT(s.dob, '%Y-%m-%d') AS dob,
                 DATE_FORMAT(s.join_date, '%Y-%m-%d') AS join_date,
                 s.position_id, 
@@ -101,8 +104,8 @@ exports.createSomtop = async (req, res) => {
         // 1. บันทึกข้อมูล พ.สมทบ ลงตารางหลัก
         const query = `
             INSERT INTO somtop 
-            (title, first_name, last_name, id_card, court_code, dob, occupation, join_date, position_id, address, house_no, moo, soi, road, subdistrict, district, province, postal_code, phone, bank_account_number, bank_branch, status, note, photo_path)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (title, first_name, last_name, id_card, court_code, dob, occupation, join_date, position_id, address, house_no, moo, soi, road, subdistrict, district, province, postal_code, phone, bank_account_number, bank_branch, status, note, photo_path, is_meeting_coordinator)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         const [result] = await connection.query(query, [
@@ -110,7 +113,7 @@ exports.createSomtop = async (req, res) => {
             dob || null, occupation || null, join_date || null, position_id || null, 
             address || null, house_no || null, moo || null, soi || null, road || null, subdistrict || null, district || null, province || null, postal_code || null,
             phone || null, bank_account_number?.trim() || null, bank_branch?.trim() || null, status || 'ใช้งาน',
-            note || null, photoPath
+            note || null, photoPath, coordinatorFlag(req.body.is_meeting_coordinator)
         ]);
 
         const newSomtopId = result.insertId;
@@ -186,14 +189,17 @@ exports.updateSomtop = async (req, res) => {
             UPDATE somtop SET 
                 title = ?, first_name = ?, last_name = ?, id_card = ?, 
                 dob = ?, occupation = ?, join_date = ?, position_id = ?, 
-                address = ?, house_no = ?, moo = ?, soi = ?, road = ?, subdistrict = ?, district = ?, province = ?, postal_code = ?, phone = ?, bank_account_number = ?, bank_branch = ?, status = ?, note = ?, photo_path = ?
+                address = ?, house_no = ?, moo = ?, soi = ?, road = ?, subdistrict = ?, district = ?, province = ?, postal_code = ?, phone = ?, bank_account_number = ?, bank_branch = ?, status = ?, note = ?, photo_path = ?,
+                is_meeting_coordinator = COALESCE(?, is_meeting_coordinator)
             WHERE id = ?${scopeSql}
         `;
 
         await connection.query(updateQuery, [
             title, first_name, last_name, id_card || null, dob || null, occupation || null, 
             join_date || null, position_id || null, address || null, house_no || null, moo || null, soi || null, road || null, subdistrict || null, district || null, province || null, postal_code || null,
-            phone || null, bank_account_number?.trim() || null, bank_branch?.trim() || null, status || 'ใช้งาน', note || null, finalPhotoPath, ...scopeParams
+            phone || null, bank_account_number?.trim() || null, bank_branch?.trim() || null, status || 'ใช้งาน', note || null, finalPhotoPath,
+            req.body.is_meeting_coordinator === undefined ? null : coordinatorFlag(req.body.is_meeting_coordinator),
+            ...scopeParams
         ]);
 
         // ⭐️ 2. จัดการประวัติการต่อวาระ (Term History)

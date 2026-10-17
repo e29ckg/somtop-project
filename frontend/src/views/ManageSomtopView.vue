@@ -274,6 +274,13 @@
           <div class="input-group"><label>รหัสไปรษณีย์</label><input v-model="formData.postal_code" maxlength="10" /></div>
 
           <div class="input-group full-width">
+            <label class="coordinator-checkbox">
+              <input type="checkbox" v-model="formData.is_meeting_coordinator" />
+              <span>ผ่านการอบรมและจดแจ้งเป็นผู้ประสานการประชุมฯ</span>
+            </label>
+          </div>
+
+          <div class="input-group full-width">
             <label>หมายเหตุ</label>
             <textarea v-model="formData.note" rows="2"></textarea>
           </div>
@@ -832,6 +839,7 @@ const decorationForm = ref({
 
 // ⭐️ อัปเดตตัวแปร formData ให้รองรับ Title, FirstName, LastName
 const formData = ref({
+  is_meeting_coordinator: false,
   id: null, 
   title: 'นาย', firstName: '', lastName: '', 
   idCard: '', occupation: '',
@@ -1119,6 +1127,7 @@ const saveData = async () => {
     payload.append('bank_account_number', formData.value.bank_account_number || '')
     payload.append('bank_branch', formData.value.bank_branch || '')
     payload.append('status', formData.value.status)
+    payload.append('is_meeting_coordinator', formData.value.is_meeting_coordinator ? '1' : '0')
     payload.append('note', formData.value.note || '')  
     payload.append('position_id', formData.value.position_id)
     payload.append('term_id', formData.value.term_id)
@@ -1225,6 +1234,7 @@ const openAddModal = () => {
   isEditing.value = false
   previewPhotoUrl.value = ''
   formData.value = { 
+    is_meeting_coordinator: false,
     id: null, title: 'นาย', firstName: '', lastName: '', idCard: '', 
     dob_day: '', dob_month: '', dob_year: '', 
     position_id: '', join_day: '', join_month: '', join_year: '',
@@ -1257,6 +1267,7 @@ const openEditModal = (person) => {
   previewPhotoUrl.value = person.photo_path || ''
 
   formData.value = {
+    is_meeting_coordinator: Number(person.is_meeting_coordinator) === 1,
     id: person.id,
     title: person.title || 'นาย',
     firstName: person.first_name || '',
@@ -1711,4 +1722,19 @@ onBeforeUnmount(revokeDocumentPreviewUrl)
 }
 
 /* ส่วนอื่นๆ อาศัย CSS จาก global.css ที่คุณทำไว้แล้ว */
+.input-group label.coordinator-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.input-group .coordinator-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  padding: 0;
+  flex-shrink: 0;
+  accent-color: #10B981;
+}
 </style>
