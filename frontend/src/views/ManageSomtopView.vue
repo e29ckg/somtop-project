@@ -376,6 +376,21 @@
             </div>
 
             <div class="detail-item full-width">
+              <span class="detail-icon" aria-hidden="true">🎓</span>
+              <div class="detail-content">
+                <label>ผ่านการอบรมและจดแจ้งเป็นผู้ประสานการประชุมฯ</label>
+                <p>
+                  <span
+                    class="status-badge"
+                    :class="Number(selectedSomtopToView.is_meeting_coordinator) === 1 ? 'active' : 'inactive'"
+                  >
+                    {{ Number(selectedSomtopToView.is_meeting_coordinator) === 1 ? 'ใช่' : 'ไม่ใช่' }}
+                  </span>
+                </p>
+              </div>
+            </div>
+
+            <div class="detail-item full-width">
               <span class="detail-icon">🏠</span>
               <div class="detail-content">
                 <label>ที่อยู่</label>
