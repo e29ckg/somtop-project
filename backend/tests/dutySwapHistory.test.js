@@ -19,6 +19,7 @@ vm.runInNewContext(fs.readFileSync(filename, 'utf8'), {
         if (name === 'pizzip' || name === 'docxtemplater' || name === 'exceljs') return class {};
         if (name === '../utils/logger') return { logActivity() {} };
         if (name === '../utils/thaiBahtText') return { thaiBahtText() {} };
+        if (name === '../utils/dutyScheduleOrder') return require('../src/utils/dutyScheduleOrder');
         return require(name);
     },
     console,

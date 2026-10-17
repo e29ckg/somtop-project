@@ -6,6 +6,7 @@ const Docxtemplater = require('docxtemplater');
 const ExcelJS = require('exceljs');
 const { logActivity } = require('../utils/logger');
 const { thaiBahtText } = require('../utils/thaiBahtText');
+const { compareDutySchedules, teamMemberOrderSql } = require('../utils/dutyScheduleOrder');
 
 const validMonth = value => /^\d{4}-\d{2}$/.test(String(value || ''));
 const validDate = value => /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''));
@@ -225,7 +226,8 @@ exports.getCalendar = async (req, res) => {
             SELECT ds.id, ds.order_id, ds.team_id, ds.somtop_id, ds.duty_type_id, ds.duty_date, ds.note, ds.status,
                 CONCAT(s.title, s.first_name, ' ', s.last_name) AS full_name,
                 s.first_name, s.last_name, s.join_date, sp.level AS position_level,
-                dt.name AS duty_type_name, dor.order_number, dor.title AS order_title, t.team_name
+                dt.name AS duty_type_name, dor.order_number, dor.title AS order_title, t.team_name,
+                ${teamMemberOrderSql}
             FROM duty_schedules ds
             JOIN somtop s ON ds.somtop_id = s.id
             LEFT JOIN somtop_positions sp ON s.position_id = sp.id
@@ -241,6 +243,7 @@ exports.getCalendar = async (req, res) => {
             ...order,
             has_signed_order_pdf: Boolean(filePath)
         }));
+        schedules.sort(compareDutySchedules);
         res.json({ orders: safeOrders, schedules, duty_types: types, holiday_dates: holidayDates });
     } catch (error) {
         console.error('Duty calendar error:', error);
@@ -583,12 +586,14 @@ exports.getOrderPrintData = async (req, res) => {
     const [orders] = await pool.query(`SELECT * FROM duty_orders WHERE id=?${inScope(req.user.court_code)}`, scopeParams(req.user.court_code, [req.params.id]));
     if (!orders.length) return res.status(404).json({ message: 'ไม่พบคำสั่ง' });
     const [records] = await pool.query(`
-        SELECT ds.duty_date, dt.name AS duty_type_name, t.team_name,
+        SELECT ds.id, ds.duty_date, ds.duty_type_id, ds.team_id, dt.name AS duty_type_name, t.team_name,
+            ${teamMemberOrderSql},
             CONCAT(s.title,s.first_name,' ',s.last_name) AS full_name
         FROM duty_schedules ds JOIN somtop s ON ds.somtop_id=s.id JOIN duty_types dt ON ds.duty_type_id=dt.id
         LEFT JOIN duty_teams t ON ds.team_id=t.id
         WHERE ds.order_id=?${inScope(req.user.court_code, 'ds.')} ORDER BY ds.duty_date, s.first_name
     `, scopeParams(req.user.court_code, [req.params.id]));
+    records.sort(compareDutySchedules);
     const countsByDate = records.reduce((result, item) => {
         result[item.duty_date] = (result[item.duty_date] || 0) + 1;
         return result;
@@ -703,7 +708,8 @@ exports.exportOrderWord = async (req, res) => {
         if (!orders.length) return res.status(404).json({ message: 'ไม่พบคำสั่ง' });
 
         const [records] = await pool.query(`
-            SELECT ds.duty_date, dt.name AS duty_type_name, t.team_name, s.is_meeting_coordinator,
+            SELECT ds.id, ds.duty_date, ds.duty_type_id, ds.team_id, dt.name AS duty_type_name, t.team_name, s.is_meeting_coordinator,
+                ${teamMemberOrderSql},
                 CONCAT(s.title, s.first_name, ' ', s.last_name) AS full_name
             FROM duty_schedules ds
             JOIN somtop s ON ds.somtop_id = s.id
@@ -728,6 +734,7 @@ exports.exportOrderWord = async (req, res) => {
             });
         }
 
+        records.sort(compareDutySchedules);
         const grouped = records.reduce((result, item) => {
             const entry = result.get(item.duty_date) || { duty_date: item.duty_date, types: new Set(), teams: new Set(), names: [] };
             entry.types.add(item.duty_type_name);

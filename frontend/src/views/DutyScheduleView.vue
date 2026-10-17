@@ -215,19 +215,9 @@ const monthTitle = computed(() => new Date(`${selectedMonth.value}-01T00:00:00`)
 const daysInMonth = computed(() => { const [y,m]=selectedMonth.value.split('-').map(Number); const total=new Date(y,m,0).getDate(); return Array.from({length:total},(_,i)=>({day:i+1,date:`${selectedMonth.value}-${String(i+1).padStart(2,'0')}`})) })
 const leadingBlanks = computed(() => Array.from({length:(new Date(`${selectedMonth.value}-01T00:00:00`).getDay()+6)%7},(_,i)=>i))
 const trailingBlanks = computed(() => Array.from({length:(7-((leadingBlanks.value.length+daysInMonth.value.length)%7))%7},(_,i)=>i))
-const thaiCollator = new Intl.Collator('th', { numeric: true, sensitivity: 'base' })
-const compareSchedules = (a, b) => {
-  const typeOrder = Number(a.duty_type_id) - Number(b.duty_type_id)
-  if (typeOrder) return typeOrder
-  if (!a.team_name && b.team_name) return 1
-  if (a.team_name && !b.team_name) return -1
-  const teamOrder = thaiCollator.compare(a.team_name || '', b.team_name || '')
-  if (teamOrder) return teamOrder
-  return thaiCollator.compare(a.full_name || '', b.full_name || '') || Number(a.id) - Number(b.id)
-}
 const schedulesByDate = computed(() => {
+  // The API supplies the same team/member order used by printed orders.
   const byDate = schedules.value.reduce((map, item) => { (map[item.duty_date] ||= []).push(item); return map }, {})
-  Object.values(byDate).forEach(items => items.sort(compareSchedules))
   return byDate
 })
 const activeDaySchedules = computed(() => schedulesByDate.value[activeDate.value] || [])

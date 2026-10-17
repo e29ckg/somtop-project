@@ -14,7 +14,7 @@ test('order printing marks only trained and registered coordinators on each duty
         { duty_date: '2026-11-03', full_name: 'นางตัวอย่าง สมทบ', is_meeting_coordinator: '0' },
         { duty_date: '2026-11-04', full_name: 'นายทดสอบ สมทบ', is_meeting_coordinator: true },
         { duty_date: '2026-11-04', full_name: 'นางตัวอย่าง สมทบ', is_meeting_coordinator: null }
-    ].map(row => ({ ...row, duty_type_name: 'เวรประชุม', team_name: 'คณะที่ 1' }));
+    ].map((row, index) => ({ ...row, duty_type_name: 'เวรประชุม', team_name: 'คณะที่ 1', team_id: 1, team_member_order: index % 2 + 1 })).reverse();
     let rendered;
     const output = Buffer.from('generated-word-document');
     class Docxtemplater {
@@ -36,6 +36,7 @@ test('order printing marks only trained and registered coordinators on each duty
             if (name === 'pizzip' || name === 'exceljs') return class {};
             if (name === '../utils/logger') return { logActivity() {} };
             if (name === '../utils/thaiBahtText') return { thaiBahtText() {} };
+            if (name === '../utils/dutyScheduleOrder') return require('../src/utils/dutyScheduleOrder');
             return require(name);
         },
         console, __dirname: path.dirname(filename), Buffer, process
