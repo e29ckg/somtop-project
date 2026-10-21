@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 
 process.env.AUTH_HUB_URL = 'http://localhost/auth';
-process.env.APP_URL = 'http://localhost:8099/somtop';
+process.env.APP_URL = 'http://localhost/somtop';
 process.env.AUTH_HUB_SYSTEM_CODE = 'somtop';
 process.env.AUTH_HUB_USER_MAP = '{"42":"court-user"}';
 let account = { id: 7, username: 'court-user', full_name: 'Court User', role: 'admin', court_code: 'pkk', auth_version: 2 };
@@ -45,19 +45,19 @@ const verify = async cookie => {
 
 test('SSO code flow, authorization, revocation and logout', async t => {
     let session;
-    await t.test('cannot bypass SSO using password login or legacy JWT', async () => {
+    await t.test('local login still validates input and rejects malformed JWT with Hub enabled', async () => {
         const res = response();
         await require('../src/controllers/authController').login({ body: {} }, res);
-        assert.equal(res.statusCode, 403);
+        assert.equal(res.statusCode, 400);
         const legacy = response();
         await require('../src/middlewares/authMiddleware').verifyToken({ cookies: { jwt: 'legacy' } }, legacy,
-            () => assert.fail('legacy JWT must not bypass Hub'));
+            () => assert.fail('malformed JWT must not be accepted'));
         assert.equal(legacy.statusCode, 401);
     });
     await t.test('browser-bound state, PKCE and clean subpath redirect; no Hub token in browser', async () => {
         const flow = start();
         assert.equal(flow.url.pathname, '/auth/api/sso/authorize');
-        assert.equal(flow.url.searchParams.get('redirect_uri'), 'http://localhost:8099/somtop/api/auth/sso/callback');
+        assert.equal(flow.url.searchParams.get('redirect_uri'), 'http://localhost/somtop/api/auth/sso/callback');
         assert.equal(flow.url.searchParams.get('code_challenge_method'), 'S256');
         assert.equal(flow.res.cookies.somtop_sso_state.options.sameSite, 'lax');
         assert.equal(flow.res.cookies.somtop_sso_state.options.httpOnly, true);
@@ -67,7 +67,7 @@ test('SSO code flow, authorization, revocation and logout', async t => {
         const res = await callback(flow.state);
         const exchange = JSON.parse(calls[0].options.body);
         assert.equal(crypto.createHash('sha256').update(exchange.code_verifier).digest('base64url'), flow.url.searchParams.get('code_challenge'));
-        assert.equal(res.url, 'http://localhost:8099/somtop/dashboard');
+        assert.equal(res.url, 'http://localhost/somtop/dashboard');
         session = res.cookies.somtop_sso.value;
         assert.notEqual(session, 'a'.repeat(43));
         assert.equal(res.cookies.somtop_sso.options.sameSite, 'strict');
@@ -125,7 +125,7 @@ test('SSO code flow, authorization, revocation and logout', async t => {
         let res = response(); const before = calls.length;
         await hub.logout(req, res, assert.ifError);
         assert.equal(res.statusCode, 403); assert.equal(calls.length, before);
-        req.get = () => 'http://localhost:8099';
+        req.get = () => 'http://localhost';
         res = response(); await hub.logout(req, res, assert.ifError);
         assert.equal(calls.at(-1).url, 'http://localhost/auth/api/sso/end-session');
         assert.equal(calls.at(-1).options.headers.Authorization, `Bearer ${'a'.repeat(43)}`);

@@ -1,5 +1,58 @@
 # Deploy ผ่าน XAMPP ในเครือข่ายภายใน
 
+ปรับปรุง: 21 ตุลาคม 2569 (2026-10-21)
+
+## ค่าปัจจุบันของเครื่องนี้
+
+| รายการ | ค่าที่ใช้งาน |
+| --- | --- |
+| URL หน้าเว็บ | `http://localhost/somtop/` — Apache พอร์ต 80 |
+| โปรแกรมที่ deploy | `C:\project\somtop-project` |
+| ไฟล์หน้าเว็บ | `C:\xampp\htdocs\somtop` |
+| API | `127.0.0.1:8088` — PM2 ชื่อ somtop-api หนึ่ง instance |
+| Auth-Hub Portal | `http://localhost/auth/portal` |
+| Callback ที่ลงทะเบียน | `http://localhost/somtop/api/auth/sso/callback` |
+| บัญชีที่เชื่อม | Hub admin-local (ID 1) → Somtop admin; role somtop ใน Hub เป็น admin |
+
+`.env` ที่ root ของโปรแกรม deploy ใช้ค่าต่อไปนี้ร่วมกับค่าฐานข้อมูลและ JWT_SECRET ของเครื่อง ห้ามคัดลอกทับไฟล์จริงทั้งไฟล์:
+
+```dotenv
+APP_URL=http://localhost/somtop
+FRONTEND_URL=http://localhost
+APP_BASE_PATH=/somtop/
+APACHE_DOCUMENT_ROOT=C:/xampp/htdocs
+XAMPP_ROOT=C:/xampp
+HOST=127.0.0.1
+PORT=8088
+APP_ENV=production
+COOKIE_SECURE=false
+COOKIE_PATH=/somtop
+AUTH_HUB_URL=http://localhost/auth
+AUTH_HUB_CLIENT_ID=somtop
+AUTH_HUB_SYSTEM_CODE=somtop
+AUTH_HUB_USER_MAP={"1":"admin"}
+```
+
+เครื่องนี้เปิด ENABLE_WEB_UPDATE=true แต่ Git ยังมีเทมเพลต `backend/templates/duty_order_template.docx` ที่แก้เฉพาะเครื่อง ตัวอัปเดตเว็บจะปฏิเสธ checkout ที่ไม่สะอาด ต้องสำรองและจัดการไฟล์นี้ก่อน ไม่สั่งทิ้งการแก้ไขเพื่อให้ผ่านเงื่อนไข ดู [DEVELOPMENT.md](DEVELOPMENT.md) สำหรับขั้นตอนนำโค้ดจาก worktree มา deploy
+
+ค่าพอร์ตหน้าเว็บและพอร์ต Node เป็นคนละส่วน การใช้เว็บพอร์ต 80 ไม่ได้เปลี่ยน PORT ของ API จาก 8088 ส่วนตัวอย่าง LAN HTTP ด้านล่างใช้อธิบายการติดตั้ง proxy/local login; เมื่อใช้ SSO ผ่าน hostname/IP ที่ไม่ใช่ loopback ต้องตั้ง HTTPS ให้ทั้ง Somtop และ Hub ตาม [AUTH_HUB.md](AUTH_HUB.md)
+
+### เปลี่ยน URL หรือพอร์ตที่ใช้เข้าหน้าเว็บ
+
+แก้ APP_URL/FRONTEND_URL ใน `.env` และ redirect_uri/portal_url ของ client somtop ใน Hub ให้ตรงกัน PM2 อาจเก็บ URL เก่าไว้ แม้แก้ไฟล์แล้วต้องส่งค่าที่ต้องการตอน restart ด้วย:
+
+```powershell
+Set-Location C:\project\somtop-project\backend
+$env:APP_URL = 'http://localhost/somtop'
+$env:FRONTEND_URL = 'http://localhost'
+pm2.cmd restart somtop-api --update-env
+pm2.cmd save
+```
+
+ตรวจ `/somtop/api/auth/sso/login` ว่าส่ง redirect_uri ที่ไม่มี `:8099` ก่อนทดสอบ login ใหม่ หากเปลี่ยน base path ต้องปรับ APP_BASE_PATH/COOKIE_PATH, build frontend และตั้ง Apache proxy ให้ตรงด้วย Restart Somtop จะล้าง SSO session ใน memory
+
+## ติดตั้งบนเครื่องอื่น
+
 Apache ให้บริการหน้าเว็บ Vue และส่ง `/somtop/api/` กับ `/somtop/uploads/` ไปยัง Node.js ที่ฟังเฉพาะ `127.0.0.1` ส่วน MySQL ใช้ของ XAMPP วางโปรเจกต์ **นอก** Apache DocumentRoot เพื่อไม่ให้ `.env`, ซอร์ส backend และไฟล์อัปโหลดถูกเสิร์ฟตรง ๆ
 
 ## 1. เตรียมเครื่องเซิร์ฟเวอร์
@@ -86,7 +139,7 @@ pm2 status
 1. จากเครื่องลูกข่าย เปิด `http://10.xx.xx.xx/somtop/` หน้าเว็บและ CSS/JS ต้องโหลดครบ
 2. เปิด `http://10.xx.xx.xx/somtop/dashboard` ตรง ๆ ต้องได้หน้าเว็บ ไม่ใช่ Apache 404
 3. ก่อนล็อกอิน ลอง `http://10.xx.xx.xx/somtop/api/auth/me` ต้องได้ HTTP 401 จาก API ไม่ใช่ HTML ของ Vue
-4. ล็อกอินด้วยบัญชีจริง แล้วทดสอบรูปและไฟล์แนบผ่าน `/somtop/uploads/`
+4. เมื่อเปิด Hub ให้ `/somtop/api/auth/config` คืน provider dual และ providers local/auth-hub ทดสอบทั้งแบบฟอร์มบัญชี Somtop และปุ่ม Auth-Hub รวมถึงรูป/ไฟล์ `/somtop/uploads/` หากไม่กำหนด Hub จะคืน provider local และมีเฉพาะบัญชี Somtop
 5. ตรวจ `pm2 status` ว่า `somtop-api` เป็น `online` และดู `C:\xampp\apache\logs\error.log` ถ้า proxy ไม่ทำงาน
 
 ถ้าเครื่องลูกข่ายยังเรียก `http://10.xx.xx.xx:8000/api/...` แสดงว่าโหลด JavaScript build เก่า ให้ดึง `main` ล่าสุด รัน `update_somtop.bat` บนเซิร์ฟเวอร์ และกด `Ctrl+Shift+R` ที่เครื่องลูกข่าย คำขอใหม่ต้องเป็น `http://10.xx.xx.xx/somtop/api/...` ถ้าเป็น URL นี้แล้วได้ 502 ให้ตรวจ `pm2 status` กับ Apache proxy config
@@ -103,7 +156,7 @@ pm2 status
 
 ระหว่างอัปเดต สคริปต์จะหยุด `somtop-api` ก่อน `npm ci` เพื่อให้ Windows ปล่อยไฟล์ native เช่น `bcrypt_lib.node` แล้วเริ่มบริการใหม่หลัง deploy หาก deploy ล้มเหลว สคริปต์จะพยายามเริ่มบริการเดิมกลับ หากยังพบ `EPERM` ให้ตรวจโปรเซส Node อื่นหรือโปรแกรมสแกนไวรัสที่กำลังเปิดไฟล์นั้นก่อนลองใหม่
 
-HTTP ภายใน LAN ส่งรหัสผ่านและข้อมูลส่วนบุคคลแบบไม่เข้ารหัส ควรจำกัดเครือข่ายที่เข้าถึงและใช้ HTTPS เมื่อพร้อม
+Auth-Hub SSO ของ Somtop อนุญาต HTTP เฉพาะ loopback เช่น localhost/127.0.0.1 เท่านั้น หากย้ายไป hostname หรือ IP ภายใน LAN ต้องตั้ง HTTPS ทั้ง APP_URL และ AUTH_HUB_URL และ COOKIE_SECURE=true ก่อนเปิด SSO
 
 
 ## อัปเดตโปรเจกต์ผ่านหน้าเว็บ
@@ -111,6 +164,8 @@ HTTP ภายใน LAN ส่งรหัสผ่านและข้อม�
 ผู้ดูแลระบบ (`admin`) เข้าได้ทุกเมนู รวมถึง **อัปเดตโปรเจกต์** การอัปเดตผ่านหน้าเว็บต้องตั้ง `APP_ENV=production` และ `ENABLE_WEB_UPDATE=true` ใน `.env` บน Windows แล้วรีสตาร์ต PM2 บริการต้องทำงานจาก checkout ที่ branch `main` มี origin ตรงกับ repository ของโปรเจกต์ และไม่มีไฟล์โค้ดที่ยังไม่ได้ commit
 
 ก่อนเริ่มอัปเดต ให้ตรวจ migration ที่จำเป็น หน้าเว็บจะให้ยืนยันการอัปเดตและพิมพ์ UPDATE ระบบจะสำรองฐานข้อมูล ไฟล์อัปโหลด เทมเพลต และค่าเซิร์ฟเวอร์โดยอัตโนมัติก่อนดึง `origin/main` แบบ fast-forward และรัน `update_somtop.bat` สถานะและ log เก็บที่ `backend/.system-update/` โดยไม่อยู่ใน Git
+
+ให้ตรวจว่า origin/main มีรุ่น SSO ที่ติดตั้งแล้วก่อนเริ่ม งาน SSO รอบนี้ deploy commit 11d7555 จาก branch codex/auth-hub-login การ push branch งานไม่ได้แปลว่า main มีโค้ดนั้นแล้ว และการเปลี่ยน schema/สิทธิ์ใน Auth-Hub ไม่ได้เป็นส่วนหนึ่งของตัวอัปเดต Somtop ต้องสำรองและจัดการแยก
 
 
 ก่อน deploy รุ่นที่ตรวจเซสชันล่าสุด ให้รัน `backend/migrations/013_auth_version.sql` และ `backend/migrations/014_login_rate_limits.sql` หนึ่งครั้ง หากเซิร์ฟเวอร์มีคอลัมน์และตารางนี้อยู่แล้ว migration จะไม่สร้างซ้ำ การ deploy ใช้โค้ดและ environment จาก checkout เดียวที่เป็น branch `main` โดย PM2 ต้องรัน `backend/server.js` ของ checkout นั้น
@@ -125,6 +180,8 @@ HTTP ภายใน LAN ส่งรหัสผ่านและข้อม�
 เมนู **อัปเดตโปรเจกต์** จะแสดง 13 ขั้นตอนพร้อมเวลาและบันทึกความคืบหน้า โดยตรวจสถานะทุก 1 วินาทีขณะทำงาน: ตรวจความพร้อม → สำรองฐานข้อมูล → สำรองไฟล์และค่าระบบ → ดาวน์โหลด GitHub → นำโค้ดใหม่มาใช้ → หยุด API → ติดตั้ง dependency ของ API และหน้าเว็บ → build → ตรวจ Apache → เผยแพร่หน้าเว็บ → เริ่ม API → ตรวจเว็บและการเชื่อมต่อฐานข้อมูล
 
 ระบบใช้ mysqldump ของ XAMPP (`XAMPP_ROOT/mysql/bin/mysqldump.exe`) หรือกำหนด `MYSQLDUMP_PATH` เอง ข้อมูลสำรองแต่ละงานเก็บที่ `backend/.system-update/backups/<job-id>/`: `database.sql`, ไฟล์อัปโหลด เทมเพลต environment, Google service-account, เว็บเดิม และ config Apache ใน `files/` พร้อม `source.tar` ของ commit เดิม โฟลเดอร์นี้อยู่นอก DocumentRoot และไม่ถูก commit ใน Git ต้องมีพื้นที่และสิทธิ์เขียนเพียงพอ ระบบยกเลิกก่อนดาวน์โหลดโค้ดหาก backup ไม่สำเร็จ การตรวจและนำเข้า migration ยังเป็นหน้าที่ของผู้ดูแลก่อนยืนยันเริ่มงาน
+
+การสำรองนี้ครอบคลุมฐาน Somtop ไม่ได้สำรองฐาน Hub อัตโนมัติ หากแก้ client/role/URL ของ Hub ต้องสำรอง Hub เพิ่ม บัญชีฐานข้อมูลแอปอาจไม่มีสิทธิ์ dump events/routines ให้ใช้บัญชีสำรองข้อมูลที่มีสิทธิ์เหมาะสมโดยไม่เพิ่มสิทธิ์บัญชีแอปเพียงเพื่อทำ backup
 
 สถานะระหว่าง API หยุดอ่านผ่านไฟล์ JSON ขั้นต่ำที่ Apache ให้บริการใต้ `<APP_BASE_PATH>.update-status/` URL ใช้ token สุ่ม 256 บิต ส่งให้ admin ผ่าน API ที่ตรวจสิทธิ์แล้ว ห้ามเปิด directory listing สถานะนี้ไม่รวมชื่อผู้ใช้ ค่าลับ เนื้อหาฐานข้อมูล หรือที่อยู่ข้อมูลสำรอง ไฟล์สถานะสาธารณะเกิน 24 ชั่วโมงจะถูกเก็บกวาดเมื่อเริ่มงานใหม่ ข้อมูลสำรองจริงจะไม่ถูกลบอัตโนมัติ
 

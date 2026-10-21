@@ -168,7 +168,7 @@ exports.unlockUser = async (req, res) => {
 exports.updateProfile = async (req, res) => {
     try {
         const { id, full_name, old_password, new_password } = req.body;
-        if (require('../services/authHub').enabled() && (old_password || new_password)) {
+        if (req.user.auth_provider === 'auth-hub' && (old_password || new_password)) {
             return res.status(400).json({ message: 'กรุณาเปลี่ยนรหัสผ่านที่ Auth-Hub' });
         }
 

@@ -7,14 +7,9 @@
         <p class="subtitle">ผู้พิพากษาสมทบ ศาลเยาวชนและครอบครัว</p>
       </div>
 
-      <p v-if="!provider && !errorMessage" class="subtitle">กำลังตรวจสอบระบบเข้าสู่ระบบ...</p>
-      <div v-if="provider === 'auth-hub'" class="login-form">
-        <p class="subtitle">ใช้บัญชี Auth-Hub เพื่อเข้าใช้งานระบบ</p>
-        <button type="button" class="btn-primary login-btn" :disabled="isLoading" @click="handleSsoLogin">
-          {{ isLoading ? 'กำลังไปยัง Auth-Hub...' : 'เข้าสู่ระบบด้วย Auth-Hub' }}
-        </button>
-      </div>
-      <form v-if="provider === 'local'" @submit.prevent="handleLogin" class="login-form">
+      <p v-if="!providers && !errorMessage" class="subtitle">กำลังตรวจสอบระบบเข้าสู่ระบบ...</p>
+      <form v-if="providers?.includes('local')" @submit.prevent="handleLogin" class="login-form">
+        <p class="subtitle login-method-title">เข้าสู่ระบบด้วยบัญชี Somtop</p>
         <div class="input-group">
           <label for="username">ชื่อผู้ใช้ (Username)</label>
           <input
@@ -40,9 +35,16 @@
         </div>
 
         <button type="submit" class="btn-primary login-btn" :disabled="isLoading">
-          {{ isLoading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ' }}
+          {{ isLoading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบด้วยบัญชี Somtop' }}
         </button>
       </form>
+      <div v-if="providers?.includes('auth-hub')" class="sso-login">
+        <div class="login-divider"><span>หรือ</span></div>
+        <button type="button" class="btn-secondary login-btn" :disabled="isLoading" @click="handleSsoLogin">
+          เข้าสู่ระบบด้วย Auth-Hub
+        </button>
+        <p class="subtitle sso-description">ใช้บัญชีกลางที่เชื่อมกับบัญชี Somtop</p>
+      </div>
       <div v-if="errorMessage" class="error-alert" role="alert">{{ errorMessage }}</div>
     </div>
   </div>
@@ -57,7 +59,7 @@ import { setSessionUser } from '../services/session'
 
 const router = useRouter()
 const route = useRoute()
-const provider = ref(null)
+const providers = ref(null)
 const username = ref('')
 const password = ref('')
 const errorMessage = ref('')
@@ -75,7 +77,7 @@ onMounted(async () => {
   }
   try {
     const response = await api.get('/auth/config')
-    provider.value = response.data.provider
+    providers.value = response.data.providers || (response.data.provider === 'auth-hub' ? ['auth-hub'] : ['local'])
   } catch {
     errorMessage.value = 'ไม่สามารถตรวจสอบระบบเข้าสู่ระบบได้ กรุณาโหลดหน้าใหม่'
   }
@@ -96,11 +98,6 @@ const handleLogin = async () => {
       password: password.value
     })
 
-    // ⭐️ บันทึก Token (ตั้งชื่อให้ตรงกับตัวแปรที่ใช้เช็กใน router/index.js)
-    // const token = response.data.jwt || response.data.token
-    // localStorage.setItem('token', token)
-    
-    // หาก API มีการส่งข้อมูลผู้ใช้กลับมาด้วย สามารถเก็บไว้ใช้แสดงชื่อมุมขวาบนได้
     if (response.data.user) {
       setSessionUser(response.data.user)
     }
@@ -174,6 +171,37 @@ const handleLogin = async () => {
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+.login-method-title,
+.sso-description {
+  text-align: center;
+}
+
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 24px 0 12px;
+  color: #6B7280;
+  font-size: 14px;
+}
+
+.login-divider::before,
+.login-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #E5E7EB;
+}
+
+.sso-description {
+  margin-top: 12px;
+  font-size: 13px;
+}
+
+.error-alert {
+  margin-top: 16px;
 }
 
 /* แจ้งเตือนเมื่อผิดพลาดแบบกล่องสีแดงอ่อน */

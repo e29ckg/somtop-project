@@ -11,6 +11,15 @@ const cookieOptions = () => ({ httpOnly: true, secure: process.env.COOKIE_SECURE
     (process.env.COOKIE_SECURE !== 'false' && process.env.NODE_ENV === 'production'), sameSite: 'lax', path: cookiePath() });
 const sessionCookie = 'somtop_sso';
 const stateCookie = 'somtop_sso_state';
+const hasSessionCookie = req => Object.hasOwn(req.cookies || {}, sessionCookie);
+// Forget this app's SSO session when explicitly switching to local login.
+// Switching login methods does not end the user's central Hub session.
+function clearLocalSession(req, res) {
+    const value = req.cookies?.[sessionCookie];
+    if (typeof value === 'string') sessions.delete(hash(value));
+    res.clearCookie(sessionCookie, { ...cookieOptions(), sameSite: 'strict' });
+    res.clearCookie(stateCookie, cookieOptions());
+}
 const prune = map => {
     for (const [key, value] of map) if (value.expires <= Date.now()) map.delete(key);
 };
@@ -98,8 +107,9 @@ async function callback(req, res) {
         prune(sessions);
         if (sessions.size >= 10000) throw new Error('Session limit reached');
         const value = random();
-        sessions.set(hash(value), { token: result.appSession, userId: user.id, version: user.auth_version, expires: Date.now() + 8 * 3600000 });
         await pool.query('UPDATE users SET last_login = NOW() WHERE id = ?', [user.id]);
+        clearLocalSession(req, res);
+        sessions.set(hash(value), { token: result.appSession, userId: user.id, version: user.auth_version, expires: Date.now() + 8 * 3600000 });
         res.cookie(sessionCookie, value, { ...cookieOptions(), sameSite: 'strict', maxAge: 8 * 3600000 });
         res.clearCookie('jwt', { ...cookieOptions(), sameSite: 'strict' });
         res.redirect(303, `${settings.app}/dashboard`);
@@ -137,9 +147,9 @@ async function logout(req, res, next) {
             try { await request('end-session', { token: session.token, body: {} }); }
             catch (error) { if (error.status !== 401) throw error; }
         }
-        if (value) sessions.delete(hash(value));
-        res.clearCookie(sessionCookie, { ...cookieOptions(), sameSite: 'strict' });
+        clearLocalSession(req, res);
+        res.clearCookie('jwt', { ...cookieOptions(), sameSite: 'strict' });
         res.json({ message: 'ออกจากระบบทุกแอปของเซสชัน Auth-Hub นี้แล้ว' });
     } catch (error) { next(error); }
 }
-module.exports = { enabled, config, start, callback, verify, logout };
+module.exports = { enabled, config, start, callback, verify, logout, hasSessionCookie, clearLocalSession };

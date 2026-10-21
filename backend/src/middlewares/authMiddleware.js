@@ -7,9 +7,10 @@ require('dotenv').config();
 // ==========================================
 const verifyToken = async (req, res, next) => {
     const authHub = require('../services/authHub');
-    if (authHub.enabled()) return authHub.verify(req, res, next);
+    // An SSO session must pass Hub validation; never fall back to a JWT if it fails.
+    if (authHub.enabled() && authHub.hasSessionCookie(req)) return authHub.verify(req, res, next);
     // ดึง Token จาก HttpOnly Cookie ที่ชื่อ 'jwt'
-    const token = req.cookies.jwt;
+    const token = req.cookies?.jwt;
 
     // ถ้าไม่มี Token (ยังไม่ล็อกอิน หรือ Cookie หมดอายุ)
     if (!token) {
@@ -37,7 +38,7 @@ const verifyToken = async (req, res, next) => {
             return res.status(401).json({ message: 'เซสชันถูกยกเลิก กรุณาเข้าสู่ระบบใหม่' });
         }
         const { auth_version, ...currentUser } = rows[0];
-        req.user = currentUser;
+        req.user = { ...currentUser, auth_provider: 'local' };
         if (!['admin', 'view'].includes(req.user.role)) {
             return res.status(401).json({ message: 'สิทธิ์บัญชีไม่ถูกต้อง กรุณาติดต่อผู้ดูแลระบบ' });
         }
