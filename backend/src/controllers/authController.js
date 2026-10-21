@@ -6,6 +6,9 @@ const cookieSecure = process.env.COOKIE_SECURE === 'false' ? false : process.env
 const cookiePath = process.env.COOKIE_PATH || '/';
 
 exports.login = async (req, res) => {
+    if (require('../services/authHub').enabled()) {
+        return res.status(403).json({ message: 'กรุณาเข้าสู่ระบบผ่าน Auth-Hub' });
+    }
     let connection;
     try {
         const { username, password } = req.body;

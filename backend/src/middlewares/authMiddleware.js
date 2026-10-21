@@ -6,6 +6,8 @@ require('dotenv').config();
 // 1. ตรวจสอบว่าเข้าสู่ระบบหรือยัง (Verify Token)
 // ==========================================
 const verifyToken = async (req, res, next) => {
+    const authHub = require('../services/authHub');
+    if (authHub.enabled()) return authHub.verify(req, res, next);
     // ดึง Token จาก HttpOnly Cookie ที่ชื่อ 'jwt'
     const token = req.cookies.jwt;
 

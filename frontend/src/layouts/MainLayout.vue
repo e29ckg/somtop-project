@@ -210,7 +210,8 @@ const goToProfile = () => {
 
 // ⭐️ ฟังก์ชันออกจากระบบแบบมียืนยัน
 const handleLogout = async () => {
-  const result = await swalConfirm('ยืนยันการออกจากระบบ', 'คุณแน่ใจหรือไม่ว่าต้องการออกจากระบบ?');
+  const result = await swalConfirm('ยืนยันการออกจากระบบ', currentUser.value?.auth_provider === 'auth-hub'
+    ? 'ออกจาก Somtop และทุกแอปในเซสชัน Auth-Hub นี้?' : 'คุณแน่ใจหรือไม่ว่าต้องการออกจากระบบ?');
     
   if (result.isConfirmed) {
     try {
@@ -225,9 +226,8 @@ const handleLogout = async () => {
       
     } catch (error) {
       console.error("เกิดข้อผิดพลาดในการออกจากระบบ:", error)
-      // แม้ API จะพัง ก็ควรบังคับลบ user และเด้งออกอยู่ดี
-      clearSession()
-      router.push('/')
+      swal.fire({ icon: 'error', title: 'ออกจากระบบไม่สำเร็จ',
+        text: error.response?.data?.message || 'กรุณาลองใหม่อีกครั้ง', confirmButtonText: 'ตกลง' })
     }
   }
 }

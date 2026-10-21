@@ -7,7 +7,14 @@
         <p class="subtitle">ผู้พิพากษาสมทบ ศาลเยาวชนและครอบครัว</p>
       </div>
 
-      <form @submit.prevent="handleLogin" class="login-form">
+      <p v-if="!provider && !errorMessage" class="subtitle">กำลังตรวจสอบระบบเข้าสู่ระบบ...</p>
+      <div v-if="provider === 'auth-hub'" class="login-form">
+        <p class="subtitle">ใช้บัญชี Auth-Hub เพื่อเข้าใช้งานระบบ</p>
+        <button type="button" class="btn-primary login-btn" :disabled="isLoading" @click="handleSsoLogin">
+          {{ isLoading ? 'กำลังไปยัง Auth-Hub...' : 'เข้าสู่ระบบด้วย Auth-Hub' }}
+        </button>
+      </div>
+      <form v-if="provider === 'local'" @submit.prevent="handleLogin" class="login-form">
         <div class="input-group">
           <label for="username">ชื่อผู้ใช้ (Username)</label>
           <input
@@ -32,30 +39,52 @@
           />
         </div>
 
-        <div v-if="errorMessage" class="error-alert">
-          {{ errorMessage }}
-        </div>
-
         <button type="submit" class="btn-primary login-btn" :disabled="isLoading">
           {{ isLoading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ' }}
         </button>
       </form>
+      <div v-if="errorMessage" class="error-alert" role="alert">{{ errorMessage }}</div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import api from '../services/api'
 import swal from 'sweetalert2' // นำเข้า SweetAlert2 สำหรับแสดง Alert
 import { setSessionUser } from '../services/session'
 
 const router = useRouter()
+const route = useRoute()
+const provider = ref(null)
 const username = ref('')
 const password = ref('')
 const errorMessage = ref('')
 const isLoading = ref(false)
+
+onMounted(async () => {
+  const messages = {
+    access_denied: 'บัญชีนี้ยังไม่ได้เชื่อมกับ Somtop หรือไม่มีสิทธิ์ใช้งาน กรุณาติดต่อผู้ดูแลระบบ',
+    unavailable: 'ไม่สามารถเชื่อมต่อ Auth-Hub ได้ กรุณาลองใหม่',
+    failed: 'การเข้าสู่ระบบไม่สำเร็จหรือคำขอหมดอายุ กรุณาลองใหม่'
+  }
+  if (route.query.auth_error) {
+    errorMessage.value = messages[route.query.auth_error] || messages.failed
+    await router.replace({ path: '/', query: {} })
+  }
+  try {
+    const response = await api.get('/auth/config')
+    provider.value = response.data.provider
+  } catch {
+    errorMessage.value = 'ไม่สามารถตรวจสอบระบบเข้าสู่ระบบได้ กรุณาโหลดหน้าใหม่'
+  }
+})
+
+const handleSsoLogin = () => {
+  isLoading.value = true
+  window.location.assign(`${import.meta.env.BASE_URL}api/auth/sso/login`)
+}
 
 const handleLogin = async () => {
   isLoading.value = true

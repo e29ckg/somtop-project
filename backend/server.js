@@ -8,6 +8,8 @@ if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
     throw new Error('JWT_SECRET is required and must contain at least 32 characters');
 }
 const app = require('./src/app');
+const authHub = require('./src/services/authHub');
+if (authHub.enabled()) authHub.config();
 
 // ตั้ง HOST=127.0.0.1 เมื่อให้ Apache เป็นทางเข้า API จากเครือข่าย
 const PORT = process.env.PORT || 8000;
