@@ -13,7 +13,7 @@ const dateText = date => {
     const [year, month, day] = date.split('-').map(Number);
     return `${day} ${months[month - 1]} ${year + 543}`;
 };
-function options(query) {
+function options(query, courtCode) {
     if (typeof query.month !== 'string' || !/^[1-9]\d{3}-(0[1-9]|1[0-2])$/.test(query.month)) fail(400, 'กรุณาระบุเดือนในรูปแบบ YYYY-MM');
     const orderId = query.order_id === undefined || query.order_id === '' ? null : Number(query.order_id);
     if (orderId !== null && (!Number.isSafeInteger(orderId) || orderId < 1)) fail(400, 'คำสั่งที่เลือกไม่ถูกต้อง');
@@ -31,12 +31,13 @@ function options(query) {
     return { month: query.month, orderId, rateSatang, withholding: withholding === '1', memoDate,
         title: text(query.title, 'หน้างบประกอบการอนุมัติโอนเงินเข้าบัญชีในระบบ K-Cash Connect Plus'),
         budgetName: text(query.budget_name, 'งบดำเนินการ', 100),
-        savingsAccount: text(query.savings_account, '', 50), currentAccount: text(query.current_account, '', 50),
+        savingsAccount: text(query.savings_account ?? (courtCode === 'pkkjc' ? '133-2-29018-1' : ''), '', 50),
+        currentAccount: text(query.current_account ?? (courtCode === 'pkkjc' ? '133-1-02413-5' : ''), '', 50),
         item: text(query.item, 'เงินค่าป่วยการและค่าตอบแทนผู้พิพากษาสมทบ (นั่งเวร)') };
 }
 
 async function loadReport(user, query) {
-    const settings = options(query);
+    const settings = options(query, user.court_code);
     if (!user.court_code) fail(400, 'กรุณากำหนดศาลให้บัญชีก่อนจัดทำรายงาน');
     const [courts] = await pool.query('SELECT court_name FROM courts WHERE court_code = ? LIMIT 1', [user.court_code]);
     if (!courts.length) fail(404, 'ไม่พบข้อมูลศาล');

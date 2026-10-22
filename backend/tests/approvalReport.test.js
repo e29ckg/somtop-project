@@ -9,7 +9,7 @@ const dbPath = require.resolve('../src/config/db');
 require.cache[dbPath] = { id: dbPath, filename: dbPath, loaded: true, exports: {
     query: async (sql, params) => {
         calls.push({ sql, params });
-        if (sql.includes('FROM courts')) return [[{ court_name: 'ศาลเยาวชนและครอบครัวจังหวัดทดสอบ' }]];
+        if (sql.includes('FROM courts')) return [[{ court_name: params[0] === 'pkkjc' ? 'ศาลเยาวชนและครอบครัวจังหวัดประจวบคีรีขันธ์' : 'ศาลเยาวชนและครอบครัวจังหวัดทดสอบ' }]];
         if (sql.includes('FROM duty_orders')) return [orderFound ? [{ id: 7 }] : []];
         if (sql.includes('FROM duty_schedules')) return [rows];
         throw new Error('Unexpected query');
@@ -27,6 +27,21 @@ const fixtures = () => [
 
 test('approval report matches payment totals and exports the reference layout', async t => {
     let report;
+    await t.test('Prachuap cover matches requested three-line header in preview and Excel', async () => {
+        rows = fixtures();
+        const cover = await loadReport({ ...user, court_code: 'pkkjc' }, { ...base, month: '2026-08' });
+        const expected = [
+            'หน้างบประกอบการอนุมัติโอนเงินเข้าบัญชีในระบบ K-Cash Connect Plus',
+            'งบดำเนินการ บัญชีออมทรัพย์ 133-2-29018-1 บัญชีกระแสรายวัน 133-1-02413-5',
+            'ตามบันทึกศาลเยาวชนและครอบครัวจังหวัดประจวบคีรีขันธ์ ลงวันที่ 22 ตุลาคม 2569 (เวรเดือนสิงหาคม 2569)'
+        ];
+        assert.deepEqual([cover.title, cover.account_line, cover.memo_line], expected);
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(await buildWorkbook(cover).xlsx.writeBuffer());
+        assert.deepEqual([1,2,3].map(row => workbook.worksheets[0].getCell(row, 1).value), expected);
+        const otherCourt = await loadReport(user, base);
+        assert.ok(!otherCourt.account_line.includes('133-2-29018-1'));
+    });
     await t.test('deduplicates days, preserves bank/phone text and reads scoped database records', async () => {
         rows = fixtures(); calls.length = 0;
         report = await loadReport(user, base);

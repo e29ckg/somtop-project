@@ -100,6 +100,7 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import api from '../services/api'
 import { swalError, swalSuccess } from '../utils/swal'
+import { currentUser } from '../services/session'
 
 const thaiMonths = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม']
 const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
@@ -123,7 +124,9 @@ const report = ref(null)
 const reportElement = ref(null)
 const previewQuery = ref('')
 const form = ref({ title: 'หน้างบประกอบการอนุมัติโอนเงินเข้าบัญชีในระบบ K-Cash Connect Plus',
-  budgetName: 'งบดำเนินการ', memoDate: today, savingsAccount: '', currentAccount: '',
+  budgetName: 'งบดำเนินการ', memoDate: today,
+  savingsAccount: currentUser.value?.court_code === 'pkkjc' ? '133-2-29018-1' : '',
+  currentAccount: currentUser.value?.court_code === 'pkkjc' ? '133-1-02413-5' : '',
   item: 'เงินค่าป่วยการและค่าตอบแทนผู้พิพากษาสมทบ (นั่งเวร)', rate: '1250', withholdingTax: false })
 const busy = computed(() => loading.value || preparing.value || refreshing.value || exporting.value)
 const hasSchedules = computed(() => schedules.value.some(row => !orderId.value || String(row.order_id) === orderId.value))
