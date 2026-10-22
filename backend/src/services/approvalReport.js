@@ -124,7 +124,7 @@ function buildWorkbook(report) {
     sheet.getCell(totalRow, 1).alignment = { horizontal: 'right', vertical: 'middle', wrapText: true };
     for (const column of [6, 8]) sheet.getCell(totalRow, column).border = { ...sheet.getCell(totalRow, column).border,
         bottom: { style: 'double', color: { argb: 'FF31558A' } } };
-    sheet.pageSetup = { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0,
+    sheet.pageSetup = { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0,
         printTitlesRow: '1:4', printArea: `A1:J${totalRow}`, margins: { left: .2, right: .2, top: .25, bottom: .25, header: 0, footer: 0 } };
     return workbook;
 }

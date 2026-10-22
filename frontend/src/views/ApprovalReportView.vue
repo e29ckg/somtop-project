@@ -206,13 +206,13 @@ const printReport = async () => {
     if (!report.value?.rows.length) { popup.close(); return }
     popup.document.title = `หน้างบประกอบการอนุมัติ ${month.value}`
     const style = popup.document.createElement('style')
-    style.textContent = `@page { size: A4 portrait; margin: 8mm 6mm; }
-      body { margin: 0; color: #112e51; font: 12px 'TH Sarabun New', 'Sarabun', Tahoma, sans-serif; }
-      .approval-heading { text-align: center; line-height: 1.5; padding: 4px 0 10px; font-size: 14px; }
+    style.textContent = `@page { size: A4 landscape; margin: 8mm 6mm; }
+      body { margin: 0; color: #112e51; font: 14px 'TH Sarabun New', 'Sarabun', Tahoma, sans-serif; }
+      .approval-heading { text-align: center; line-height: 1.5; padding: 4px 0 10px; font-size: 16px; }
       table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-      th, td { border: 1px solid #d6dce4; padding: 4px 2px; vertical-align: middle; overflow-wrap: anywhere; }
+      th, td { border: 1px solid #d6dce4; padding: 6px 5px; vertical-align: middle; overflow-wrap: anywhere; }
       th { font-weight: normal; text-align: center; border-bottom: 2px solid #222; }
-      td { text-align: center; } .text-left { text-align: left; } .amount { text-align: right; white-space: nowrap; font-size: 11px; }
+      td { text-align: center; } .text-left { text-align: left; } .amount { text-align: right; white-space: nowrap; }
       .total-label { text-align: right; } .total-amount { border-bottom: 3px double #31558a; }
       tr { break-inside: avoid; } thead { display: table-header-group; } tfoot { display: table-row-group; }`
     popup.document.head.appendChild(style)
