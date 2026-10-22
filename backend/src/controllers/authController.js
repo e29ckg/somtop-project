@@ -10,7 +10,7 @@ exports.login = async (req, res) => {
     try {
         const { username, password } = req.body;
 
-        if (!username || !password) {
+        if (typeof username !== 'string' || typeof password !== 'string' || !username || !password) {
             return res.status(400).json({ message: 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน' });
         }
 
@@ -59,6 +59,10 @@ exports.login = async (req, res) => {
             }
         }
 
+        if (!['admin', 'view'].includes(user.role)) {
+            await connection.commit();
+            return res.status(403).json({ message: 'สิทธิ์บัญชีไม่ถูกต้อง กรุณาติดต่อผู้ดูแลระบบ' });
+        }
         await connection.query('UPDATE users SET last_login = NOW(), failed_login_attempts = 0, lockout_until = NULL WHERE id = ?', [user.id]);
         await connection.commit();
 
@@ -70,6 +74,7 @@ exports.login = async (req, res) => {
                 full_name: user.full_name, 
                 role: user.role, 
                 court_code: user.court_code,
+                auth_provider: 'local',
             }
         };
 
@@ -80,6 +85,7 @@ exports.login = async (req, res) => {
             audience: 'somtop-web'
         });
 
+        require('../services/authHub').clearLocalSession(req, res);
         res.cookie('jwt', token, {
             httpOnly: true,
             secure: cookieSecure,
@@ -120,6 +126,7 @@ exports.logout = async (req, res, next) => {
         sameSite: 'strict',
         path: cookiePath
     });
+    require('../services/authHub').clearLocalSession(req, res);
     res.status(200).json({ message: 'ออกจากระบบสำเร็จ' });
 };
 

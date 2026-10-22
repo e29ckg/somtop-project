@@ -39,6 +39,8 @@
           <input type="text" :value="userInfo.court_code ? userInfo.court_code.toUpperCase() : '-'" disabled style="background-color: #F3F4F6;" class="font-mono" />
         </div>
 
+        <p v-if="userInfo.auth_provider === 'auth-hub'" class="full-width text-muted">จัดการรหัสผ่านและ MFA ได้ที่ Auth-Hub</p>
+        <template v-else>
         <!-- ส่วนที่ 2: เปลี่ยนรหัสผ่าน -->
         <div class="input-group full-width" style="margin-top: 16px;">
           <h3 style="margin: 0 0 16px 0; border-bottom: 1px solid #E5E7EB; padding-bottom: 8px; font-size: 16px; color: #111827;">
@@ -61,6 +63,7 @@
           <input type="password" v-model="formData.confirm_password" placeholder="กรอกรหัสผ่านใหม่อีกครั้ง" />
         </div>
 
+        </template>
         <div class="modal-actions full-width" style="margin-top: 24px; justify-content: center;">
           <button type="submit" class="btn-primary" style="width: 100%; padding: 12px; font-size: 16px;" :disabled="isLoading">
             {{ isLoading ? 'กำลังบันทึก...' : 'บันทึกการเปลี่ยนแปลง' }}

@@ -51,6 +51,9 @@
         <router-link v-if="isAdmin" to="/payment-evidence" class="nav-item">
            <span class="nav-icon">🧾</span><span class="sidebar-text">ตรวจสอบหลักฐานการรับเงิน</span>
         </router-link>
+        <router-link v-if="isAdmin" to="/approval-report" class="nav-item">
+           <span class="nav-icon">📑</span><span class="sidebar-text">หน้างบประกอบการอนุมัติ</span>
+        </router-link>
         <!-- ⭐️ ซ่อน/แสดงเมนูตั้งค่า เฉพาะผู้ที่มี Role = admin เท่านั้น -->
         <div v-if="isAdmin">
           <div class="menu-category">ตั้งค่าระบบ</div>
@@ -180,6 +183,8 @@ const toggleSidebar = () => {
 }
 
 const currentRouteName = computed(() => {
+  if (route.path === '/approval-report') return 'หน้างบประกอบการอนุมัติ'
+  if (route.path === '/payment-evidence') return 'ตรวจสอบหลักฐานการรับเงิน'
   if (route.path === '/dashboard') return 'ภาพรวมระบบ'
   if (route.path === '/profile') return 'โปรไฟล์ผู้ใช้งาน'
   if (route.path === '/manage-somtop') return 'จัดการข้อมูล พ.สมทบ'
@@ -210,7 +215,8 @@ const goToProfile = () => {
 
 // ⭐️ ฟังก์ชันออกจากระบบแบบมียืนยัน
 const handleLogout = async () => {
-  const result = await swalConfirm('ยืนยันการออกจากระบบ', 'คุณแน่ใจหรือไม่ว่าต้องการออกจากระบบ?');
+  const result = await swalConfirm('ยืนยันการออกจากระบบ', currentUser.value?.auth_provider === 'auth-hub'
+    ? 'ออกจาก Somtop และทุกแอปในเซสชัน Auth-Hub นี้?' : 'คุณแน่ใจหรือไม่ว่าต้องการออกจากระบบ?');
     
   if (result.isConfirmed) {
     try {
@@ -225,9 +231,8 @@ const handleLogout = async () => {
       
     } catch (error) {
       console.error("เกิดข้อผิดพลาดในการออกจากระบบ:", error)
-      // แม้ API จะพัง ก็ควรบังคับลบ user และเด้งออกอยู่ดี
-      clearSession()
-      router.push('/')
+      swal.fire({ icon: 'error', title: 'ออกจากระบบไม่สำเร็จ',
+        text: error.response?.data?.message || 'กรุณาลองใหม่อีกครั้ง', confirmButtonText: 'ตกลง' })
     }
   }
 }

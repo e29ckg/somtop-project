@@ -1,19 +1,40 @@
 # ⚖️ โปรแกรมบริหารจัดการ พ.สมทบ (Somtop Management System)
 
-ระบบสารสนเทศสำหรับบริหารจัดการข้อมูลพื้นฐาน สถิติการปฏิบัติงาน และประวัติการลาของผู้พิพากษาสมทบ[cite: 1] ออกแบบด้วยสถาปัตยกรรมแบบแยกส่วน (Decoupled Architecture) เพื่อความปลอดภัยและประสิทธิภาพสูงสุด[cite: 1]
+ระบบสารสนเทศสำหรับบริหารจัดการข้อมูลผู้พิพากษาสมทบ วาระการทำงาน การลา กิจกรรม เวรปฏิบัติหน้าที่ และเอกสารที่เกี่ยวข้อง
+
+ปรับปรุงคู่มือ: 21 ตุลาคม 2569 (2026-10-21)
+
+## ใช้งานบนเครื่องนี้
+
+เปิด **http://localhost/somtop/** ผ่าน Apache พอร์ต **80** เลือกกรอกชื่อผู้ใช้/รหัสผ่านบัญชี Somtop หรือกด **เข้าสู่ระบบด้วย Auth-Hub** Portal กลางอยู่ที่ **http://localhost/auth/portal** เครื่องนี้เชื่อมบัญชี Hub `admin-local` (ID `1`) กับบัญชี Somtop `admin` และให้ role ระบบ `somtop` เป็น `admin` ใน Hub
+
+| หน้าที่ | โฟลเดอร์บนเครื่องนี้ |
+| --- | --- |
+| แก้โค้ดในแชตนี้ | `C:\Users\PKKJC-IT-519\.codex\worktrees\f40b\somtop-project` |
+| โปรแกรมที่ deploy และ Backend | `C:\project\somtop-project` |
+| หน้าเว็บที่ Apache ให้บริการ | `C:\xampp\htdocs\somtop` |
+| Auth-Hub | `C:\project\Auth-Hub` |
+
+Worktree อาจเปลี่ยนตามงาน การแก้โค้ดหรือ push GitHub ยังไม่เปลี่ยนเว็บจริงจนกว่าจะ deploy ไม่แก้ซอร์ส Vue ใน `htdocs\somtop` เพราะ build ครั้งต่อไปจะเขียนทับ
+
+คู่มือที่เกี่ยวข้อง: [การใช้งานและภาพรวม](PROJECT_DOCUMENTATION.md), [แก้โค้ดและ deploy](DEVELOPMENT.md), [Auth-Hub SSO](AUTH_HUB.md), [XAMPP/PM2](DEPLOY_XAMPP.md), [Backend](BACKEND.md), [Frontend](frontend/README.md), [Design System](DESIGN.md) และ [ประวัติการเปลี่ยนแปลง](CHANGELOG.md)
+
+`localhost` หมายถึงเครื่องที่เปิด browser หากเข้าจากเครื่องอื่นต้องตั้ง hostname/HTTPS และ callback ให้ตรงกัน พอร์ต `8088` เป็น API ภายในเครื่อง ไม่ใช่พอร์ตที่ผู้ใช้เข้าเว็บ
 
 ## 🛠️ เทคโนโลยีที่ใช้งาน (Tech Stack)
-*   **Frontend:** Vue.js 3 (Vite), Vue Router[cite: 1, 3]
-*   **Backend:** Node.js, Express.js[cite: 3, 4]
-*   **Database:** MySQL (เชื่อมต่อผ่าน `mysql2` Connection Pool)[cite: 3, 5]
-*   **Authentication:** JWT (JSON Web Token) ควบคู่กับ HttpOnly Cookie[cite: 1, 3]
+
+*   **Frontend:** Vue.js 3 (Vite), Vue Router
+*   **Backend:** Node.js, Express.js
+*   **Database:** MySQL (เชื่อมต่อผ่าน `mysql2` Connection Pool)
+*   **Authentication:** เลือกได้ทั้งบัญชี Somtop (JWT/HttpOnly cookie) และ Auth-Hub SSO (authorization code + PKCE S256) เมื่อกำหนด AUTH_HUB_URL หากไม่กำหนดจะแสดงเฉพาะบัญชี Somtop
 
 ## ✨ ฟีเจอร์หลัก (Key Features)
-*   **ระบบยืนยันตัวตน:** เข้าสู่ระบบด้วยรหัสผ่านที่เข้ารหัส (Bcrypt) และจัดการเซสชันด้วย JWT อย่างปลอดภัย[cite: 3, 5]
-*   **แดชบอร์ดสถิติ:** แสดงภาพรวมจำนวน พ.สมทบ, สถานะการปฏิบัติหน้าที่, และการแจ้งเตือนล่าสุด[cite: 1]
-*   **จัดการข้อมูล พ.สมทบ:** เพิ่ม ลบ แก้ไข ข้อมูลส่วนตัว พร้อมระบบอัปโหลดรูปโปรไฟล์ (กรองข้อมูลตามศาลที่สังกัดอัตโนมัติ)[cite: 1, 5]
-*   **ระบบประวัติการลา:** บันทึกการลางาน (ลาป่วย, ลากิจ, ฯลฯ) พร้อมแนบไฟล์เอกสาร[cite: 1, 3]
-*   **จัดการข้อมูลหน่วยงานศาล (Admin):** เพิ่ม ลบ แก้ไข ข้อมูลศาลต่างๆ ในระบบ พร้อมระบบค้นหาแบบ Dropdown[cite: 1]
+
+*   **ระบบยืนยันตัวตน:** ทั้งสองวิธีใช้ข้อมูลบัญชีและศาลจาก Somtop ถ้าเลือก Auth-Hub จะตรวจ session กับ Hub ทุก protected API และรองรับ logout กลาง รหัสผ่านบัญชี Somtop จัดการใน Somtop ส่วนรหัสผ่าน/MFA ของ Hub จัดการที่ Hub
+*   **แดชบอร์ดสถิติ:** แสดงภาพรวมจำนวน พ.สมทบ, สถานะการปฏิบัติหน้าที่, และการแจ้งเตือนล่าสุด
+*   **จัดการข้อมูล พ.สมทบ:** เพิ่ม ลบ แก้ไข ข้อมูลส่วนตัว พร้อมระบบอัปโหลดรูปโปรไฟล์ (กรองข้อมูลตามศาลที่สังกัดอัตโนมัติ)
+*   **ระบบประวัติการลา:** บันทึกการลางาน (ลาป่วย, ลากิจ, ฯลฯ) พร้อมแนบไฟล์เอกสาร
+*   **จัดการข้อมูลหน่วยงานศาล (Admin):** เพิ่ม ลบ แก้ไข ข้อมูลศาลต่างๆ ในระบบ พร้อมระบบค้นหาแบบ Dropdown
 
 ## 📁 โครงสร้างโปรเจกต์ (Project Structure)
 ```text
@@ -37,13 +58,12 @@ somtop-project/
 
 2. โคลนโปรเจกต์ และติดตั้งแพ็กเกจทั้งสองฝั่ง:
 ```bash
-npm --prefix backend install
-npm --prefix frontend install
+npm run install:all
 
 ```
 
 
-3. คัดลอกไฟล์ `.env.example` เป็น `.env` และตั้งค่าการเชื่อมต่อฐานข้อมูล
+3. คัดลอกไฟล์ `.env.example` เป็น `.env` เฉพาะเมื่อยังไม่มีไฟล์เดิม ตั้งฐานข้อมูลสำหรับพัฒนา ใช้ `APP_ENV=development`, `APP_URL=http://localhost:5173`, `FRONTEND_URL=http://localhost:5173`, `COOKIE_PATH=/` และ `COOKIE_SECURE=false` ใช้ Node.js `^22.18.0` หรือ `>=24.12.0` ตาม Frontend หากทดสอบ SSO ผ่าน Vite ต้องลงทะเบียน client/callback แยกจากระบบจริงตาม [AUTH_HUB.md](AUTH_HUB.md)
 
 
 4. รันระบบทั้งหมดพร้อมกัน (ผ่าน Concurrently):
@@ -64,7 +84,7 @@ npm run dev
 
 ระบบใช้ฐานข้อมูล MySQL โดยออกแบบให้รองรับการแยกข้อมูลตามศาล (Multi-tenant) และมีการเก็บประวัติการใช้งานอย่างครบถ้วน:
 
-* **`users`**: เก็บข้อมูลผู้ใช้งานระบบ (Admin/Viewer) พร้อมรหัสศาล (`court_code`).
+* **`users`**: เก็บบัญชี Somtop, role `admin`/`view`, รหัสศาล (`court_code`) และ `auth_version` บัญชี Auth-Hub อยู่คนละฐานข้อมูลและจับคู่ด้วย `AUTH_HUB_USER_MAP`.
 
 
 * **`somtop`**: เก็บประวัติ พ.สมทบ โดยแยกฟิลด์คำนำหน้า ชื่อ และสกุล (`title`, `first_name`, `last_name`) เก็บเลขบัตรประชาชนแบบ UNIQUE และมีฟิลด์ `photo_path` สำหรับเก็บที่อยู่ไฟล์รูปภาพ.
@@ -84,9 +104,9 @@ npm run dev
 
 ### 🌐 วิธีการใช้งาน API Endpoints
 
-API ฝั่ง Backend (Node.js/Express) ทำงานผ่าน Base URL `/api` และถูกป้องกันด้วย Middleware `verifyToken` ซึ่งจะอ่าน JWT จาก HttpOnly Cookie อัตโนมัติ ตัวอย่างการทำงานหลักๆ เช่น กลุ่ม `/api/somtop` และ `/api/leaves`:
+API ภายใน Backend ใช้ Base URL `/api` ส่วน browser เรียก `/somtop/api` ผ่าน Apache Middleware `verifyToken` เลือกตรวจ session กับ Auth-Hub หรือ local JWT ตาม configuration แล้วอ่านบัญชีปัจจุบันจากฐานข้อมูล ไม่ใช้ข้อมูล localStorage เป็นหลักฐานยืนยันสิทธิ์ ดู endpoint ของ login ใน [BACKEND.md](BACKEND.md)
 
-* **`GET /api/somtop`**: ใช้ดึงข้อมูล พ.สมทบ ทั้งหมด โดยระบบ Backend จะแอบอ่าน `court_code` จาก Token ของผู้ใช้เพื่อกรองข้อมูลให้ตรงกับศาลนั้นๆ อัตโนมัติ (Frontend ไม่ต้องส่งค่าศาลมา).
+* **`GET /api/somtop`**: ดึงข้อมูลตามสิทธิ์และขอบเขตศาลที่ Backend ตรวจจากบัญชีปัจจุบัน (`req.user`) ไม่เชื่อค่าศาลที่ Frontend อ้างเอง.
 
 
 * **`POST /api/somtop`**: ใช้เพิ่มข้อมูลใหม่ รองรับการอัปโหลดไฟล์รูปภาพผ่าน `multipart/form-data` ด้วยไลบรารี Multer. หากเกิด Error (เช่น เลขบัตรประชาชนซ้ำ) ระบบจะลบไฟล์ขยะที่เพิ่งอัปโหลดทิ้งทันที.
