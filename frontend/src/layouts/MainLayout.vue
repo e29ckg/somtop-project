@@ -51,6 +51,9 @@
         <router-link v-if="isAdmin" to="/payment-evidence" class="nav-item">
            <span class="nav-icon">🧾</span><span class="sidebar-text">ตรวจสอบหลักฐานการรับเงิน</span>
         </router-link>
+        <router-link v-if="isAdmin" to="/approval-report" class="nav-item">
+           <span class="nav-icon">📑</span><span class="sidebar-text">หน้างบประกอบการอนุมัติ</span>
+        </router-link>
         <!-- ⭐️ ซ่อน/แสดงเมนูตั้งค่า เฉพาะผู้ที่มี Role = admin เท่านั้น -->
         <div v-if="isAdmin">
           <div class="menu-category">ตั้งค่าระบบ</div>
@@ -180,6 +183,8 @@ const toggleSidebar = () => {
 }
 
 const currentRouteName = computed(() => {
+  if (route.path === '/approval-report') return 'หน้างบประกอบการอนุมัติ'
+  if (route.path === '/payment-evidence') return 'ตรวจสอบหลักฐานการรับเงิน'
   if (route.path === '/dashboard') return 'ภาพรวมระบบ'
   if (route.path === '/profile') return 'โปรไฟล์ผู้ใช้งาน'
   if (route.path === '/manage-somtop') return 'จัดการข้อมูล พ.สมทบ'

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const dutyController = require('../controllers/dutyController');
+const approvalReportController = require('../controllers/approvalReportController');
 const { verifyToken, verifyAdmin } = require('../middlewares/authMiddleware');
 const uploadDutyOrder = require('../middlewares/uploadDutyOrderMiddleware');
 const asyncHandler = handler => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
@@ -19,6 +20,8 @@ router.get('/orders/:id/print-data', asyncHandler(dutyController.getOrderPrintDa
 router.get('/orders/:id/export-word', asyncHandler(dutyController.exportOrderWord));
 router.get('/orders/:id/export-payment-excel', verifyAdmin, asyncHandler(dutyController.exportPaymentExcel));
 router.get('/payment-excel', verifyAdmin, asyncHandler(dutyController.exportPaymentExcel));
+router.get('/approval-report', verifyAdmin, asyncHandler(approvalReportController.preview));
+router.get('/approval-report/excel', verifyAdmin, asyncHandler(approvalReportController.exportExcel));
 router.get('/orders/:id/signed-pdf', asyncHandler(dutyController.downloadSignedOrderPdf));
 router.post('/orders', verifyAdmin, asyncHandler(dutyController.createOrder));
 router.put('/orders/:id', verifyAdmin, asyncHandler(dutyController.updateOrder));
