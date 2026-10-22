@@ -109,7 +109,9 @@ test('approval report matches payment totals and exports the reference layout', 
         assert.equal(sheet.getCell('F7').value,3750);
         assert.equal(sheet.getCell('H7').value,3750);
         assert.equal(sheet.getCell('F7').border.bottom.style,'double');
-        assert.equal(sheet.pageSetup.orientation,'landscape');
+        assert.equal(sheet.pageSetup.orientation,'portrait');
+        assert.equal(sheet.pageSetup.paperSize,9);
+        assert.equal(sheet.pageSetup.fitToWidth,1);
         assert.equal(sheet.pageSetup.printTitlesRow,'1:4');
     });
     await t.test('untrusted text remains literal text in Excel', async () => {
