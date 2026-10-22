@@ -107,7 +107,7 @@ function buildWorkbook(report) {
     sheet.mergeCells(totalRow, 9, totalRow, 10);
     sheet.getRow(totalRow).height = 30;
     sheet.eachRow((row, rowNumber) => {
-        row.font = { name: 'TH Sarabun New', size: 16, color: { argb: 'FF112E51' } };
+        row.font = { name: 'TH Sarabun New', size: 16, bold: rowNumber <= 4, color: { argb: 'FF112E51' } };
         row.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
         if (rowNumber > 4 && rowNumber < totalRow) {
             row.height = 30;

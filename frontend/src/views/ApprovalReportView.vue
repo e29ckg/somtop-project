@@ -208,10 +208,10 @@ const printReport = async () => {
     const style = popup.document.createElement('style')
     style.textContent = `@page { size: A4 landscape; margin: 8mm 6mm; }
       body { margin: 0; color: #112e51; font: 14px 'TH Sarabun New', 'Sarabun', Tahoma, sans-serif; }
-      .approval-heading { text-align: center; line-height: 1.5; padding: 4px 0 10px; font-size: 16px; }
+      .approval-heading { text-align: center; line-height: 1.5; padding: 4px 0 10px; font-size: 16px; font-weight: 700; }
       table { width: 100%; border-collapse: collapse; table-layout: fixed; }
       th, td { border: 1px solid #d6dce4; padding: 6px 5px; vertical-align: middle; overflow-wrap: anywhere; }
-      th { font-weight: normal; text-align: center; border-bottom: 2px solid #222; }
+      th { font-weight: 700; text-align: center; border-bottom: 2px solid #222; }
       td { text-align: center; } .text-left { text-align: left; } .amount { text-align: right; white-space: nowrap; }
       .total-label { text-align: right; } .total-amount { border-bottom: 3px double #31558a; }
       tr { break-inside: avoid; } thead { display: table-header-group; } tfoot { display: table-row-group; }`
@@ -249,10 +249,10 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .notice { padding: 12px 16px; border-radius: 8px; background: #fffbeb; color: #92400e; font-size: 14px; }
 .preview-html { overflow-x: auto; padding: 24px; border: 1px solid #e5e7eb; border-radius: 8px; background: white; }
 .approval-document { min-width: 1100px; color: #112e51; font-family: 'TH Sarabun New', 'Sarabun', Tahoma, sans-serif; font-size: 16px; }
-.approval-heading { text-align: center; line-height: 1.5; padding: 4px 0 10px; }
+.approval-heading { text-align: center; line-height: 1.5; padding: 4px 0 10px; font-weight: 700; }
 .approval-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .approval-table th, .approval-table td { border: 1px solid #d6dce4; padding: 8px 6px; vertical-align: middle; overflow-wrap: anywhere; }
-.approval-table th { text-align: center; border-bottom: 2px solid #222; font-weight: normal; background: white; }
+.approval-table th { text-align: center; border-bottom: 2px solid #222; font-weight: 700; background: white; }
 .approval-table td { text-align: center; }
 .approval-table .text-left { text-align: left; }
 .approval-table .amount { text-align: right; white-space: nowrap; }
