@@ -36,9 +36,11 @@ test('approval report matches payment totals and exports the reference layout', 
             'ตามบันทึกศาลเยาวชนและครอบครัวจังหวัดประจวบคีรีขันธ์ ลงวันที่ 22 ตุลาคม 2569 (เวรเดือนสิงหาคม 2569)'
         ];
         assert.deepEqual([cover.title, cover.account_line, cover.memo_line], expected);
+        assert.equal(cover.rows[0].item, 'ค่าตอบแทนผู้พิพากษาสมทบ');
         const workbook = new ExcelJS.Workbook();
         await workbook.xlsx.load(await buildWorkbook(cover).xlsx.writeBuffer());
         assert.deepEqual([1,2,3].map(row => workbook.worksheets[0].getCell(row, 1).value), expected);
+        assert.equal(workbook.worksheets[0].getCell('E5').value, 'ค่าตอบแทนผู้พิพากษาสมทบ');
         const otherCourt = await loadReport(user, base);
         assert.ok(!otherCourt.account_line.includes('133-2-29018-1'));
     });

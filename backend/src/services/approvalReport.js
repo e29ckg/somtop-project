@@ -33,7 +33,7 @@ function options(query, courtCode) {
         budgetName: text(query.budget_name, 'งบดำเนินการ', 100),
         savingsAccount: text(query.savings_account ?? (courtCode === 'pkkjc' ? '133-2-29018-1' : ''), '', 50),
         currentAccount: text(query.current_account ?? (courtCode === 'pkkjc' ? '133-1-02413-5' : ''), '', 50),
-        item: text(query.item, 'เงินค่าป่วยการและค่าตอบแทนผู้พิพากษาสมทบ (นั่งเวร)') };
+        item: text(query.item, 'ค่าตอบแทนผู้พิพากษาสมทบ') };
 }
 
 async function loadReport(user, query) {

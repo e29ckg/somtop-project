@@ -127,7 +127,7 @@ const form = ref({ title: 'หน้างบประกอบการอน�
   budgetName: 'งบดำเนินการ', memoDate: today,
   savingsAccount: currentUser.value?.court_code === 'pkkjc' ? '133-2-29018-1' : '',
   currentAccount: currentUser.value?.court_code === 'pkkjc' ? '133-1-02413-5' : '',
-  item: 'เงินค่าป่วยการและค่าตอบแทนผู้พิพากษาสมทบ (นั่งเวร)', rate: '1250', withholdingTax: false })
+  item: 'ค่าตอบแทนผู้พิพากษาสมทบ', rate: '1250', withholdingTax: false })
 const busy = computed(() => loading.value || preparing.value || refreshing.value || exporting.value)
 const hasSchedules = computed(() => schedules.value.some(row => !orderId.value || String(row.order_id) === orderId.value))
 const params = () => ({ month: month.value, order_id: orderId.value, title: form.value.title,
